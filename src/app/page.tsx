@@ -1,69 +1,100 @@
-import Image from "next/image";
+import Link from 'next/link'
+import { Sparkles, Shield, Scroll, Users, Play } from 'lucide-react'
 
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-black">
+      {/* Top Header */}
+      <header className="border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Shield className="w-6 h-6 text-amber-500" />
+            <span className="font-bold tracking-tight text-lg text-white">D&D Playground</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/login"
+              className="text-xs font-medium text-zinc-400 hover:text-white transition"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Sign In
+            </Link>
+            <Link
+              href="/hub"
+              className="text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Enter Hub
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </header>
+
+      {/* Hero Section */}
+      <main className="max-w-4xl mx-auto px-6 py-20 text-center space-y-8 flex-1 flex flex-col justify-center items-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 text-xs font-mono">
+          <Sparkles className="w-3.5 h-3.5" /> AI-Orchestrated Tabletop Engine
+        </div>
+
+        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
+          Synchronized tabletop roleplay, <br className="hidden sm:inline" />
+          governed by an intelligent DM.
+        </h1>
+
+        <p className="text-zinc-400 text-sm sm:text-base max-w-2xl leading-relaxed">
+          Draft hidden actions in synchronized turns, trigger custom lorebooks on the fly, 
+          and let the AI Dungeon Master weave your party's destiny into a living chronicle.
+        </p>
+
+        {/* Primary CTAs specified in Project Overview */}
+        <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full sm:w-auto">
+          <Link
+            href="/hub"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition shadow-lg shadow-amber-600/20"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Scroll className="w-4 h-4" /> Text Campaign
+          </Link>
+
+          <button
+            disabled
+            title="Grid-Box Walking Mode coming in future releases"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 font-semibold text-sm cursor-not-allowed"
           >
-            Documentation
-          </a>
+            <Play className="w-4 h-4" /> Live Campaign (Grid Mode)
+            <span className="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono">Soon</span>
+          </button>
+        </div>
+
+        {/* Quick Feature Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-12 text-left w-full">
+          <div className="p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 space-y-2">
+            <Users className="w-5 h-5 text-amber-500" />
+            <h3 className="font-semibold text-white text-sm">Gartic Phone Loop</h3>
+            <p className="text-xs text-zinc-400 leading-normal">
+              Secret drafting phases with simultaneous reveals prevent meta-gaming and ensure spontaneous chaos.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 space-y-2">
+            <Scroll className="w-5 h-5 text-amber-500" />
+            <h3 className="font-semibold text-white text-sm">Dynamic Lorebooks</h3>
+            <p className="text-xs text-zinc-400 leading-normal">
+              Inject world knowledge only when keywords or narrative hooks match, saving context tokens.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 space-y-2">
+            <Shield className="w-5 h-5 text-amber-500" />
+            <h3 className="font-semibold text-white text-sm">Host Intervention</h3>
+            <p className="text-xs text-zinc-400 leading-normal">
+              Head Table hosts can fine-tune narrative text in real time to maintain campaign consistency.
+            </p>
+          </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-900 py-6 text-center text-xs text-zinc-600">
+        D&D Playground &copy; {new Date().getFullYear()} &mdash; Pure text tabletop RPG engine.
+      </footer>
     </div>
-  );
+  )
 }
