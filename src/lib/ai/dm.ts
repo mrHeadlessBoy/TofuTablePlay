@@ -59,7 +59,7 @@ ${actionsSummary || 'The party surveys their surroundings.'}
 
 DIRECTIVES:
 1. ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่อง ห้ามรีเซ็ตหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
-2. บรรยายผลลัพธ์ อุปสรรค และบรรยากาศ (ความยาว 2-3 ย่อหน้า)
+2. บรรยายผลลัพธ์ อุปสรรค และบรรยากาศ
 3. ตอนท้ายต้องมีสรุปสถานะปัจจุบันและข้อกำหนดการทอยเต๋าตามรูปแบบด้านล่างอย่างเคร่งครัด
 
 รูปแบบการตอบ (FORMAT):
@@ -76,7 +76,7 @@ DIRECTIVES:
 `
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash-lite',
+    model: 'gemini-3.6-flash',
     contents: prompt,
   })
 
