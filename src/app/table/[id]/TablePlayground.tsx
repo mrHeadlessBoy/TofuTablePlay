@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -28,8 +29,14 @@ import {
   ArrowLeft,
   RotateCcw,
   Save,
+  Dices,
 } from 'lucide-react'
 import Link from 'next/link'
+import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
+import type { DiceActor } from '@/components/dice/DiceRoller'
+
+// The dice tray draws a 3D die with three.js, so it is only downloaded when a player opens it
+const DiceRoller = dynamic(() => import('@/components/dice/DiceRoller'), { ssr: false })
 
 type Character = {
   id: string
@@ -102,6 +109,7 @@ export default function TablePlayground({
   const [turns, setTurns] = useState(initialTurns)
   const [draftAction, setDraftAction] = useState('')
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
+  const [diceOpen, setDiceOpen] = useState(false)
 
   // A new turn starts with an empty draft for every player, not only the host who resolved it
   const [draftTurn, setDraftTurn] = useState(initialTable.current_turn)
@@ -134,6 +142,30 @@ export default function TablePlayground({
   // Derive the active member and character dynamically from live members state
   const activeMember = members.find((m) => m.user_id === userId) || currentMember
   const activeChar = activeMember?.characters
+
+  // The draft is locked once the player is ready, so the dice tray is locked with it
+  const draftLocked = Boolean(activeMember?.is_ready) || table.turn_phase === 'countdown' || isResolving
+
+  // Let the player roll as their own character, with that sheet's ability bonuses
+  const diceActors: DiceActor[] = activeChar
+    ? [
+        {
+          id: activeChar.id,
+          name: activeChar.name,
+          modifiers: Object.fromEntries(
+            Object.entries(activeChar.stats || {}).map(([key, value]) => [key, abilityModifier(value)])
+          ),
+        },
+      ]
+    : []
+
+  // Write the roll into the draft so the Dungeon Master reads the number when the turn resolves
+  const handleDiceRoll = (roll: DiceRoll) => {
+    if (draftLocked) return
+    const result = describeRoll(roll)
+    const text = result.startsWith(roll.label) ? `[ทอยเต๋า ${result}]` : `[ทอยเต๋า ${roll.label}: ${result}]`
+    setDraftAction((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+  }
 
   const handleOpenEdit = () => {
     if (activeChar) {
@@ -740,6 +772,35 @@ export default function TablePlayground({
                 }}
                 className="flex-1 bg-zinc-950 border border-zinc-750 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-amber-500 outline-none disabled:opacity-50"
               />
+              {/* Dice tray: opens above the input, and every roll is added to the draft */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDiceOpen((open) => !open)}
+                  disabled={draftLocked}
+                  aria-label="Dice tray"
+                  aria-expanded={diceOpen}
+                  title="ทอยเต๋า"
+                  className={`h-full px-3 rounded-lg border transition disabled:opacity-50 ${
+                    diceOpen && !draftLocked
+                      ? 'border-amber-500 bg-amber-950/40 text-amber-400'
+                      : 'border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400'
+                  }`}
+                >
+                  <Dices className="w-4 h-4" />
+                </button>
+                {diceOpen && !draftLocked && (
+                  <div className="absolute bottom-full right-0 z-30 mb-3 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-xl">
+                    <DiceRoller
+                      actors={diceActors}
+                      onRoll={handleDiceRoll}
+                      onClose={() => setDiceOpen(false)}
+                      hint="เลือกลูกเต๋าแล้วกด ROLL ผลทอยจะถูกใส่ในช่อง action ให้"
+                      className="bg-zinc-950"
+                    />
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={handleReadyToggle}
