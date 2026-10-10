@@ -26,7 +26,13 @@ async function HubData() {
     return table ? [table] : []
   })
 
-  return <HubClient publicCampaigns={publicCampaigns || []} activeTables={activeTables} />
+  return (
+    <HubClient
+      publicCampaigns={publicCampaigns || []}
+      activeTables={activeTables}
+      currentUserId={user?.id ?? null}
+    />
+  )
 }
 
 export default function CampaignHubPage() {

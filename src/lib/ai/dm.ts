@@ -21,12 +21,11 @@ export async function generateDmNarrative(input: DmTurnInput) {
 
   // Consolidate recent context for the lore scanner
   const actionsSummary = partyActions.map((a) => `${a.characterName}: ${a.action}`).join('\n')
-  const recentHistory = recentTurns.map((t) => t.narrative_output).slice(-2).join('\n')
+  const recentHistory = recentTurns.slice(-4).map(t => `Turn ${t.turn_number}:\n${t.narrative_output}`).join('\n\n')
   const scanTargetText = `${recentHistory}\n${actionsSummary}`
 
   // Pull relevant lore entries dynamically
   const triggeredLore = extractTriggeredLore(loreEntries, scanTargetText, true)
-
   const loreContext = triggeredLore
     .map((l) => `[LORE: ${l.title} (${l.category})] - ${l.content}`)
     .join('\n')
@@ -52,16 +51,26 @@ ${recentTurns.length > 0 ? recentTurns.map(t => `Turn ${t.turn_number}:${t.narra
 SUBMITTED PARTY ACTIONS FOR THIS TURN (การกระทำของปาร์ตี้ในเทิร์นนี้):
 ${actionsSummary || 'The party surveys their surroundings.'}
 
-DIRECTIVES (คำสั่งการทำงาน):
-1.ร้อยเรียงการกระทำของสมาชิกทุกคนในปาร์ตี้เข้าด้วยกันอย่างกลมกลืน ให้เป็นการดำเนินเรื่องในฉากเดียวกันที่เห็นภาพชัดเจน
-2.ตัดสินผลลัพธ์ทั้งความสำเร็จ ความตึงเครียด อุปสรรค หรือผลสืบเนื่อง โดยอิงตามกฎของแคมเปญและ Lore ที่ระบุไว้
-3.ควบคุมโทนของเรื่องให้ตรงตามแนว (genre) สรุปปิดท้ายการบรรยายด้วยการฉายภาพสถานการณ์ปัจจุบัน พร้อมกระตุ้นให้ปาร์ตี้เลือกการกระทำถัดไป
-4.แสดงผลลัพธ์เฉพาะเนื้อหาบรรยายเรื่องราวเท่านั้น ความยาว 2-4 ย่อหน้าที่ชวนดื่มด่ำกับบรรยากาศ (ห้ามมีข้อความอื่นนอกเหนือจากนี้)
-5.มีการทอยลูกเต๋าโดยให้กำหนดเพลเยอร์ที่จะต้องทอยลูกเต๋าในท้ายการตอบข้อความและบอก condition / require stat พร้อม mod จาก character sheet ของ ${actionsSummary}
+DIRECTIVES:
+1. ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่อง ห้ามรีเซ็ตหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
+2. บรรยายผลลัพธ์ อุปสรรค และบรรยากาศ (ความยาว 2-3 ย่อหน้า)
+3. ตอนท้ายต้องมีสรุปสถานะปัจจุบันและข้อกำหนดการทอยเต๋าตามรูปแบบด้านล่างอย่างเคร่งครัด
+
+รูปแบบการตอบ (FORMAT):
+[NARRATIVE]
+(เนื้อหาบรรยายเรื่องราวการกระทำและผลลัพธ์ของเทิร์นนี้)
+
+[CURRENT STATE & SUMMARY]
+- พิกัด/สถานที่ปัจจุบัน: (ระบุที่อยู่ปัจจุบันของปาร์ตี้)
+- ภัยคุกคาม/สถานการณ์ขณะนี้: (สรุป 1-2 ประโยคว่ากำลังเผชิญหน้ากับอะไร)
+- เป้าหมายระยะสั้น: (ปาร์ตี้ต้องทำอะไรต่อไป)
+
+[ACTION / DICE REQUIREMENT]
+*ชื่อตัวละคร*: [ทอยเต๋า: d20 + Mod] เพื่อ... (Condition: ความสำเร็จ/ล้มเหลว)
 `
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash-lite',
+    model: 'gemini-3.6-lite',
     contents: prompt,
   })
 

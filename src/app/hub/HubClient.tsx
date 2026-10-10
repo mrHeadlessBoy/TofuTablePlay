@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { launchTable, joinTableByCode } from './actions'
-import { Play, LogIn, Compass } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { launchTable, joinTableByCode, deleteTable, deleteCampaign } from './actions'
+import { Play, LogIn, Compass, Trash2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 type PublicCampaign = {
@@ -10,6 +11,7 @@ type PublicCampaign = {
   category: string
   title: string
   core_description: string
+  creator_id?: string | null
 }
 
 type ActiveTable = {
@@ -17,12 +19,48 @@ type ActiveTable = {
   table_code: string
   current_turn: number | string
   turn_phase: string
+  head_table_id?: string | null
   campaigns?: { title?: string } | null
 }
 
-export default function HubClient({ publicCampaigns, activeTables }: { publicCampaigns: PublicCampaign[]; activeTables: ActiveTable[] }) {
+type HubClientProps = {
+  publicCampaigns: PublicCampaign[]
+  activeTables: ActiveTable[]
+  currentUserId: string | null
+}
+
+export default function HubClient({ publicCampaigns, activeTables, currentUserId }: HubClientProps) {
+  const router = useRouter()
   const [tableCode, setTableCode] = useState('')
   const [joining, setJoining] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDeleteTable = async (tbl: ActiveTable) => {
+    const name = tbl.campaigns?.title ?? tbl.table_code
+    if (!confirm(`Delete table "${name}" (${tbl.table_code})? All turns and members will be removed. This cannot be undone.`)) return
+    setDeletingId(`table:${tbl.id}`)
+    try {
+      await deleteTable(String(tbl.id))
+      router.refresh()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete table.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const handleDeleteCampaign = async (camp: PublicCampaign) => {
+    if (!confirm(`Delete campaign "${camp.title}"? Its lorebook and every table running it will be removed. This cannot be undone.`)) return
+    setDeletingId(`campaign:${camp.id}`)
+    try {
+      await deleteCampaign(String(camp.id))
+      router.refresh()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete campaign.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const handleJoin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -83,6 +121,21 @@ export default function HubClient({ publicCampaigns, activeTables }: { publicCam
                 >
                   <Play className="w-3.5 h-3.5" /> Re-enter Table
                 </Link>
+                {currentUserId && tbl.head_table_id === currentUserId && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTable(tbl)}
+                    disabled={deletingId !== null}
+                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition disabled:opacity-50"
+                  >
+                    {deletingId === `table:${tbl.id}` ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    Delete Table
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -110,6 +163,21 @@ export default function HubClient({ publicCampaigns, activeTables }: { publicCam
                   <Play className="w-3.5 h-3.5" /> Launch as Head Table
                 </button>
               </form>
+              {currentUserId && camp.creator_id === currentUserId && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCampaign(camp)}
+                  disabled={deletingId !== null}
+                  className="mt-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {deletingId === `campaign:${camp.id}` ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  Delete Campaign
+                </button>
+              )}
             </div>
           ))}
         </div>
