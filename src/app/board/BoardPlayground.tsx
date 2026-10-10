@@ -5,10 +5,9 @@ import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, Clock, Dices, Loader2, Minus, Plus, RotateCcw, ScrollText, TriangleAlert, X } from 'lucide-react'
 import BoardScene, { type BoardSceneHandle, type SceneInsets } from './BoardScene'
 import DialogueBox from './DialogueBox'
-import DicePanel, { type RollOrder } from './DicePanel'
 import StoryLog from './StoryLog'
 import { GLASS, LABEL, PartyRoster, RollRequests, SceneCard, ThreatList, TokenInspector, type PlacingDraft } from './BoardPanels'
-import { abilityModifier, describeRoll, rollDice } from '@/lib/board/dice'
+import { DiceRoller, abilityModifier, describeRoll, rollDice, type DiceActor, type DiceRoll } from '@/components/dice'
 import { FEET_PER_TILE, MAP_THEMES, findFreeTiles, generateMap, reachableTiles, tileAt, tileIndex } from '@/lib/board/maps'
 import {
   appendLog,
@@ -25,7 +24,7 @@ import {
   type CodexCharacter,
 } from '@/lib/board/session'
 import { applyDmResult, buildDmInput } from '@/lib/board/turn'
-import type { AbilityKey, DiceRoll, MapTheme, NarrateAction, Point, RollRequest, Token } from '@/lib/board/types'
+import { ABILITY_KEYS, type AbilityKey, type MapTheme, type NarrateAction, type Point, type RollRequest, type Token } from '@/lib/board/types'
 
 type BoardPlaygroundProps = {
   userId: string
@@ -77,6 +76,17 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
   const reachable = useMemo(
     () => (selected && !locked && !placing ? reachableTiles(map, tokens, selected, remainingFeet) : NO_REACH),
     [map, tokens, selected, remainingFeet, locked, placing]
+  )
+
+  // Heroes as the dice tray sees them: a name plus the ability bonuses they can roll with.
+  const diceActors = useMemo<DiceActor[]>(
+    () =>
+      heroes.map((hero) => ({
+        id: hero.id,
+        name: hero.name,
+        modifiers: Object.fromEntries(ABILITY_KEYS.map((key) => [key, abilityModifier(hero.stats[key])])),
+      })),
+    [heroes]
   )
 
   const benched = useMemo(() => {
@@ -262,8 +272,8 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
 
   // ---------- dice ----------
 
-  const performRoll = (order: RollOrder, context = '') => {
-    const roll = rollDice(order)
+  /** Every roll at the table ends up here: show it in the tray, log it, and queue it for the DM. */
+  const recordRoll = (roll: DiceRoll, context = '') => {
     const who = roll.roller || 'Party'
     const what = context ? `${roll.label} · ${context}` : roll.label
     setActiveRoll(roll)
@@ -282,31 +292,23 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
 
   const answerRequest = (request: RollRequest) => {
     const hero = heroes.find((entry) => entry.name === request.character)
-    performRoll(
-      {
+    recordRoll(
+      rollDice({
         sides: 20,
-        count: 1,
         modifier: abilityModifier(hero?.stats[request.ability]),
-        mode: 'normal',
         roller: request.character,
         label: `${request.ability} check`,
         dc: request.dc,
-      },
+      }),
       request.reason
     )
     dismissRequest(request)
   }
 
   const quickCheck = (token: Token, ability: AbilityKey) => {
-    performRoll({
-      sides: 20,
-      count: 1,
-      modifier: abilityModifier(token.stats[ability]),
-      mode: 'normal',
-      roller: token.name,
-      label: `${ability} check`,
-      dc: null,
-    })
+    recordRoll(
+      rollDice({ sides: 20, modifier: abilityModifier(token.stats[ability]), roller: token.name, label: `${ability} check` })
+    )
   }
 
   // Esc leaves placing mode, then closes panels.
@@ -583,7 +585,14 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
         {/* Bottom right: dice */}
         <div className="pointer-events-auto absolute bottom-[15.5rem] right-3 flex flex-col items-end gap-2 lg:bottom-3">
           {diceOpen && (
-            <DicePanel heroes={heroes} activeRoll={activeRoll} history={rollHistory} onRoll={(order) => performRoll(order)} onClose={() => setDiceOpen(false)} />
+            <DiceRoller
+              actors={diceActors}
+              roll={activeRoll}
+              history={rollHistory}
+              onRoll={(roll) => recordRoll(roll)}
+              onClose={() => setDiceOpen(false)}
+              hint="เลือกลูกเต๋าแล้วกด ROLL ผลทอยจะถูกเก็บลง Log และส่งให้ DM ในเทิร์นถัดไป"
+            />
           )}
           <button
             type="button"

@@ -1,6 +1,6 @@
 import { findFreeTiles } from './maps'
 import { appendLog, logEntry, makeToken, uniqueName, type BoardSession } from './session'
-import { newId } from './dice'
+import { newId } from './utils'
 import type { BoardMap, DmTurnInput, DmTurnResult, LogEntry, RollRequest, Token } from './types'
 
 const HISTORY_TURNS = 4

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { Dices, Footprints, Heart, MapPin, Minus, PenLine, Plus, Shield, Skull, Trash2, UserPlus, Users, X } from 'lucide-react'
-import { abilityModifier, formatModifier } from '@/lib/board/dice'
+import { abilityModifier, formatModifier } from '@/components/dice/dice'
 import type { CodexCharacter } from '@/lib/board/session'
 import { ABILITY_KEYS, type AbilityKey, type RollRequest, type SceneSummary, type Token } from '@/lib/board/types'
 

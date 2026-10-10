@@ -57,30 +57,6 @@ export type Token = {
   characterId?: string
 }
 
-export type DieSides = 4 | 6 | 8 | 10 | 12 | 20 | 100
-export type RollMode = 'normal' | 'advantage' | 'disadvantage'
-
-export type DiceRoll = {
-  id: string
-  /** Who rolled. Empty when it is a free roll from the dice tray. */
-  roller: string
-  label: string
-  sides: DieSides
-  count: number
-  modifier: number
-  mode: RollMode
-  /** Dice that count toward the total. */
-  kept: number[]
-  /** The d20 that advantage / disadvantage threw away. */
-  dropped: number | null
-  total: number
-  dc: number | null
-  /** null when the roll had no DC. */
-  success: boolean | null
-  critical: 'hit' | 'fail' | null
-  at: number
-}
-
 export type RollRequest = {
   id: string
   character: string

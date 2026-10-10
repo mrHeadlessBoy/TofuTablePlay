@@ -1,13 +1,48 @@
-import type { AbilityKey, DiceRoll, DieSides, RollMode, Stats } from './types'
+// Dice rules and maths for the shared dice tray.
+// No React in this file, so pages, components and server code can all import it.
+
+export type DieSides = 4 | 6 | 8 | 10 | 12 | 20 | 100
+export type RollMode = 'normal' | 'advantage' | 'disadvantage'
 
 export const DIE_SIDES: DieSides[] = [4, 6, 8, 10, 12, 20, 100]
 
-export function newId(prefix: string): string {
+export type DiceRoll = {
+  id: string
+  /** Who rolled. Empty when it is a free roll. */
+  roller: string
+  label: string
+  sides: DieSides
+  count: number
+  modifier: number
+  mode: RollMode
+  /** Dice that count toward the total. */
+  kept: number[]
+  /** The d20 that advantage / disadvantage threw away. */
+  dropped: number | null
+  total: number
+  dc: number | null
+  /** null when the roll had no DC. */
+  success: boolean | null
+  critical: 'hit' | 'fail' | null
+  at: number
+}
+
+export type RollOptions = {
+  sides: DieSides
+  count?: number
+  modifier?: number
+  mode?: RollMode
+  roller?: string
+  label?: string
+  dc?: number | null
+}
+
+function rollId(): string {
   const random =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID().slice(0, 8)
       : Math.random().toString(36).slice(2, 10)
-  return `${prefix}_${random}`
+  return `roll_${random}`
 }
 
 /** Uniform integer in 1..sides. Uses the crypto RNG so there is no modulo bias. */
@@ -34,24 +69,6 @@ export function abilityModifier(score: number | string | undefined): number {
 
 export function formatModifier(modifier: number): string {
   return modifier >= 0 ? `+${modifier}` : `${modifier}`
-}
-
-export function normaliseStats(stats: Partial<Record<string, number | string>> | null | undefined): Stats {
-  const read = (key: AbilityKey) => {
-    const value = Number(stats?.[key])
-    return Number.isFinite(value) ? value : 10
-  }
-  return { STR: read('STR'), DEX: read('DEX'), CON: read('CON'), INT: read('INT'), WIS: read('WIS'), CHA: read('CHA') }
-}
-
-type RollOptions = {
-  sides: DieSides
-  count?: number
-  modifier?: number
-  mode?: RollMode
-  roller?: string
-  label?: string
-  dc?: number | null
 }
 
 export function rollDice(options: RollOptions): DiceRoll {
@@ -83,7 +100,7 @@ export function rollDice(options: RollOptions): DiceRoll {
   }
 
   return {
-    id: newId('roll'),
+    id: rollId(),
     roller,
     label: options.label ?? `${count}d${sides}`,
     sides,

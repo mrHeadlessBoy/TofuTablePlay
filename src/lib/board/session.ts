@@ -1,4 +1,4 @@
-import { newId, normaliseStats } from './dice'
+import { newId, normaliseStats } from './utils'
 import { findFreeTiles, generateMap } from './maps'
 import type {
   BoardMap,
