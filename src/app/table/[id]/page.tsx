@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import TablePlayground from './TablePlayground'
+import { getTableMembers } from './actions'
 
 export default function TablePage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -35,14 +36,7 @@ async function TableContent({ params }: { params: Promise<{ id: string }> }) {
 
   if (!table) notFound()
 
-  // Fetch Members & linked characters
-  const { data: members } = await supabase
-    .from('table_members')
-    .select(`
-      *,
-      characters (*)
-    `)
-    .eq('table_id', id)
+  const members = await getTableMembers(id)
 
   // Fetch User's Characters
   const { data: userCharacters } = await supabase
@@ -63,13 +57,13 @@ async function TableContent({ params }: { params: Promise<{ id: string }> }) {
     .select('*')
     .eq('campaign_id', table.campaign_id)
 
-  const currentMember = members?.find((m) => m.user_id === user.id)
+  const currentMember = members.find((m) => m.user_id === user.id)
   const isHeadTable = table.head_table_id === user.id
 
   return (
     <TablePlayground
       initialTable={table}
-      initialMembers={members || []}
+      initialMembers={members}
       initialTurns={turns || []}
       lorebook={lorebook || []}
       userCharacters={userCharacters || []}
