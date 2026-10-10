@@ -324,7 +324,7 @@ export default function TablePlayground({
               {/* Inventory */}
               <div>
                 <span className="text-[10px] uppercase font-mono text-zinc-400">Inventory</span>
-                <div className="mt-1 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-300 min-h-[60px] whitespace-pre-line text-[11px]">
+                <div className="mt-1 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-300 min-h-15 whitespace-pre-line text-[11px]">
                   {activeChar.inventory || 'Empty'}
                 </div>
               </div>
