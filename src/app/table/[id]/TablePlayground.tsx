@@ -100,7 +100,14 @@ export default function TablePlayground({
   const [turns, setTurns] = useState(initialTurns)
   const [draftAction, setDraftAction] = useState('')
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
-  
+
+  // A new turn starts with an empty draft for every player, not only the host who resolved it
+  const [draftTurn, setDraftTurn] = useState(initialTable.current_turn)
+  if (table.current_turn !== draftTurn) {
+    setDraftTurn(table.current_turn)
+    setDraftAction('')
+  }
+
   // Host override and AI generation states
   const [isResolving, setIsResolving] = useState(false)
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
@@ -306,10 +313,19 @@ export default function TablePlayground({
       prev.map((m) => (m.user_id === userId ? { ...m, is_ready: nextState } : m))
     )
 
-    if (nextState && draftAction.trim()) {
-      await submitActionDraft(table.id, table.current_turn, draftAction)
+    try {
+      if (nextState && draftAction.trim()) {
+        await submitActionDraft(table.id, table.current_turn, draftAction)
+      }
+      await toggleReadyStatus(table.id, nextState)
+    } catch (err: unknown) {
+      // Roll back so the roster never shows READY for a draft that was not saved
+      setMembers((prev) =>
+        prev.map((m) => (m.user_id === userId ? { ...m, is_ready: !nextState } : m))
+      )
+      alert(err instanceof Error ? err.message : 'Failed to submit your action')
+      return
     }
-    await toggleReadyStatus(table.id, nextState)
     broadcastSync()
   }
 

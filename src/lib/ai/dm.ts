@@ -13,16 +13,28 @@ interface DmTurnInput {
   }
   loreEntries: LoreEntry[]
   recentTurns: { turn_number: number; narrative_output: string }[]
-  partyActions: { characterName: string; classType: string; action: string }[]
+  // One entry per party member (any party size). action is null when that player sent no draft.
+  partyActions: { characterName: string; classType: string; action: string | null }[]
 }
+
+const NO_ACTION_TEXT =
+  '(ไม่ได้ส่งแอ็กชันในเทิร์นนี้ — ตัวละครยังอยู่ในฉาก แต่ห้ามตัดสินใจแทนผู้เล่น)'
 
 export async function generateDmNarrative(input: DmTurnInput) {
   const { campaign, loreEntries, recentTurns, partyActions } = input
 
-  // Consolidate recent context for the lore scanner
-  const actionsSummary = partyActions.map((a) => `${a.characterName}: ${a.action}`).join('\n')
+  // One numbered line per party member, however many are seated, so nobody is dropped from the prompt
+  const actionsSummary = partyActions
+    .map((a, i) => `${i + 1}. ${a.characterName} (${a.classType}): ${a.action || NO_ACTION_TEXT}`)
+    .join('\n')
+
+  // Consolidate recent context for the lore scanner (only what players actually wrote)
+  const submittedText = partyActions
+    .filter((a) => a.action)
+    .map((a) => `${a.characterName}: ${a.action}`)
+    .join('\n')
   const recentHistory = recentTurns.slice(-4).map(t => `Turn ${t.turn_number}:\n${t.narrative_output}`).join('\n\n')
-  const scanTargetText = `${recentHistory}\n${actionsSummary}`
+  const scanTargetText = `${recentHistory}\n${submittedText}`
 
   // Pull relevant lore entries dynamically
   const triggeredLore = extractTriggeredLore(loreEntries, scanTargetText, true)
@@ -54,13 +66,14 @@ ${loreContext || 'No specific lore triggered this turn.'}
 PREVIOUS TURN HISTORY (ประวัติเทิร์นก่อนหน้า - ล่าสุด):
 ${historyText}
 
-SUBMITTED PARTY ACTIONS FOR THIS TURN (การกระทำของปาร์ตี้ในเทิร์นนี้):
+SUBMITTED PARTY ACTIONS FOR THIS TURN (การกระทำของปาร์ตี้ในเทิร์นนี้ — สมาชิก ${partyActions.length} คน):
 ${actionsSummary || 'The party surveys their surroundings.'}
 
 DIRECTIVES:
 1. ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่อง ห้ามรีเซ็ตหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
 2. บรรยายผลลัพธ์ อุปสรรค และบรรยากาศ (ความยาว 2-3 ย่อหน้า)
 3. ตอนท้ายต้องมีสรุปสถานะปัจจุบันและข้อกำหนดการทอยเต๋าตามรูปแบบด้านล่างอย่างเคร่งครัด
+4. ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในรายการข้างต้นให้ครบ ห้ามข้ามหรือรวบตัวละครใด และในส่วน [ACTION / DICE REQUIREMENT] ให้เขียนหนึ่งบรรทัดต่อตัวละครหนึ่งคนที่ส่งแอ็กชันมา
 
 รูปแบบการตอบ (FORMAT):
 [NARRATIVE]

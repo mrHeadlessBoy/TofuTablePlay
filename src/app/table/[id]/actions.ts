@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { generateDmNarrative } from '@/lib/ai/dm'
 
@@ -44,8 +44,11 @@ export async function submitActionDraft(tableId: string, currentTurnNumber: numb
 
   if (!turn) throw new Error('Current turn not found')
 
-  // Record action draft
-  const { error } = await supabase
+  // Record action draft.
+  // member.id above always belongs to the signed-in user, so writing through the service-role
+  // client is safe and makes the save behave the same for every seat (not only the Head Table).
+  const db = createAdminClient() ?? supabase
+  const { error } = await db
     .from('turn_actions')
     .upsert(
       {
@@ -123,6 +126,18 @@ export async function resolveTurn(tableId: string) {
 
   if (tableErr || !table) throw new Error('Table not found')
 
+  // Only someone seated at this table may resolve its turn (the party reads below bypass RLS)
+  const { data: callerSeat } = await supabase
+    .from('table_members')
+    .select('id')
+    .eq('table_id', tableId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!callerSeat && table.head_table_id !== user.id) {
+    throw new Error('Only members of this table can resolve its turn')
+  }
+
   // Atomic Concurrency Lock: Claim resolution lock so multiple simultaneous callers cannot execute resolveTurn twice
   const { data: lockedTable, error: lockErr } = await supabase
     .from('tables')
@@ -139,7 +154,18 @@ export async function resolveTurn(tableId: string) {
   }
 
   try {
-    // 2. Fetch actions drafted for current turn
+    // Drafts are private: with the caller's own session, RLS only returns the caller's
+    // turn_actions row, so the Head Table would resolve the turn with just their own draft.
+    // Read the whole party through the service-role client instead.
+    const admin = createAdminClient()
+    const db = admin ?? supabase
+    if (!admin) {
+      console.warn(
+        '[resolveTurn] SUPABASE_SERVICE_ROLE_KEY is not set — other players\' drafts may be hidden by RLS.'
+      )
+    }
+
+    // 2. Fetch every seat at the table and the drafts submitted for the current turn
     const { data: currentTurnRecord, error: turnRecErr } = await supabase
       .from('turns')
       .select('id, turn_number')
@@ -147,20 +173,45 @@ export async function resolveTurn(tableId: string) {
       .eq('turn_number', table.current_turn)
       .single()
 
-    if (turnRecErr) throw new Error(`Failed to locate turn record: ${turnRecErr.message}`)
+    if (turnRecErr || !currentTurnRecord) {
+      throw new Error(`Failed to locate turn record: ${turnRecErr?.message ?? 'not found'}`)
+    }
 
-    const { data: actions, error: actErr } = await supabase
+    const { data: seats, error: seatsErr } = await db
+      .from('table_members')
+      .select('id, joined_at, characters(*)')
+      .eq('table_id', tableId)
+      .order('joined_at', { ascending: true })
+
+    if (seatsErr) throw new Error(`Failed to fetch party members: ${seatsErr.message}`)
+
+    const { data: actions, error: actErr } = await db
       .from('turn_actions')
-      .select('*, table_members(characters(*))')
-      .eq('turn_id', currentTurnRecord?.id)
+      .select('member_id, action_text')
+      .eq('turn_id', currentTurnRecord.id)
 
     if (actErr) throw new Error(`Failed to fetch player actions: ${actErr.message}`)
 
-    const partyActions = (actions || []).map((act) => ({
-      characterName: act.table_members?.characters?.name || 'Unknown Adventurer',
-      classType: act.table_members?.characters?.class_archetype || 'Wanderer',
-      action: act.action_text,
-    }))
+    const draftByMember = new Map<string, string>()
+    for (const act of actions || []) {
+      const text = (act.action_text || '').trim()
+      if (text) draftByMember.set(act.member_id, text)
+    }
+
+    // One entry per seated player, in join order — the party size is whatever the table holds.
+    // A seat with neither a character nor a draft is a spectator and is left out.
+    const partyActions = (seats || []).flatMap((seat, index) => {
+      const character = Array.isArray(seat.characters) ? seat.characters[0] : seat.characters
+      const action = draftByMember.get(seat.id) ?? null
+      if (!character && !action) return []
+      return [
+        {
+          characterName: character?.name || `Unknown Adventurer ${index + 1}`,
+          classType: character?.class_archetype || 'Wanderer',
+          action,
+        },
+      ]
+    })
 
     // 3. Fetch lorebook entries for dynamic scanning
     const { data: loreEntries, error: loreErr } = await supabase
@@ -199,8 +250,8 @@ export async function resolveTurn(tableId: string) {
 
     if (insertTurnErr) throw new Error(`Failed to persist new turn: ${insertTurnErr.message}`)
 
-    // 7. Reset ready statuses and bump turn counter
-    const { error: resetMembersErr } = await supabase
+    // 7. Reset ready statuses for every seat (not just the caller's) and bump turn counter
+    const { error: resetMembersErr } = await db
       .from('table_members')
       .update({ is_ready: false })
       .eq('table_id', tableId)
