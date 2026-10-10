@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Guard protected routes
-  const protectedPrefixes = ['/characters', '/campaigns', '/table', '/hub']
+  const protectedPrefixes = ['/characters', '/campaigns', '/table', '/hub', '/board']
   const isProtected = protectedPrefixes.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )
