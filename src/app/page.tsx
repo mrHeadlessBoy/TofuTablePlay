@@ -41,7 +41,7 @@ export default function LandingPage() {
 
         <p className="text-zinc-400 text-sm sm:text-base max-w-2xl leading-relaxed">
           Draft hidden actions in synchronized turns, trigger custom lorebooks on the fly, 
-          and let the AI Dungeon Master weave your party's destiny into a living chronicle.
+          and let the AI Dungeon Master weave your party destiny into a living chronicle.
         </p>
 
         {/* Primary CTAs specified in Project Overview */}

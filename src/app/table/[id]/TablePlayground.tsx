@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   toggleReadyStatus,
@@ -13,7 +13,6 @@ import {
 import {
   Shield,
   Heart,
-  Send,
   CheckCircle2,
   Clock,
   Users,
@@ -25,6 +24,59 @@ import {
   UserX,
 } from 'lucide-react'
 
+type Character = {
+  id: string
+  name: string
+  class_archetype?: string
+  current_hp?: number
+  max_hp?: number
+  armor_class?: number
+  status_condition?: string
+  stats?: Record<string, number | string>
+  inventory?: string
+}
+
+type Member = {
+  id: string
+  user_id: string
+  is_ready: boolean
+  characters?: Character | null
+}
+
+type Turn = {
+  id: string
+  turn_number: number
+  narrative_output: string
+  edited_by_host?: boolean
+}
+
+type LorebookEntry = {
+  id: string
+  title: string
+  category?: string
+  content?: string
+}
+
+type TableData = {
+  id: string
+  table_code: string
+  turn_phase?: string
+  countdown_end?: string | null
+  current_turn?: number
+  head_table_id?: string
+}
+
+type TablePlaygroundProps = {
+  initialTable: TableData
+  initialMembers: Member[]
+  initialTurns: Turn[]
+  lorebook: LorebookEntry[]
+  userCharacters: Character[]
+  currentMember?: Member | null
+  userId: string
+  isHeadTable: boolean
+}
+
 export default function TablePlayground({
   initialTable,
   initialMembers,
@@ -34,7 +86,7 @@ export default function TablePlayground({
   currentMember,
   userId,
   isHeadTable,
-}: any) {
+}: TablePlaygroundProps) {
   const [table, setTable] = useState(initialTable)
   const [members, setMembers] = useState(initialMembers)
   const [turns, setTurns] = useState(initialTurns)
@@ -56,7 +108,13 @@ export default function TablePlayground({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tables', filter: `id=eq.${table.id}` },
         (payload) => {
-          setTable(payload.new)
+          const nextTable = payload.new as Partial<TableData> | null
+          if (!nextTable) return
+
+          setTable((currentTable) => ({
+            ...currentTable,
+            ...nextTable,
+          }))
         }
       )
       .on(
@@ -89,54 +147,74 @@ export default function TablePlayground({
     }
   }, [table.id, supabase])
 
+  const handleResolveTurn = useCallback(async () => {
+    setIsResolving(true)
+    try {
+      await resolveTurn(table.id)
+      setDraftAction('')
+    } catch (err: unknown) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Error resolving turn with AI')
+    } finally {
+      setIsResolving(false)
+    }
+  }, [table.id])
+
   // Synchronized countdown timer
   useEffect(() => {
-    if (table.turn_phase === 'countdown' && table.countdown_end) {
-      const interval = setInterval(() => {
-        const remaining = Math.max(
-          0,
-          Math.ceil((new Date(table.countdown_end).getTime() - Date.now()) / 1000)
-        )
-        setCountdownSeconds(remaining)
-        if (remaining <= 0) {
-          clearInterval(interval)
-        }
-      }, 250)
-      return () => clearInterval(interval)
-    } else {
-      setCountdownSeconds(null)
+    if (table.turn_phase !== 'countdown' || !table.countdown_end) {
+      const resetId = window.setTimeout(() => {
+        setCountdownSeconds(null)
+      }, 0)
+      return () => window.clearTimeout(resetId)
     }
+
+    const countdownEnd = new Date(table.countdown_end)
+
+    if (Number.isNaN(countdownEnd.getTime())) {
+      const resetId = window.setTimeout(() => {
+        setCountdownSeconds(null)
+      }, 0)
+      return () => window.clearTimeout(resetId)
+    }
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((countdownEnd.getTime() - Date.now()) / 1000)
+      )
+      setCountdownSeconds(remaining)
+      if (remaining <= 0) {
+        clearInterval(interval)
+      }
+    }, 250)
+    return () => clearInterval(interval)
   }, [table.turn_phase, table.countdown_end])
 
   // Automatic turn resolution once the countdown reaches 0 (invoked by Head Table)
   useEffect(() => {
     if (
-      isHeadTable &&
-      table.turn_phase === 'countdown' &&
-      countdownSeconds === 0 &&
-      !isResolving
+      !isHeadTable ||
+      table.turn_phase !== 'countdown' ||
+      countdownSeconds !== 0 ||
+      isResolving
     ) {
-      handleResolveTurn()
+      return
     }
-  }, [countdownSeconds, isHeadTable, table.turn_phase])
+
+    const timeoutId = window.setTimeout(() => {
+      void handleResolveTurn()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [countdownSeconds, isHeadTable, table.turn_phase, isResolving, handleResolveTurn])
 
   const activeChar = currentMember?.characters
 
-  const handleResolveTurn = async () => {
-    setIsResolving(true)
-    try {
-      await resolveTurn(table.id)
-      setDraftAction('')
-    } catch (err: any) {
-      console.error(err)
-      alert(err.message || 'Error resolving turn with AI')
-    } finally {
-      setIsResolving(false)
-    }
-  }
-
   const handleReadyToggle = async () => {
     if (!currentMember) return
+    if (typeof table.current_turn !== 'number') return
+
     const nextState = !currentMember.is_ready
     if (nextState && draftAction.trim()) {
       await submitActionDraft(table.id, table.current_turn, draftAction)
@@ -181,7 +259,7 @@ export default function TablePlayground({
               <label className="text-xs text-zinc-400 font-medium">
                 Select a character for this session:
               </label>
-              {userCharacters.map((char: any) => (
+              {userCharacters.map((char: Character) => (
                 <button
                   key={char.id}
                   onClick={() => handleSelectCharacter(char.id)}
@@ -265,7 +343,7 @@ export default function TablePlayground({
         {/* Narrative chat area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            {turns.map((turn: any) => (
+            {turns.map((turn: Turn) => (
               <div
                 key={turn.id}
                 className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-5 shadow-lg space-y-3"
@@ -333,7 +411,7 @@ export default function TablePlayground({
             {isResolving && (
               <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3 text-amber-400 text-sm animate-pulse">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                The AI Dungeon Master is resolving the party's actions...
+                The AI Dungeon Master is resolving the party actions...
               </div>
             )}
           </div>
@@ -392,7 +470,7 @@ export default function TablePlayground({
               <h3 className="text-sm font-semibold text-white">Party Roster</h3>
             </div>
             <div className="mt-3 space-y-2">
-              {members.map((m: any) => {
+              {members.map((m: Member) => {
                 const charName = m.characters?.name || 'Spectator/Unbound'
                 return (
                   <div
@@ -446,7 +524,7 @@ export default function TablePlayground({
               <h3 className="text-sm font-semibold text-white">Campaign Lorebook</h3>
             </div>
             <div className="mt-3 space-y-2 max-h-60 overflow-y-auto pr-1">
-              {lorebook.map((entry: any) => (
+              {lorebook.map((entry: LorebookEntry) => (
                 <div key={entry.id} className="p-2 rounded bg-zinc-950 border border-zinc-800 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-white">{entry.title}</span>
