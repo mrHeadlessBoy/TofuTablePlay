@@ -30,6 +30,12 @@ export async function generateDmNarrative(input: DmTurnInput) {
     .map((l) => `[LORE: ${l.title} (${l.category})] - ${l.content}`)
     .join('\n')
 
+  // Limit previous turn history to a rolling window (last 5 turns) so the prompt doesn't grow unbounded
+  const turnsWindow = recentTurns.slice(-5)
+  const historyText = turnsWindow.length > 0
+    ? `${recentTurns.length > 5 ? '[Earlier turns archived for brevity]\n\n' : ''}${turnsWindow.map((t) => `Turn ${t.turn_number}:\n${t.narrative_output}`).join('\n\n')}`
+    : 'This is the start of the adventure.'
+
   const prompt = `
 คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
@@ -45,8 +51,8 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 DYNAMIC LORE INJECTION (ข้อมูล Lore เพิ่มเติม):
 ${loreContext || 'No specific lore triggered this turn.'}
 
-PREVIOUS TURN HISTORY (ประวัติเทิร์นก่อนหน้า):
-${recentTurns.length > 0 ? recentTurns.map(t => `Turn ${t.turn_number}:${t.narrative_output}`).join('\n\n') : 'This is the start of the adventure.'}
+PREVIOUS TURN HISTORY (ประวัติเทิร์นก่อนหน้า - ล่าสุด):
+${historyText}
 
 SUBMITTED PARTY ACTIONS FOR THIS TURN (การกระทำของปาร์ตี้ในเทิร์นนี้):
 ${actionsSummary || 'The party surveys their surroundings.'}
@@ -70,7 +76,7 @@ DIRECTIVES:
 `
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.6-lite',
+    model: 'gemini-3.5-flash-lite',
     contents: prompt,
   })
 

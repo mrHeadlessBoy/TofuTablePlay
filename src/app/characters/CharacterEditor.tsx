@@ -5,10 +5,10 @@ import { saveCharacter, CharacterFormData } from './actions'
 
 const defaultStats = { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }
 
-type CharacterRecord = CharacterFormData & { id?: number }
+type CharacterRecord = CharacterFormData & { id?: string | number }
 
 export default function CharacterEditor({ characters }: { characters: CharacterRecord[] }) {
-  const [selectedChar, setSelectedChar] = useState<CharacterFormData | null>(null)
+  const [selectedChar, setSelectedChar] = useState<CharacterRecord | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const handleNew = () => {
@@ -186,6 +186,17 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-zinc-400 uppercase">Appearance & Visual Traits</label>
+              <textarea
+                rows={2}
+                placeholder="Physical build, clothing, notable scars or aura..."
+                value={selectedChar.appearance || ''}
+                onChange={(e) => setSelectedChar({ ...selectedChar, appearance: e.target.value })}
+                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

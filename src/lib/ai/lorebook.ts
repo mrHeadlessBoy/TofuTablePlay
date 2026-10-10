@@ -7,15 +7,19 @@ export interface LoreEntry {
   activation_mode: 'Always Active' | 'Keyword Triggered' | 'Secret / DM-Only'
 }
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export function extractTriggeredLore(
   loreEntries: LoreEntry[],
   combinedText: string,
   isDmContext: boolean = true
 ): LoreEntry[] {
-  const normalizedText = combinedText.toLowerCase()
+  const normalizedText = (combinedText || '').toLowerCase()
   const matched = new Map<string, LoreEntry>()
 
-  for (const entry of loreEntries) {
+  for (const entry of (loreEntries || [])) {
     // 1. Always Active: Injected into every turn
     if (entry.activation_mode === 'Always Active') {
       matched.set(entry.id, entry)
@@ -28,10 +32,25 @@ export function extractTriggeredLore(
     }
 
     // 3. Keyword Triggered: Scan trigger keys
-    const hasMatch = entry.trigger_keys.some((key) => {
-      if (!key.trim()) return false
-      const regex = new RegExp(`\\b${key.trim().toLowerCase()}\\b`, 'i')
-      return regex.test(normalizedText)
+    const keys = Array.isArray(entry.trigger_keys) ? entry.trigger_keys : []
+    const hasMatch = keys.some((key) => {
+      const trimmed = (key || '').trim().toLowerCase()
+      if (!trimmed) return false
+
+      // If the keyword contains Thai characters, non-ASCII, symbols (e.g. C++, ( ), +1), or spaces,
+      // \b will not work properly or will fail to match. Use direct substring matching.
+      const isPureAsciiWord = /^[a-z0-9_-]+$/i.test(trimmed)
+      if (isPureAsciiWord) {
+        try {
+          const regex = new RegExp(`\\b${escapeRegExp(trimmed)}\\b`, 'i')
+          return regex.test(normalizedText)
+        } catch {
+          return normalizedText.includes(trimmed)
+        }
+      }
+
+      // Multilingual (Thai, CJK, etc.) and symbol-laden phrases
+      return normalizedText.includes(trimmed)
     })
 
     if (hasMatch) {

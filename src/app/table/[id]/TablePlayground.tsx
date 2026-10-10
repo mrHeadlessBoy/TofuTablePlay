@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import {
   toggleReadyStatus,
@@ -9,6 +10,7 @@ import {
   resolveTurn,
   hostOverrideNarrative,
   voteKickMember,
+  updateCharacterCombatState,
 } from './actions'
 import {
   Shield,
@@ -23,6 +25,8 @@ import {
   Loader2,
   UserX,
   ArrowLeft,
+  RotateCcw,
+  Save,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -79,6 +83,8 @@ type TablePlaygroundProps = {
   isHeadTable: boolean
 }
 
+const CONDITIONS = ['Normal', 'Bloodied', 'Poisoned', 'Stunned', 'Blinded', 'Unconscious', 'Blessed', 'Charmed', 'Exhausted']
+
 export default function TablePlayground({
   initialTable,
   initialMembers,
@@ -100,20 +106,78 @@ export default function TablePlayground({
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
 
-  // Real-time listener for table state, members, and turns
+  // Character Inspector editing state
+  const [isEditingChar, setIsEditingChar] = useState(false)
+  const [isSavingChar, setIsSavingChar] = useState(false)
+  const [isSwitchingChar, setIsSwitchingChar] = useState(false)
+  const [charForm, setCharForm] = useState({
+    current_hp: 10,
+    max_hp: 10,
+    armor_class: 10,
+    status_condition: 'Normal',
+    inventory: '',
+    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 } as Record<string, number | string>,
+  })
+
+  // Ref to hold the Supabase channel for broadcasting
+  const channelRef = useRef<RealtimeChannel | null>(null)
+
+  // Derive the active member and character dynamically from live members state
+  const activeMember = members.find((m) => m.user_id === userId) || currentMember
+  const activeChar = activeMember?.characters
+
+  const handleOpenEdit = () => {
+    if (activeChar) {
+      setCharForm({
+        current_hp: activeChar.current_hp ?? 10,
+        max_hp: activeChar.max_hp ?? 10,
+        armor_class: activeChar.armor_class ?? 10,
+        status_condition: activeChar.status_condition || 'Normal',
+        inventory: activeChar.inventory || '',
+        stats: activeChar.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
+      })
+    }
+    setIsEditingChar(true)
+  }
+
+  // Real-time listener for table state, members, and turns with broadcast and polling fallback
   useEffect(() => {
-    // Created inside the effect (client-only) so Supabase's internal Date.now()
-    // calls never run during server prerendering.
     const supabase = createClient()
+
+    const fetchMembers = async () => {
+      const { data } = await supabase
+        .from('table_members')
+        .select('*, characters(*)')
+        .eq('table_id', table.id)
+      if (data) setMembers(data)
+    }
+
+    const fetchTable = async () => {
+      const { data } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('id', table.id)
+        .single()
+      if (data) setTable((prev) => ({ ...prev, ...data }))
+    }
+
+    const fetchTurns = async () => {
+      const { data } = await supabase
+        .from('turns')
+        .select('*')
+        .eq('table_id', table.id)
+        .order('turn_number', { ascending: true })
+      if (data) setTurns(data)
+    }
+
     const channel = supabase
-      .channel(`table:${table.id}`)
+      .channel(`table_sync:${table.id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tables', filter: `id=eq.${table.id}` },
         (payload) => {
           const nextTable = payload.new as Partial<TableData> | null
           if (!nextTable) return
-
           setTable((currentTable) => ({
             ...currentTable,
             ...nextTable,
@@ -123,45 +187,64 @@ export default function TablePlayground({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'table_members', filter: `table_id=eq.${table.id}` },
-        async () => {
-          const { data } = await supabase
-            .from('table_members')
-            .select('*, characters(*)')
-            .eq('table_id', table.id)
-          if (data) setMembers(data)
+        () => {
+          fetchMembers()
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'turns', filter: `table_id=eq.${table.id}` },
-        async () => {
-          const { data } = await supabase
-            .from('turns')
-            .select('*')
-            .eq('table_id', table.id)
-            .order('turn_number', { ascending: true })
-          if (data) setTurns(data)
+        () => {
+          fetchTurns()
         }
       )
+      .on('broadcast', { event: 'table_sync' }, () => {
+        fetchMembers()
+        fetchTable()
+        fetchTurns()
+      })
       .subscribe()
 
+    channelRef.current = channel
+
+    // 3-second light polling fallback so that players are always synchronized even if websocket disconnects
+    const interval = setInterval(() => {
+      fetchMembers()
+      fetchTable()
+      fetchTurns()
+    }, 3000)
+
     return () => {
+      clearInterval(interval)
       supabase.removeChannel(channel)
     }
   }, [table.id])
+
+  const broadcastSync = useCallback(() => {
+    try {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'table_sync',
+        payload: { userId, timestamp: Date.now() },
+      })
+    } catch {
+      // Ignored if channel isn't ready
+    }
+  }, [userId])
 
   const handleResolveTurn = useCallback(async () => {
     setIsResolving(true)
     try {
       await resolveTurn(table.id)
       setDraftAction('')
+      broadcastSync()
     } catch (err: unknown) {
       console.error(err)
       alert(err instanceof Error ? err.message : 'Error resolving turn with AI')
     } finally {
       setIsResolving(false)
     }
-  }, [table.id])
+  }, [table.id, broadcastSync])
 
   // Synchronized countdown timer
   useEffect(() => {
@@ -212,31 +295,78 @@ export default function TablePlayground({
     return () => window.clearTimeout(timeoutId)
   }, [countdownSeconds, isHeadTable, table.turn_phase, isResolving, handleResolveTurn])
 
-  const activeChar = currentMember?.characters
-
   const handleReadyToggle = async () => {
-    if (!currentMember) return
+    if (!activeMember) return
     if (typeof table.current_turn !== 'number') return
 
-    const nextState = !currentMember.is_ready
+    const nextState = !activeMember.is_ready
+
+    // Optimistic UI update
+    setMembers((prev) =>
+      prev.map((m) => (m.user_id === userId ? { ...m, is_ready: nextState } : m))
+    )
+
     if (nextState && draftAction.trim()) {
       await submitActionDraft(table.id, table.current_turn, draftAction)
     }
     await toggleReadyStatus(table.id, nextState)
+    broadcastSync()
   }
 
   const handleSelectCharacter = async (charId: string) => {
+    const chosen = userCharacters.find((c) => c.id === charId)
+    // Optimistic update
+    if (chosen) {
+      setMembers((prev) =>
+        prev.map((m) => (m.user_id === userId ? { ...m, characters: chosen } : m))
+      )
+    }
+    setIsSwitchingChar(false)
     await linkCharacterToTable(table.id, charId)
+    broadcastSync()
+  }
+
+  const handleSaveCharEdits = async () => {
+    if (!activeChar) return
+    setIsSavingChar(true)
+    try {
+      await updateCharacterCombatState(table.id, activeChar.id, charForm)
+
+      // Optimistic update
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.user_id === userId
+            ? {
+                ...m,
+                characters: m.characters
+                  ? {
+                      ...m.characters,
+                      ...charForm,
+                    }
+                  : null,
+              }
+            : m
+        )
+      )
+      setIsEditingChar(false)
+      broadcastSync()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to update character')
+    } finally {
+      setIsSavingChar(false)
+    }
   }
 
   const handleSaveHostEdit = async (turnId: string) => {
     await hostOverrideNarrative(turnId, editText, table.id)
     setEditingTurnId(null)
+    broadcastSync()
   }
 
   const handleKick = async (targetUserId: string, targetName: string) => {
-    if (confirm(`Vote to remove ${targetName} from this table?`)) {
+    if (confirm(`Remove ${targetName} from this table?`)) {
       await voteKickMember(table.id, targetUserId)
+      broadcastSync()
     }
   }
 
@@ -252,9 +382,33 @@ export default function TablePlayground({
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Campaign Hub
           </Link>
           <div className="border-b border-zinc-800 pb-3">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-amber-500">
-              Character Inspector
-            </span>
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] uppercase font-mono tracking-wider text-amber-500">
+                Character Inspector
+              </span>
+              {activeChar && !isSwitchingChar && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (isEditingChar) {
+                        setIsEditingChar(false)
+                      } else {
+                        handleOpenEdit()
+                      }
+                    }}
+                    className="text-[10px] text-zinc-400 hover:text-amber-400 flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3 h-3" /> {isEditingChar ? 'Close' : 'Edit'}
+                  </button>
+                  <button
+                    onClick={() => setIsSwitchingChar(true)}
+                    className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Switch
+                  </button>
+                </div>
+              )}
+            </div>
             <h2 className="text-xl font-bold text-white mt-1">
               {activeChar ? activeChar.name : 'No Character Bound'}
             </h2>
@@ -263,11 +417,21 @@ export default function TablePlayground({
             </p>
           </div>
 
-          {!activeChar ? (
+          {!activeChar || isSwitchingChar ? (
             <div className="space-y-3">
-              <label className="text-xs text-zinc-400 font-medium">
-                Select a character for this session:
-              </label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs text-zinc-400 font-medium">
+                  Select a character for this session:
+                </label>
+                {isSwitchingChar && (
+                  <button
+                    onClick={() => setIsSwitchingChar(false)}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
               {userCharacters.map((char: Character) => (
                 <button
                   key={char.id}
@@ -285,6 +449,106 @@ export default function TablePlayground({
                   No character sheets found. Create one in the Character Codex.
                 </p>
               )}
+            </div>
+          ) : isEditingChar ? (
+            /* Inline Character Editor */
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono">Current HP</label>
+                  <input
+                    type="number"
+                    value={charForm.current_hp}
+                    onChange={(e) => setCharForm({ ...charForm, current_hp: Number(e.target.value) })}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono">Max HP</label>
+                  <input
+                    type="number"
+                    value={charForm.max_hp}
+                    onChange={(e) => setCharForm({ ...charForm, max_hp: Number(e.target.value) })}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono">Armor Class</label>
+                  <input
+                    type="number"
+                    value={charForm.armor_class}
+                    onChange={(e) => setCharForm({ ...charForm, armor_class: Number(e.target.value) })}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono">Condition</label>
+                  <select
+                    value={charForm.status_condition}
+                    onChange={(e) => setCharForm({ ...charForm, status_condition: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
+                  >
+                    {CONDITIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Stats Editor */}
+              <div>
+                <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-1">Ability Scores</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {Object.keys(charForm.stats || {}).map((stat) => (
+                    <div key={stat} className="bg-zinc-950 border border-zinc-800 rounded p-1 text-center">
+                      <span className="text-[9px] text-zinc-500 uppercase block">{stat}</span>
+                      <input
+                        type="number"
+                        value={charForm.stats[stat] ?? 10}
+                        onChange={(e) =>
+                          setCharForm({
+                            ...charForm,
+                            stats: { ...charForm.stats, [stat]: Number(e.target.value) },
+                          })
+                        }
+                        className="w-full bg-transparent text-center font-bold text-xs text-white outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Inventory Editor */}
+              <div>
+                <label className="text-[10px] text-zinc-400 uppercase font-mono">Inventory</label>
+                <textarea
+                  rows={3}
+                  value={charForm.inventory}
+                  onChange={(e) => setCharForm({ ...charForm, inventory: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-xs text-white mt-1"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveCharEdits}
+                  disabled={isSavingChar}
+                  className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-xs font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" /> {isSavingChar ? 'Saving...' : 'Save Sheet'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingChar(false)}
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4 text-xs">
@@ -315,8 +579,12 @@ export default function TablePlayground({
               {/* Status */}
               <div className="p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg flex justify-between items-center">
                 <span className="text-zinc-400">Condition:</span>
-                <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-amber-400 font-medium">
-                  {activeChar.status_condition}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                  activeChar.status_condition === 'Normal'
+                    ? 'bg-zinc-800 text-zinc-300'
+                    : 'bg-amber-950 text-amber-400 border border-amber-800'
+                }`}>
+                  {activeChar.status_condition || 'Normal'}
                 </span>
               </div>
 
@@ -420,7 +688,7 @@ export default function TablePlayground({
             {isResolving && (
               <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3 text-amber-400 text-sm animate-pulse">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                The AI Dungeon Master is resolving the party actions...
+                The AI Dungeon Master is resolving the party&apos;s actions...
               </div>
             )}
           </div>
@@ -439,12 +707,12 @@ export default function TablePlayground({
               <input
                 type="text"
                 placeholder={
-                  currentMember?.is_ready
+                  activeMember?.is_ready
                     ? 'Action locked. Waiting for other players...'
                     : 'Draft your hidden turn action...'
                 }
                 value={draftAction}
-                disabled={currentMember?.is_ready || table.turn_phase === 'countdown' || isResolving}
+                disabled={activeMember?.is_ready || table.turn_phase === 'countdown' || isResolving}
                 onChange={(e) => setDraftAction(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleReadyToggle()
@@ -456,13 +724,13 @@ export default function TablePlayground({
                 onClick={handleReadyToggle}
                 disabled={isResolving}
                 className={`px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-50 ${
-                  currentMember?.is_ready
+                  activeMember?.is_ready
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                     : 'bg-amber-600 hover:bg-amber-500 text-white'
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                {currentMember?.is_ready ? 'Ready!' : 'Ready Up'}
+                {activeMember?.is_ready ? 'Ready!' : 'Ready Up'}
               </button>
             </div>
           </div>
@@ -472,7 +740,7 @@ export default function TablePlayground({
       {/* RIGHT PANEL: Party Roster & Lorebook Overview */}
       <aside className="w-80 border-l border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-between overflow-y-auto">
         <div className="space-y-6">
-          {/* Party Roster with Vote Kick */}
+          {/* Party Roster with Host Kick */}
           <div>
             <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
               <Users className="w-4 h-4 text-amber-500" />
@@ -480,7 +748,8 @@ export default function TablePlayground({
             </div>
             <div className="mt-3 space-y-2">
               {members.map((m: Member) => {
-                const charName = m.characters?.name || 'Spectator/Unbound'
+                const char = m.characters
+                const charName = char?.name || 'Spectator/Unbound'
                 return (
                   <div
                     key={m.id}
@@ -495,9 +764,19 @@ export default function TablePlayground({
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-zinc-500">
-                        {m.characters?.class_archetype || 'No class'}
-                      </span>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-500">
+                        <span>{char?.class_archetype || 'No class'}</span>
+                        {char?.current_hp !== undefined && (
+                          <span className="text-red-400 font-mono">
+                            HP: {char.current_hp}/{char.max_hp}
+                          </span>
+                        )}
+                        {char?.status_condition && char.status_condition !== 'Normal' && (
+                          <span className="text-amber-400 font-mono">
+                            [{char.status_condition}]
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -510,10 +789,10 @@ export default function TablePlayground({
                       >
                         {m.is_ready ? 'READY' : 'DRAFTING'}
                       </span>
-                      {m.user_id !== userId && (
+                      {isHeadTable && m.user_id !== userId && (
                         <button
                           onClick={() => handleKick(m.user_id, charName)}
-                          title="Vote to Kick"
+                          title="Kick Player (Host)"
                           className="text-zinc-600 hover:text-red-400 transition"
                         >
                           <UserX className="w-3.5 h-3.5" />

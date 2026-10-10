@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { launchTable, joinTableByCode, deleteTable, deleteCampaign } from './actions'
-import { Play, LogIn, Compass, Trash2, Loader2 } from 'lucide-react'
+import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from './actions'
+import { Play, LogIn, Compass, Trash2, Loader2, LogOut } from 'lucide-react'
 import Link from 'next/link'
 
 type PublicCampaign = {
@@ -49,8 +49,23 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
     }
   }
 
+  const handleLeaveTable = async (tbl: ActiveTable) => {
+    const name = tbl.campaigns?.title ?? tbl.table_code
+    if (!confirm(`Leave table "${name}" (${tbl.table_code})?`)) return
+    setDeletingId(`leave:${tbl.id}`)
+    try {
+      await leaveTable(String(tbl.id))
+      router.refresh()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to leave table.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const handleDeleteCampaign = async (camp: PublicCampaign) => {
-    if (!confirm(`Delete campaign "${camp.title}"? Its lorebook and every table running it will be removed. This cannot be undone.`)) return
+    const title = camp.title || 'Untitled Campaign'
+    if (!confirm(`Delete campaign "${title}"? Its lorebook and every table running it will be removed. This cannot be undone.`)) return
     setDeletingId(`campaign:${camp.id}`)
     try {
       await deleteCampaign(String(camp.id))
@@ -121,7 +136,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                 >
                   <Play className="w-3.5 h-3.5" /> Re-enter Table
                 </Link>
-                {currentUserId && tbl.head_table_id === currentUserId && (
+                {currentUserId && tbl.head_table_id === currentUserId ? (
                   <button
                     type="button"
                     onClick={() => handleDeleteTable(tbl)}
@@ -135,7 +150,21 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                     )}
                     Delete Table
                   </button>
-                )}
+                ) : currentUserId ? (
+                  <button
+                    type="button"
+                    onClick={() => handleLeaveTable(tbl)}
+                    disabled={deletingId !== null}
+                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition disabled:opacity-50"
+                  >
+                    {deletingId === `leave:${tbl.id}` ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <LogOut className="w-3.5 h-3.5" />
+                    )}
+                    Leave Table
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>

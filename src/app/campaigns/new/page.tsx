@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createCampaign, LoreEntryInput } from '../actions'
 import { Trash2, Plus, BookOpen, Sparkles } from 'lucide-react'
 import Link from 'next/link'
@@ -17,6 +18,7 @@ type LoreCategory = (typeof LORE_CATEGORIES)[number]
 type ActivationMode = (typeof ACTIVATION_MODES)[number]
 
 export default function NewCampaignPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('Fantasy')
@@ -55,7 +57,13 @@ export default function NewCampaignPage() {
 
   const handleAddLoreEntry = () => {
     if (!newEntry.title.trim() || !newEntry.content.trim()) return
-    setLoreEntries([...loreEntries, newEntry])
+    // Also capture any uncommitted trigger keys currently in triggerInput
+    const pendingKeys = triggerInput.trim()
+      ? triggerInput.split(',').map((k) => k.trim()).filter(Boolean)
+      : []
+    const finalTriggerKeys = Array.from(new Set([...newEntry.trigger_keys, ...pendingKeys]))
+
+    setLoreEntries([...loreEntries, { ...newEntry, trigger_keys: finalTriggerKeys }])
     setNewEntry({
       title: '',
       trigger_keys: [],
@@ -63,6 +71,7 @@ export default function NewCampaignPage() {
       category: 'Faction',
       activation_mode: 'Keyword Triggered',
     })
+    setTriggerInput('')
   }
 
   const handleRemoveLoreEntry = (index: number) => {
@@ -73,15 +82,31 @@ export default function NewCampaignPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      await createCampaign({
+      // If user filled in a lore draft but forgot to click "Attach Entry to Lorebook", include it
+      const finalEntries = [...loreEntries]
+      if (newEntry.title.trim() && newEntry.content.trim()) {
+        const pendingKeys = triggerInput.trim()
+          ? triggerInput.split(',').map((k) => k.trim()).filter(Boolean)
+          : []
+        finalEntries.push({
+          ...newEntry,
+          trigger_keys: Array.from(new Set([...newEntry.trigger_keys, ...pendingKeys])),
+        })
+      }
+
+      const res = await createCampaign({
         title,
         category,
         custom_category: customCategory,
         world_setting: worldSetting,
         core_description: coreDescription,
         rule_mechanics: ruleMechanics,
-        loreEntries,
+        loreEntries: finalEntries,
       })
+
+      if (res?.success) {
+        router.push('/hub')
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong while creating the campaign.'
       alert(message)
@@ -240,6 +265,7 @@ export default function NewCampaignPage() {
                     placeholder="Entry Title (e.g. Order of the Sun)"
                     value={newEntry.title}
                     onChange={(e) => setNewEntry({ ...newEntry, title: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-white"
                   />
                 </div>
