@@ -1,8 +1,10 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import HubClient from './HubClient'
 
-export default async function CampaignHubPage() {
+// Reads cookies (runtime data), so it must render inside <Suspense>.
+async function HubData() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -25,6 +27,16 @@ export default async function CampaignHubPage() {
   })
 
   return (
+    <HubClient
+      publicCampaigns={publicCampaigns || []}
+      activeTables={activeTables}
+      currentUserId={user?.id ?? null}
+    />
+  )
+}
+
+export default function CampaignHubPage() {
+  return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
@@ -42,7 +54,9 @@ export default async function CampaignHubPage() {
           </div>
         </div>
 
-        <HubClient publicCampaigns={publicCampaigns || []} activeTables={activeTables} />
+        <Suspense fallback={<p className="text-sm text-zinc-500">Loading campaigns...</p>}>
+          <HubData />
+        </Suspense>
       </div>
     </div>
   )

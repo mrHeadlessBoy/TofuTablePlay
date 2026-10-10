@@ -90,10 +90,9 @@ export default function LandingPage() {
           </div>
         </div>
       </main>
-
       {/* Footer */}
       <footer className="border-t border-zinc-900 py-6 text-center text-xs text-zinc-600">
-        D&D Playground &copy; {new Date().getFullYear()} &mdash; Pure text tabletop RPG engine.
+        D&D Playground &copy; 2026 &mdash; Pure text tabletop RPG engine.
       </footer>
     </div>
   )

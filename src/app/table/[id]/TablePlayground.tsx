@@ -22,7 +22,9 @@ import {
   X,
   Loader2,
   UserX,
+  ArrowLeft,
 } from 'lucide-react'
+import Link from 'next/link'
 
 type Character = {
   id: string
@@ -98,10 +100,11 @@ export default function TablePlayground({
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
 
-  const supabase = createClient()
-
   // Real-time listener for table state, members, and turns
   useEffect(() => {
+    // Created inside the effect (client-only) so Supabase's internal Date.now()
+    // calls never run during server prerendering.
+    const supabase = createClient()
     const channel = supabase
       .channel(`table:${table.id}`)
       .on(
@@ -145,7 +148,7 @@ export default function TablePlayground({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [table.id, supabase])
+  }, [table.id])
 
   const handleResolveTurn = useCallback(async () => {
     setIsResolving(true)
@@ -242,6 +245,12 @@ export default function TablePlayground({
       {/* LEFT PANEL: Character Inspector */}
       <aside className="w-80 border-r border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-between overflow-y-auto">
         <div className="space-y-6">
+          <Link
+            href="/hub"
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-amber-400 transition"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Campaign Hub
+          </Link>
           <div className="border-b border-zinc-800 pb-3">
             <span className="text-[10px] uppercase font-mono tracking-wider text-amber-500">
               Character Inspector
