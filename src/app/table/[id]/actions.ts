@@ -19,6 +19,76 @@ export async function linkCharacterToTable(tableId: string, characterId: string)
   revalidatePath(`/table/${tableId}`)
 }
 
+export async function getTableMembers(tableId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: ownSeat, error: ownSeatErr } = await supabase
+    .from('table_members')
+    .select('id')
+    .eq('table_id', tableId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (ownSeatErr) throw new Error(ownSeatErr.message)
+  if (!ownSeat) throw new Error('You are not a member of this table')
+
+  const admin = createAdminClient()
+  if (!admin) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required to display party character names.')
+  }
+
+  const { data: members, error: membersErr } = await admin
+    .from('table_members')
+    .select('id, user_id, is_ready, character_id')
+    .eq('table_id', tableId)
+    .order('joined_at', { ascending: true })
+
+  if (membersErr) throw new Error(`Failed to fetch table members: ${membersErr.message}`)
+
+  const characterIds = [...new Set((members ?? []).flatMap((member) => (
+    member.character_id ? [member.character_id] : []
+  )))]
+
+  if (characterIds.length === 0) {
+    return (members ?? []).map((member) => ({ ...member, characters: null }))
+  }
+
+  const { data: partyCharacters, error: charactersErr } = await admin
+    .from('characters')
+    .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition')
+    .in('id', characterIds)
+
+  if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
+
+  const charactersById = new Map((partyCharacters ?? []).map((character) => [character.id, character]))
+  const ownCharacterIds = (members ?? [])
+    .filter((member) => member.user_id === user.id && member.character_id)
+    .map((member) => member.character_id)
+
+  if (ownCharacterIds.length > 0) {
+    const { data: ownCharacters, error: ownCharactersErr } = await supabase
+      .from('characters')
+      .select('*')
+      .in('id', ownCharacterIds)
+      .eq('user_id', user.id)
+
+    if (ownCharactersErr) throw new Error(`Failed to fetch your character sheet: ${ownCharactersErr.message}`)
+
+    for (const character of ownCharacters ?? []) {
+      charactersById.set(character.id, character)
+    }
+  }
+
+  return (members ?? []).map((member) => ({
+    id: member.id,
+    user_id: member.user_id,
+    is_ready: member.is_ready,
+    characters: member.character_id ? charactersById.get(member.character_id) ?? null : null,
+  }))
+}
+
 export async function submitActionDraft(tableId: string, currentTurnNumber: number, actionText: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

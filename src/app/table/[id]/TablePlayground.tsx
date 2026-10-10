@@ -7,6 +7,7 @@ import {
   toggleReadyStatus,
   submitActionDraft,
   linkCharacterToTable,
+  getTableMembers,
   resolveTurn,
   hostOverrideNarrative,
   voteKickMember,
@@ -97,6 +98,7 @@ export default function TablePlayground({
 }: TablePlaygroundProps) {
   const [table, setTable] = useState(initialTable)
   const [members, setMembers] = useState(initialMembers)
+  const [memberLoadError, setMemberLoadError] = useState<string | null>(null)
   const [turns, setTurns] = useState(initialTurns)
   const [draftAction, setDraftAction] = useState('')
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
@@ -147,16 +149,19 @@ export default function TablePlayground({
     setIsEditingChar(true)
   }
 
-  // Real-time listener for table state, members, and turns with broadcast and polling fallback
+  // Load members on page load and refresh them only when member state changes.
   useEffect(() => {
     const supabase = createClient()
 
     const fetchMembers = async () => {
-      const { data } = await supabase
-        .from('table_members')
-        .select('*, characters(*)')
-        .eq('table_id', table.id)
-      if (data) setMembers(data)
+      try {
+        setMembers(await getTableMembers(table.id))
+        setMemberLoadError(null)
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to refresh party members'
+        console.error(message)
+        setMemberLoadError(message)
+      }
     }
 
     const fetchTable = async () => {
@@ -214,9 +219,8 @@ export default function TablePlayground({
 
     channelRef.current = channel
 
-    // 3-second light polling fallback so that players are always synchronized even if websocket disconnects
+    // Keep the polling fallback for table and turn updates; member data is event-driven.
     const interval = setInterval(() => {
-      fetchMembers()
       fetchTable()
       fetchTurns()
     }, 3000)
@@ -330,16 +334,17 @@ export default function TablePlayground({
   }
 
   const handleSelectCharacter = async (charId: string) => {
-    const chosen = userCharacters.find((c) => c.id === charId)
-    // Optimistic update
-    if (chosen) {
-      setMembers((prev) =>
-        prev.map((m) => (m.user_id === userId ? { ...m, characters: chosen } : m))
-      )
+    try {
+      await linkCharacterToTable(table.id, charId)
+      setMembers(await getTableMembers(table.id))
+      setMemberLoadError(null)
+      setIsSwitchingChar(false)
+      broadcastSync()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to select character'
+      console.error(message)
+      alert(message)
     }
-    setIsSwitchingChar(false)
-    await linkCharacterToTable(table.id, charId)
-    broadcastSync()
   }
 
   const handleSaveCharEdits = async () => {
@@ -763,6 +768,9 @@ export default function TablePlayground({
               <h3 className="text-sm font-semibold text-white">Party Roster</h3>
             </div>
             <div className="mt-3 space-y-2">
+              {memberLoadError && (
+                <p className="text-xs text-red-400" role="alert">{memberLoadError}</p>
+              )}
               {members.map((m: Member) => {
                 const char = m.characters
                 const charName = char?.name || 'Spectator/Unbound'
