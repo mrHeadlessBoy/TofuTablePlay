@@ -11,12 +11,15 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg('')
+
+    // Create the client here (not during render) so Supabase's internal
+    // Date.now() calls don't run while Next.js prerenders this page.
+    const supabase = createClient()
 
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({ email, password })

@@ -98,10 +98,11 @@ export default function TablePlayground({
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
 
-  const supabase = createClient()
-
   // Real-time listener for table state, members, and turns
   useEffect(() => {
+    // Created inside the effect (client-only) so Supabase's internal Date.now()
+    // calls never run during server prerendering.
+    const supabase = createClient()
     const channel = supabase
       .channel(`table:${table.id}`)
       .on(
@@ -145,7 +146,7 @@ export default function TablePlayground({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [table.id, supabase])
+  }, [table.id])
 
   const handleResolveTurn = useCallback(async () => {
     setIsResolving(true)

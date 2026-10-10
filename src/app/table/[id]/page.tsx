@@ -1,8 +1,22 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import TablePlayground from './TablePlayground'
 
-export default async function TablePage({ params }: { params: Promise<{ id: string }> }) {
+export default function TablePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-950 text-zinc-500 p-8 text-sm">Loading table...</div>
+      }
+    >
+      <TableContent params={params} />
+    </Suspense>
+  )
+}
+
+// Reads params + cookies (runtime data), so it must render inside <Suspense>.
+async function TableContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

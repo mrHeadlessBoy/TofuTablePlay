@@ -1,7 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { connection } from 'next/server'
 
 export async function createClient() {
+  // Supabase auth uses Date.now() internally (e.g. session expiry checks).
+  // connection() tells Next.js the rest only runs at request time, so those
+  // calls aren't flagged as unstable values during (partial) prerendering.
+  await connection()
   const cookieStore = await cookies()
 
   return createServerClient(
