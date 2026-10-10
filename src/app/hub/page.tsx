@@ -19,7 +19,10 @@ export default async function CampaignHubPage() {
     .select('table_id, tables(*, campaigns(title, category))')
     .eq('user_id', user?.id)
 
-  const activeTables = activeMemberships?.map((m) => m.tables).filter(Boolean) || []
+  const activeTables = (activeMemberships ?? []).flatMap((membership) => {
+    const table = Array.isArray(membership.tables) ? membership.tables[0] : membership.tables
+    return table ? [table] : []
+  })
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">

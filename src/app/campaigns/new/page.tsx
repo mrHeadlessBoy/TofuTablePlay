@@ -13,6 +13,9 @@ const CATEGORIES = [
 const LORE_CATEGORIES = ['Faction', 'Location', 'NPC', 'Item/Artifact', 'History/Event', 'Custom'] as const
 const ACTIVATION_MODES = ['Always Active', 'Keyword Triggered', 'Secret / DM-Only'] as const
 
+type LoreCategory = (typeof LORE_CATEGORIES)[number]
+type ActivationMode = (typeof ACTIVATION_MODES)[number]
+
 export default function NewCampaignPage() {
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState('')
@@ -79,8 +82,9 @@ export default function NewCampaignPage() {
         rule_mechanics: ruleMechanics,
         loreEntries,
       })
-    } catch (err: any) {
-      alert(err.message)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong while creating the campaign.'
+      alert(message)
       setLoading(false)
     }
   }
@@ -242,7 +246,7 @@ export default function NewCampaignPage() {
                 <div>
                   <select
                     value={newEntry.category}
-                    onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value as any })}
+                    onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value as LoreCategory })}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-white"
                   >
                     {LORE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -251,7 +255,7 @@ export default function NewCampaignPage() {
                 <div>
                   <select
                     value={newEntry.activation_mode}
-                    onChange={(e) => setNewEntry({ ...newEntry, activation_mode: e.target.value as any })}
+                    onChange={(e) => setNewEntry({ ...newEntry, activation_mode: e.target.value as ActivationMode })}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-white"
                   >
                     {ACTIVATION_MODES.map((m) => <option key={m} value={m}>{m}</option>)}

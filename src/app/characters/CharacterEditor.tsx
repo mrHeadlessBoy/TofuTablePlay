@@ -5,7 +5,9 @@ import { saveCharacter, CharacterFormData } from './actions'
 
 const defaultStats = { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }
 
-export default function CharacterEditor({ characters }: { characters: any[] }) {
+type CharacterRecord = CharacterFormData & { id?: number }
+
+export default function CharacterEditor({ characters }: { characters: CharacterRecord[] }) {
   const [selectedChar, setSelectedChar] = useState<CharacterFormData | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -41,8 +43,9 @@ export default function CharacterEditor({ characters }: { characters: any[] }) {
     try {
       await saveCharacter(selectedChar)
       setSelectedChar(null)
-    } catch (err: any) {
-      alert(err.message)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save character.'
+      alert(message)
     } finally {
       setIsSaving(false)
     }

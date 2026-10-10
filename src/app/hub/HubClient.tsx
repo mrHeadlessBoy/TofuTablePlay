@@ -1,22 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { launchTable, joinTableByCode } from './actions'
 import { Play, LogIn, Compass } from 'lucide-react'
 import Link from 'next/link'
 
-export default function HubClient({ publicCampaigns, activeTables }: { publicCampaigns: any[], activeTables: any[] }) {
+type PublicCampaign = {
+  id: string | number
+  category: string
+  title: string
+  core_description: string
+}
+
+type ActiveTable = {
+  id: string | number
+  table_code: string
+  current_turn: number | string
+  turn_phase: string
+  campaigns?: { title?: string } | null
+}
+
+export default function HubClient({ publicCampaigns, activeTables }: { publicCampaigns: PublicCampaign[]; activeTables: ActiveTable[] }) {
   const [tableCode, setTableCode] = useState('')
   const [joining, setJoining] = useState(false)
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleJoin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!tableCode.trim()) return
     setJoining(true)
     try {
       await joinTableByCode(tableCode)
-    } catch (err: any) {
-      alert(err.message)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to join table.'
+      alert(message)
+    } finally {
       setJoining(false)
     }
   }
@@ -53,7 +70,7 @@ export default function HubClient({ publicCampaigns, activeTables }: { publicCam
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-white">Your Active Tables</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {activeTables.map((tbl: any) => (
+            {activeTables.map((tbl) => (
               <div key={tbl.id} className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
                 <div>
                   <span className="text-[10px] uppercase font-mono tracking-widest text-amber-500">CODE: {tbl.table_code}</span>
@@ -85,7 +102,7 @@ export default function HubClient({ publicCampaigns, activeTables }: { publicCam
                 <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
                 <p className="text-xs text-zinc-400 mt-2 line-clamp-3">{camp.core_description}</p>
               </div>
-              <form action={launchTable.bind(null, camp.id)} className="mt-5">
+              <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
                 <button
                   type="submit"
                   className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5"
