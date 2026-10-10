@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from './actions'
-import { Play, LogIn, Compass, Trash2, Loader2, LogOut } from 'lucide-react'
+import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices } from 'lucide-react'
 import Link from 'next/link'
 
 type PublicCampaign = {
@@ -211,6 +211,20 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           ))}
         </div>
       </div>
+
+      {/* Battle Board entry: floats in the bottom-right corner of the hub */}
+      <Link
+        href="/board"
+        className="group fixed bottom-6 right-6 z-20 flex items-center gap-3 rounded-xl border border-amber-500/40 bg-zinc-900/80 px-4 py-3 shadow-lg shadow-black/40 backdrop-blur transition hover:border-amber-400 hover:bg-zinc-900"
+      >
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-amber-600 text-white transition group-hover:bg-amber-500">
+          <Dices className="w-5 h-5" />
+        </span>
+        <span>
+          <span className="block text-sm font-semibold text-white">Battle Board</span>
+          <span className="block text-[11px] text-zinc-400">3D grid tabletop · solo prototype</span>
+        </span>
+      </Link>
     </div>
   )
 }
