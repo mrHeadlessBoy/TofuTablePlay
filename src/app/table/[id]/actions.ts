@@ -491,6 +491,7 @@ export async function updateCharacterCombatState(
     armor_class?: number
     status_condition?: string
     inventory?: string
+    equipment?: string[]
     stats?: Record<string, number | string>
   }
 ) {

@@ -3,6 +3,13 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+/** Equipment slots: [head, torso, leg, foot, left hand, right hand] */
+export type EquipmentSlots = [string, string, string, string, string, string]
+
+export const EQUIPMENT_LABELS = ['Head', 'Torso', 'Leg', 'Foot', 'Left Hand', 'Right Hand'] as const
+
+export const EMPTY_EQUIPMENT: EquipmentSlots = ['', '', '', '', '', '']
+
 export interface CharacterFormData {
   id?: string
   user_id?: string
@@ -25,6 +32,7 @@ export interface CharacterFormData {
   weaknesses: string
   inventory: string
   status_condition: string
+  equipment: EquipmentSlots
 }
 
 export async function saveCharacter(data: CharacterFormData) {
@@ -47,6 +55,7 @@ export async function saveCharacter(data: CharacterFormData) {
     weaknesses: data.weaknesses,
     inventory: data.inventory,
     status_condition: data.status_condition || 'Normal',
+    equipment: data.equipment,
   }
 
   if (data.id) {
