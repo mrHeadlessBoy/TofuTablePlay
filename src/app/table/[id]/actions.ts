@@ -257,7 +257,7 @@ export async function resolveTurn(tableId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  // 1. Fetch table and campaign settings
+  // Fetch table and campaign settings
   const { data: table, error: tableErr } = await supabase
     .from('tables')
     .select('*, campaigns(*)')
@@ -305,7 +305,7 @@ export async function resolveTurn(tableId: string) {
       )
     }
 
-    // 2. Fetch every seat at the table and the drafts submitted for the current turn
+    // Fetch every seat at the table and the drafts submitted for the current turn
     const { data: currentTurnRecord, error: turnRecErr } = await supabase
       .from('turns')
       .select('id, turn_number')
@@ -340,20 +340,27 @@ export async function resolveTurn(tableId: string) {
 
     // One entry per seated player, in join order — the party size is whatever the table holds.
     // A seat with neither a character nor a draft is a spectator and is left out.
-    const partyActions = (seats || []).flatMap((seat, index) => {
+const partyActions = (seats || []).flatMap((seat, index) => { 
       const character = Array.isArray(seat.characters) ? seat.characters[0] : seat.characters
       const action = draftByMember.get(seat.id) ?? null
       if (!character && !action) return []
+      
       return [
         {
           characterName: character?.name || `Unknown Adventurer ${index + 1}`,
           classType: character?.class_archetype || 'Wanderer',
+          currentHp: character?.current_hp ?? 10,
+          maxHp: character?.max_hp ?? 10,
+          ac: character?.armor_class ?? 10,
+          condition: character?.status_condition || 'Normal',
+          inventory: character?.inventory || '',
+          equipment: Array.isArray(character?.equipment) ? character.equipment : [],
           action,
         },
       ]
     })
 
-    // 3. Fetch lorebook entries for dynamic scanning
+    // Fetch lorebook entries for dynamic scanning
     const { data: loreEntries, error: loreErr } = await supabase
       .from('lorebook_entries')
       .select('*')
@@ -361,7 +368,7 @@ export async function resolveTurn(tableId: string) {
 
     if (loreErr) throw new Error(`Failed to fetch lorebook entries: ${loreErr.message}`)
 
-    // 4. Fetch recent turn history
+    // Fetch recent turn history
     const { data: recentTurns, error: turnsErr } = await supabase
       .from('turns')
       .select('turn_number, narrative_output')
@@ -370,7 +377,7 @@ export async function resolveTurn(tableId: string) {
 
     if (turnsErr) throw new Error(`Failed to fetch turns history: ${turnsErr.message}`)
 
-    // 5. Generate AI Dungeon Master scene narrative
+    // Generate AI Dungeon Master scene narrative
     const aiNarrative = await generateDmNarrative({
       campaign: table.campaigns,
       loreEntries: loreEntries || [],
@@ -380,7 +387,7 @@ export async function resolveTurn(tableId: string) {
 
     const nextTurnNumber = table.current_turn + 1
 
-    // 6. Persist new narrative turn
+    // Persist new narrative turn
     const { error: insertTurnErr } = await supabase.from('turns').insert({
       table_id: tableId,
       turn_number: nextTurnNumber,
@@ -390,7 +397,7 @@ export async function resolveTurn(tableId: string) {
 
     if (insertTurnErr) throw new Error(`Failed to persist new turn: ${insertTurnErr.message}`)
 
-    // 7. Reset ready statuses for every seat (not just the caller's) and bump turn counter
+    // Reset ready statuses for every seat (not just the caller's) and bump turn counter
     const { error: resetMembersErr } = await db
       .from('table_members')
       .update({ is_ready: false })

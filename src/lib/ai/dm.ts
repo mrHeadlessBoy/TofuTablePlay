@@ -9,6 +9,18 @@ const DM_MODEL = 'gemini-3.5-flash-lite'
 // The opening scene is written while the host waits on the Launch button, so give up after this long
 const OPENING_TIMEOUT_MS = 15000
 
+// ปรับ Type ให้รองรับ Combat & Inventory State
+export interface PartyMemberAction {
+  characterName: string
+  classType: string
+  currentHp?: number
+  maxHp?: number
+  ac?: number
+  inventory?: string
+  equipment?: string[]
+  action: string | null
+}
+
 export interface DmTurnInput {
   campaign: {
     title: string
@@ -21,10 +33,9 @@ export interface DmTurnInput {
   recentTurns: {
     turn_number: number
     narrative_output: string
-    party_actions_summary?: string // รองรับการส่งแอ็กชันเทิร์นก่อนหน้า (ถ้ามี)
+    party_actions_summary?: string
   }[]
-  // One entry per party member (any party size). action is null when that player sent no draft.
-  partyActions: { characterName: string; classType: string; action: string | null }[]
+  partyActions: PartyMemberAction[] // ใช้ Type ใหม่
 }
 
 const NO_ACTION_TEXT =
@@ -33,12 +44,24 @@ const NO_ACTION_TEXT =
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const { campaign, loreEntries, recentTurns, partyActions } = input
 
-  // 1. จัดการสรุปการกระทำของผู้เล่นในเทิร์นปัจจุบัน
+// จัดรูปแบบสรุปสภาพตัวละคร + แอ็กชันให้ AI เข้าใจบริบททางกายภาพ
   const actionsSummary = partyActions
-    .map((a, i) => `${i + 1}. ${a.characterName} (${a.classType}): ${a.action || NO_ACTION_TEXT}`)
-    .join('\n')
+    .map((a, i) => {
+      const hpText = `HP ${a.currentHp ?? '?'}/${a.maxHp ?? '?'}`
+      const acText = `AC ${a.ac ?? 10}`
+      const equipList = (a.equipment || []).filter(Boolean).join(', ')
+      const invPreview = a.inventory ? a.inventory.replace(/\n+/g, ', ').slice(0, 120) : ''
+      const gear = [equipList && `สวมใส่: ${equipList}`, invPreview && `ไอเทม: ${invPreview}`]
+        .filter(Boolean)
+        .join(' | ')
 
-  // 2. สแกน Lorebook ดึงข้อมูลแบบ Dynamic เฉพาะคำที่ถูก Trigger
+      return `${i + 1}. ${a.characterName} (${a.classType})
+   - [สภาพร่างกาย]: ${hpText} | ${acText} }${gear ? `\n   - [อุปกรณ์/ไอเทม]: ${gear}` : ''}
+   - [แอ็กชันและผลเต๋า]: ${a.action || NO_ACTION_TEXT}`
+    })
+    .join('\n\n')
+
+  // สแกน Lorebook ดึงข้อมูลแบบ Dynamic เฉพาะคำที่ถูก Trigger
   const submittedText = partyActions
     .filter((a) => a.action)
     .map((a) => `${a.characterName}: ${a.action}`)
@@ -54,7 +77,7 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
     ? triggeredLore.map((l) => `[LORE: ${l.title} (${l.category})]: ${l.content}`).join('\n')
     : null
 
-  // 3. STATIC SYSTEM INSTRUCTION (คงที่ 100% ตลอดทั้งแคมเปญ เพื่อให้เกิด Prompt Caching)
+  // STATIC SYSTEM INSTRUCTION (คงที่ 100% ตลอดทั้งแคมเปญ เพื่อให้เกิด Prompt Caching)
   const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
 [WORLD SETTING & TONE]
@@ -87,9 +110,9 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 [ Decision ]
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ข้ามและ "ห้ามพิมพ์หัวข้อ [ Decision ] ออกมาเด็ดขาด")*
 (หากมีการทอย ให้ระบุเฉพาะตัวละครที่ต้องทอย 1 บรรทัดต่อ 1 คน):
-- [ชื่อตัวละคร]: สิ่งที่ทำ: (สิ่งที่ผู้เล่นทำ) | [ประเภทเต๋าที่เหมาะสม เช่น d20/d12/d8/d6 + สเตตัส]`
+- [ชื่อตัวละคร]: สิ่งที่ทำ(ห้ามบอกว่าผู้เล่นควรทำอะไร): | [ประเภทเต๋าที่เหมาะสม เช่น d20/d12/d8/d6 + สเตตัส]`
 
-  // 4. CONSTRUCT MULTI-TURN CONTENTS (Sliding Window 4 เทิร์นล่าสุด)
+  // CONSTRUCT MULTI-TURN CONTENTS (Sliding Window 4 เทิร์นล่าสุด)
   // แยกบทบาท user/model ชัดเจนเพื่อให้ AI จำสไตล์การบรรยายของตัวเองได้
   const turnsWindow = recentTurns.slice(-4)
   const contents: { role: 'user' | 'model'; parts: [{ text: string }] }[] = []
@@ -103,17 +126,11 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
         ? `[TURN ${playedTurn} PARTY ACTIONS]\n${turn.party_actions_summary}`
         : `[TURN ${playedTurn}]: The party executes their declared actions.`
 
-    contents.push({
-      role: 'user',
-      parts: [{ text: userPrompt }],
-    })
-    contents.push({
-      role: 'model',
-      parts: [{ text: turn.narrative_output }],
-    })
+ contents.push({ role: 'user', parts: [{ text: userPrompt }] })
+    contents.push({ role: 'model', parts: [{ text: turn.narrative_output }] })
   }
 
-  // 5. CURRENT TURN PAYLOAD + AUTHOR'S NOTE REMINDER
+  // CURRENT TURN PAYLOAD + AUTHOR'S NOTE REMINDER
   // รวม Dynamic Lore + Actions + ตอกย้ำ Format ที่จุดสุดท้ายเพื่อป้องกัน Format หลุด
   const currentTurnUserParts = [
     loreContext ? `[DYNAMIC LORE INJECTION FOR THIS TURN]\n${loreContext}\n` : '',
@@ -130,7 +147,7 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
     parts: [{ text: currentTurnUserParts }],
   })
 
-  // 6. ส่งคำขอไปยัง API พร้อม System Instruction แยกต่างหาก
+  // ส่งคำขอไปยัง API พร้อม System Instruction แยกต่างหาก
   const response = await ai.models.generateContent({
     model: DM_MODEL,
     contents: contents,
