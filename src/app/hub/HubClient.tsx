@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from './actions'
 import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil } from 'lucide-react'
@@ -27,6 +28,29 @@ type HubClientProps = {
   publicCampaigns: PublicCampaign[]
   activeTables: ActiveTable[]
   currentUserId: string | null
+}
+
+// Launching now waits for the AI Dungeon Master to write the opening scene. The button shows that
+// it is working and cannot be pressed twice, because a second press would open a second table.
+function LaunchButton() {
+  const { pending } = useFormStatus()
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+    >
+      {pending ? (
+        <>
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> The DM is writing the opening scene...
+        </>
+      ) : (
+        <>
+          <Play className="w-3.5 h-3.5" /> Launch as Head Table
+        </>
+      )}
+    </button>
+  )
 }
 
 export default function HubClient({ publicCampaigns, activeTables, currentUserId }: HubClientProps) {
@@ -185,12 +209,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                 <p className="text-xs text-zinc-400 mt-2 line-clamp-3">{camp.core_description}</p>
               </div>
               <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
-                <button
-                  type="submit"
-                  className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5" /> Launch as Head Table
-                </button>
+                <LaunchButton />
               </form>
               <div className="mt-2 flex gap-2">
                 <Link

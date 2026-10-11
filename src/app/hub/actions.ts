@@ -3,6 +3,11 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { generateOpeningNarrative } from '@/lib/ai/dm'
+import { OPENING_TURN_NUMBER } from '@/lib/turns'
+
+// Used as the opening narration only when the AI could not write one
+const OPENING_FALLBACK = 'The journey begins. Review your character sheet and submit your opening moves.'
 
 function generateTableCode(length = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -13,11 +18,34 @@ function generateTableCode(length = 6): string {
   return result
 }
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+// The opening narration of a new table: ask the AI Dungeon Master to open the story from the campaign sheet.
+// A failed or slow AI call must never stop a table from opening, so any error ends in the fallback line.
+async function writeOpeningScene(supabase: SupabaseServerClient, campaignId: string): Promise<string> {
+  try {
+    const [{ data: campaign }, { data: loreEntries }] = await Promise.all([
+      supabase.from('campaigns').select('*').eq('id', campaignId).single(),
+      supabase.from('lorebook_entries').select('*').eq('campaign_id', campaignId),
+    ])
+    if (!campaign) return OPENING_FALLBACK
+
+    return await generateOpeningNarrative({ campaign, loreEntries: loreEntries || [] })
+  } catch (err) {
+    console.error('[launchTable] Opening scene generation failed:', err)
+    return OPENING_FALLBACK
+  }
+}
+
 export async function launchTable(campaignId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) throw new Error('Not authenticated')
+
+  // Written before anything is saved: if this request dies while the AI is thinking,
+  // no half-made table (one without its opening row) is left behind.
+  const openingNarrative = await writeOpeningScene(supabase, campaignId)
 
   const code = generateTableCode()
 
@@ -42,11 +70,11 @@ export async function launchTable(campaignId: string) {
     user_id: user.id,
   })
 
-  // 3. Create initial Turn 1 placeholder
+  // 3. Save the opening narration. It is shown as an introduction, and play starts at Turn 1 after it.
   await supabase.from('turns').insert({
     table_id: table.id,
-    turn_number: 1,
-    narrative_output: 'The journey begins. Review your character sheet and submit your opening moves.',
+    turn_number: OPENING_TURN_NUMBER,
+    narrative_output: openingNarrative,
   })
 
   redirect(`/table/${table.id}`)
@@ -91,8 +119,6 @@ export async function leaveTable(tableId: string) {
   if (error) throw new Error(error.message)
   revalidatePath('/hub')
 }
-
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
 // Deletes a table and all of its child rows.
 async function purgeTables(supabase: SupabaseServerClient, tableIds: string[]) {
