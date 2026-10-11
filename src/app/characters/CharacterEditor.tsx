@@ -8,7 +8,7 @@ import { Trash2, Loader2 } from 'lucide-react'
 const defaultStats = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 }
 
 type CharacterRecord = CharacterFormData & { id?: string | number; user_id?: string | null }
-
+/*  */
 export default function CharacterEditor({
   characters,
   currentUserId,
