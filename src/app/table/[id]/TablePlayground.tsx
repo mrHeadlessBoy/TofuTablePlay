@@ -6,14 +6,16 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import {
   toggleReadyStatus,
-  submitActionDraft,
   linkCharacterToTable,
   getTableMembers,
+  getServerTime,
   resolveTurn,
   hostOverrideNarrative,
   voteKickMember,
   updateCharacterCombatState,
 } from './actions'
+import { COUNTDOWN_MS } from './countdown'
+import { OPENING_TURN_NUMBER } from '@/lib/turns'
 import {
   Shield,
   Heart,
@@ -94,6 +96,31 @@ type TablePlaygroundProps = {
 
 const EQUIPMENT_LABELS = ['Head', 'Torso', 'Leg', 'Foot', 'Left Hand', 'Right Hand'] as const
 const EMPTY_EQUIPMENT = ['', '', '', '', '', '']
+const COUNTDOWN_SECONDS = Math.ceil(COUNTDOWN_MS / 1000)
+// How long another player's Ready click is trusted when their request never reports back
+const READY_CLAIM_TTL_MS = 6000
+
+// A Ready click that the roster on screen already shows, before the server's copy has caught up.
+// settledAt is set once the request behind it has finished (null while it is still running).
+type ReadyClaim = { ready: boolean; settledAt: number | null; expiresAt: number }
+type ReadyClaims = Map<string, ReadyClaim>
+
+// Lays those clicks over a roster that just came from the server. A reload that was asked for
+// before a click was saved still carries the old value, and used to flip the badge back.
+// Once a reload that started after the request finished arrives, the server's copy is the truth
+// again and the claim is dropped.
+function withReadyClaims(list: Member[], claims: ReadyClaims, reloadStartedAt: number): Member[] {
+  if (claims.size === 0) return list
+  const now = Date.now()
+  for (const [memberUserId, claim] of claims) {
+    const confirmed = claim.settledAt !== null && reloadStartedAt >= claim.settledAt
+    if (confirmed || now > claim.expiresAt) claims.delete(memberUserId)
+  }
+  return list.map((m) => {
+    const claim = claims.get(m.user_id)
+    return claim ? { ...m, is_ready: claim.ready } : m
+  })
+}
 
 const CONDITIONS = ['Normal', 'Bloodied', 'Poisoned', 'Stunned', 'Blinded', 'Unconscious', 'Blessed', 'Charmed', 'Exhausted']
 
@@ -114,6 +141,17 @@ export default function TablePlayground({
   const [draftAction, setDraftAction] = useState('')
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
   const [diceOpen, setDiceOpen] = useState(false)
+
+  // Server clock minus this device's clock, in ms. countdown_end is stamped by the server,
+  // so a device whose clock is a few seconds off would otherwise count down from another number.
+  const clockOffsetRef = useRef(0)
+  // Ready clicks the server's roster has not caught up with (this player's own, and ones announced by others)
+  const readyClaimsRef = useRef<ReadyClaims>(new Map())
+  // Roster refreshes run one at a time (see refreshMembers)
+  const membersRefreshRef = useRef({ running: false, again: false })
+  // When the table state last came from a trusted answer, so a slower, older poll result is dropped
+  const tableSetAtRef = useRef(0)
+  const seenPhaseRef = useRef(`${initialTable.turn_phase}:${initialTable.current_turn}`)
 
   // A new turn starts with an empty draft for every player, not only the host who resolved it
   const [draftTurn, setDraftTurn] = useState(initialTable.current_turn)
@@ -149,7 +187,15 @@ export default function TablePlayground({
   const activeChar = activeMember?.characters
 
   // The draft is locked once the player is ready, so the dice tray is locked with it
-  const draftLocked = Boolean(activeMember?.is_ready) || table.turn_phase === 'countdown' || isResolving
+  // True on every player's screen while the Dungeon Master is writing the turn, not only the host's.
+  // isResolving is the host's own request; the others learn it from the table phase. The countdown
+  // reaching zero counts too, so nobody waits for that phase change to arrive before seeing the loader.
+  const turnResolving =
+    isResolving ||
+    table.turn_phase === 'resolving' ||
+    (table.turn_phase === 'countdown' && countdownSeconds === 0)
+
+  const draftLocked = Boolean(activeMember?.is_ready) || table.turn_phase === 'countdown' || turnResolving
 
   // Let the player roll as their own character, with that sheet's ability bonuses
   const diceActors: DiceActor[] = activeChar
@@ -187,28 +233,73 @@ export default function TablePlayground({
     setIsEditingChar(true)
   }
 
-  // Load members on page load and refresh them only when member state changes.
+  // Ask the server what time it is, so the countdown below does not depend on this device's clock.
   useEffect(() => {
-    const supabase = createClient()
+    let cancelled = false
 
-    const fetchMembers = async () => {
+    const syncClock = async () => {
+      let bestRoundTrip = Infinity
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        const sentAt = Date.now()
+        try {
+          const serverNow = await getServerTime()
+          const roundTrip = Date.now() - sentAt
+          // The quickest answer spent the least time on the wire, so it is the most accurate one
+          if (!cancelled && roundTrip < bestRoundTrip) {
+            bestRoundTrip = roundTrip
+            clockOffsetRef.current = serverNow - (sentAt + roundTrip / 2)
+          }
+        } catch {
+          // Keep the offset we already have
+        }
+      }
+    }
+
+    void syncClock()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Reload the roster from the server. Server actions queue up one behind another, so a burst of
+  // realtime events used to line up several reloads in front of this player's own Ready click.
+  // Now only one runs at a time, and events that arrive meanwhile share a single follow-up reload.
+  const refreshMembers = useCallback(async () => {
+    const refresh = membersRefreshRef.current
+    if (refresh.running) {
+      refresh.again = true
+      return
+    }
+    refresh.running = true
+    do {
+      refresh.again = false
+      const startedAt = Date.now()
       try {
-        setMembers(await getTableMembers(table.id))
+        const latest: Member[] = await getTableMembers(table.id)
+        setMembers(withReadyClaims(latest, readyClaimsRef.current, startedAt))
         setMemberLoadError(null)
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to refresh party members'
         console.error(message)
         setMemberLoadError(message)
       }
-    }
+    } while (refresh.again)
+    refresh.running = false
+  }, [table.id])
+
+  // Load members on page load and refresh them only when member state changes.
+  useEffect(() => {
+    const supabase = createClient()
 
     const fetchTable = async () => {
+      const askedAt = Date.now()
       const { data } = await supabase
         .from('tables')
         .select('*')
         .eq('id', table.id)
         .single()
-      if (data) setTable((prev) => ({ ...prev, ...data }))
+      // An answer that was asked for before a newer state arrived is already out of date
+      if (data && askedAt >= tableSetAtRef.current) setTable((prev) => ({ ...prev, ...data }))
     }
 
     const fetchTurns = async () => {
@@ -228,6 +319,7 @@ export default function TablePlayground({
         (payload) => {
           const nextTable = payload.new as Partial<TableData> | null
           if (!nextTable) return
+          tableSetAtRef.current = Date.now()
           setTable((currentTable) => ({
             ...currentTable,
             ...nextTable,
@@ -238,7 +330,7 @@ export default function TablePlayground({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'table_members', filter: `table_id=eq.${table.id}` },
         () => {
-          fetchMembers()
+          void refreshMembers()
         }
       )
       .on(
@@ -248,8 +340,19 @@ export default function TablePlayground({
           fetchTurns()
         }
       )
-      .on('broadcast', { event: 'table_sync' }, () => {
-        fetchMembers()
+      .on('broadcast', { event: 'member_ready' }, ({ payload }) => {
+        // Another player just pressed Ready: show it at once. Their confirmed state follows with table_sync.
+        const memberUserId: unknown = payload?.userId
+        const ready: unknown = payload?.ready
+        if (typeof memberUserId !== 'string' || typeof ready !== 'boolean' || memberUserId === userId) return
+        readyClaimsRef.current.set(memberUserId, { ready, settledAt: null, expiresAt: Date.now() + READY_CLAIM_TTL_MS })
+        setMembers((prev) => prev.map((m) => (m.user_id === memberUserId ? { ...m, is_ready: ready } : m)))
+      })
+      .on('broadcast', { event: 'table_sync' }, ({ payload }) => {
+        // The sender's request has finished: the reload below is the truth for them again
+        const senderClaim = typeof payload?.userId === 'string' ? readyClaimsRef.current.get(payload.userId) : undefined
+        if (senderClaim) senderClaim.settledAt = Date.now()
+        void refreshMembers()
         fetchTable()
         fetchTurns()
       })
@@ -267,32 +370,61 @@ export default function TablePlayground({
       clearInterval(interval)
       supabase.removeChannel(channel)
     }
-  }, [table.id])
+  }, [table.id, userId, refreshMembers])
 
-  const broadcastSync = useCallback(() => {
-    try {
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'table_sync',
-        payload: { userId, timestamp: Date.now() },
-      })
-    } catch {
-      // Ignored if channel isn't ready
-    }
-  }, [userId])
+  // The roster is refreshed by events. If one was missed, catch up whenever the table moves to
+  // another phase or turn (those arrive separately, through realtime and the polling above).
+  useEffect(() => {
+    const phaseKey = `${table.turn_phase}:${table.current_turn}`
+    if (phaseKey === seenPhaseRef.current) return
+    seenPhaseRef.current = phaseKey
+    void refreshMembers()
+  }, [table.turn_phase, table.current_turn, refreshMembers])
+
+  const broadcast = useCallback(
+    (event: 'table_sync' | 'member_ready', extra: Record<string, unknown> = {}) => {
+      try {
+        channelRef.current?.send({
+          type: 'broadcast',
+          event,
+          payload: { userId, timestamp: Date.now(), ...extra },
+        })
+      } catch {
+        // Ignored if channel isn't ready
+      }
+    },
+    [userId]
+  )
+
+  const broadcastSync = useCallback(() => broadcast('table_sync'), [broadcast])
 
   const handleResolveTurn = useCallback(async () => {
     setIsResolving(true)
+    let failure: string | null = null
     try {
-      await resolveTurn(table.id)
+      const result = await resolveTurn(table.id)
       setDraftAction('')
-      broadcastSync()
+      // Move this screen on from the answer itself. Waiting for realtime left the countdown sitting
+      // at zero for a moment, which kept the loader up and could fire this resolve a second time.
+      tableSetAtRef.current = Date.now()
+      if (result.resolved && typeof result.turnNumber === 'number') {
+        const nextTurn = result.turnNumber
+        setTable((prev) => ({ ...prev, current_turn: nextTurn, turn_phase: 'drafting', countdown_end: null }))
+      } else {
+        // Another request holds this turn: keep showing the loader until its result arrives
+        setTable((prev) => ({ ...prev, turn_phase: 'resolving' }))
+      }
     } catch (err: unknown) {
       console.error(err)
-      alert(err instanceof Error ? err.message : 'Error resolving turn with AI')
-    } finally {
-      setIsResolving(false)
+      failure = err instanceof Error ? err.message : 'Error resolving turn with AI'
+      // resolveTurn puts the table back to drafting when it fails, so do the same here
+      tableSetAtRef.current = Date.now()
+      setTable((prev) => ({ ...prev, turn_phase: 'drafting', countdown_end: null }))
     }
+    setIsResolving(false)
+    // Tell the other players either way, so their loader ends with the new turn or with the retry
+    broadcastSync()
+    if (failure) alert(failure)
   }, [table.id, broadcastSync])
 
   // Synchronized countdown timer
@@ -314,9 +446,11 @@ export default function TablePlayground({
     }
 
     const interval = setInterval(() => {
-      const remaining = Math.max(
-        0,
-        Math.ceil((countdownEnd.getTime() - Date.now()) / 1000)
+      // "Now" on the server's clock, the same one that stamped countdown_end
+      const serverNow = Date.now() + clockOffsetRef.current
+      const remaining = Math.min(
+        COUNTDOWN_SECONDS,
+        Math.max(0, Math.ceil((countdownEnd.getTime() - serverNow) / 1000))
       )
       setCountdownSeconds(remaining)
       if (remaining <= 0) {
@@ -345,30 +479,44 @@ export default function TablePlayground({
   }, [countdownSeconds, isHeadTable, table.turn_phase, isResolving, handleResolveTurn])
 
   const handleReadyToggle = async () => {
-    if (!activeMember) return
+    // One request at a time: a second click while the first was on its way made the badge jump
+    if (!activeMember || readyClaimsRef.current.get(userId)?.settledAt === null) return
     if (typeof table.current_turn !== 'number') return
 
     const nextState = !activeMember.is_ready
+    const setOwnReady = (ready: boolean) =>
+      setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, is_ready: ready } : m)))
 
-    // Optimistic UI update
-    setMembers((prev) =>
-      prev.map((m) => (m.user_id === userId ? { ...m, is_ready: nextState } : m))
-    )
+    // Show it right away, on this screen and on the other players' screens.
+    // The server's answer follows, and table_sync below replaces the guess with the saved state.
+    const claim: ReadyClaim = { ready: nextState, settledAt: null, expiresAt: Infinity }
+    readyClaimsRef.current.set(userId, claim)
+    setOwnReady(nextState)
+    broadcast('member_ready', { ready: nextState })
 
+    let failure: string | null = null
     try {
-      if (nextState && draftAction.trim()) {
-        await submitActionDraft(table.id, table.current_turn, draftAction)
+      const phase = await toggleReadyStatus(
+        table.id,
+        nextState,
+        nextState ? { turnNumber: table.current_turn, text: draftAction } : undefined
+      )
+      if (phase) {
+        // This click started or stopped the countdown: show it without waiting for realtime
+        tableSetAtRef.current = Date.now()
+        setTable((prev) => ({ ...prev, ...phase }))
       }
-      await toggleReadyStatus(table.id, nextState)
     } catch (err: unknown) {
       // Roll back so the roster never shows READY for a draft that was not saved
-      setMembers((prev) =>
-        prev.map((m) => (m.user_id === userId ? { ...m, is_ready: !nextState } : m))
-      )
-      alert(err instanceof Error ? err.message : 'Failed to submit your action')
-      return
+      failure = err instanceof Error ? err.message : 'Failed to submit your action'
+      readyClaimsRef.current.delete(userId)
+      setOwnReady(!nextState)
     }
+
+    // Saved (or rolled back). The claim stays until a roster reload that started after this moment arrives.
+    claim.settledAt = Date.now()
     broadcastSync()
+    if (failure) alert(failure)
   }
 
   const handleSelectCharacter = async (charId: string) => {
@@ -726,7 +874,10 @@ export default function TablePlayground({
                 <div className="flex justify-between items-center border-b border-zinc-800/60 pb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider">
-                      Turn {turn.turn_number}
+                      {/* The opening narration is not a played turn, so play is numbered from the row after it */}
+                      {turn.turn_number === OPENING_TURN_NUMBER
+                        ? 'คำบรรยาย'
+                        : `Turn ${turn.turn_number - OPENING_TURN_NUMBER}`}
                     </span>
                     {turn.edited_by_host && (
                       <span className="text-[10px] text-amber-400/80 bg-amber-950/60 border border-amber-800 px-1.5 py-0.5 rounded">
@@ -783,7 +934,7 @@ export default function TablePlayground({
             ))}
 
             {/* AI Turn Processing State */}
-            {isResolving && (
+            {turnResolving && (
               <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3 text-amber-400 text-sm animate-pulse">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 The AI Dungeon Master is resolving the party&apos;s actions...
@@ -795,9 +946,9 @@ export default function TablePlayground({
         {/* Bottom Private Drafting Input & Ready Barrier */}
         <div className="border-t border-zinc-800 bg-zinc-900/80 p-4 backdrop-blur-md">
           <div className="max-w-3xl mx-auto space-y-3">
-            {table.turn_phase === 'countdown' && (
+            {table.turn_phase === 'countdown' && !turnResolving && (
               <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-600/50 flex items-center justify-center gap-2 text-amber-300 font-mono text-sm animate-pulse">
-                <Clock className="w-4 h-4" /> ALL PLAYERS READY — Submitting actions in {countdownSeconds}s...
+                <Clock className="w-4 h-4" /> ALL PLAYERS READY — Submitting actions in {countdownSeconds ?? COUNTDOWN_SECONDS}s...
               </div>
             )}
 
@@ -810,7 +961,7 @@ export default function TablePlayground({
                     : 'Draft your hidden turn action...'
                 }
                 value={draftAction}
-                disabled={activeMember?.is_ready || table.turn_phase === 'countdown' || isResolving}
+                disabled={activeMember?.is_ready || table.turn_phase === 'countdown' || turnResolving}
                 onChange={(e) => setDraftAction(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleReadyToggle()
@@ -849,7 +1000,7 @@ export default function TablePlayground({
               <button
                 type="button"
                 onClick={handleReadyToggle}
-                disabled={isResolving}
+                disabled={turnResolving}
                 className={`px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-50 ${
                   activeMember?.is_ready
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white'

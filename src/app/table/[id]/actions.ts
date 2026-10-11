@@ -3,6 +3,10 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { generateDmNarrative } from '@/lib/ai/dm'
+import { COUNTDOWN_MS, type TablePhase } from './countdown'
+
+type SessionClient = Awaited<ReturnType<typeof createClient>>
+type DbClient = SessionClient | NonNullable<ReturnType<typeof createAdminClient>>
 
 export async function linkCharacterToTable(tableId: string, characterId: string) {
   const supabase = await createClient()
@@ -89,29 +93,31 @@ export async function getTableMembers(tableId: string) {
   }))
 }
 
-export async function submitActionDraft(tableId: string, currentTurnNumber: number, actionText: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-
-  // Find member id
-  const { data: member } = await supabase
-    .from('table_members')
-    .select('id')
-    .eq('table_id', tableId)
-    .eq('user_id', user.id)
-    .single()
+// Saves one player's draft for the given turn. Shared by submitActionDraft and toggleReadyStatus.
+async function saveActionDraft(
+  supabase: SessionClient,
+  userId: string,
+  tableId: string,
+  turnNumber: number,
+  actionText: string
+) {
+  // The seat and the turn row do not depend on each other, so look them up together
+  const [{ data: member }, { data: turn }] = await Promise.all([
+    supabase
+      .from('table_members')
+      .select('id')
+      .eq('table_id', tableId)
+      .eq('user_id', userId)
+      .single(),
+    supabase
+      .from('turns')
+      .select('id')
+      .eq('table_id', tableId)
+      .eq('turn_number', turnNumber)
+      .single(),
+  ])
 
   if (!member) throw new Error('Member not found')
-
-  // Find current turn entry
-  const { data: turn } = await supabase
-    .from('turns')
-    .select('id')
-    .eq('table_id', tableId)
-    .eq('turn_number', currentTurnNumber)
-    .single()
-
   if (!turn) throw new Error('Current turn not found')
 
   // Record action draft.
@@ -130,56 +136,120 @@ export async function submitActionDraft(tableId: string, currentTurnNumber: numb
     )
 
   if (error) throw new Error(error.message)
-  revalidatePath(`/table/${tableId}`)
 }
 
-export async function toggleReadyStatus(tableId: string, isReady: boolean) {
+export async function submitActionDraft(tableId: string, currentTurnNumber: number, actionText: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { error } = await supabase
-    .from('table_members')
-    .update({ is_ready: isReady })
-    .eq('table_id', tableId)
-    .eq('user_id', user.id)
+  await saveActionDraft(supabase, user.id, tableId, currentTurnNumber, actionText)
+  revalidatePath(`/table/${tableId}`)
+}
 
-  if (error) throw new Error(error.message)
-
-  // Verify whether all members are ready
-  const { data: members, error: membersErr } = await supabase
+async function everyoneReady(db: DbClient, tableId: string): Promise<boolean> {
+  const { data: members, error } = await db
     .from('table_members')
     .select('is_ready')
     .eq('table_id', tableId)
 
-  if (membersErr) throw new Error(membersErr.message)
+  if (error) throw new Error(error.message)
+  return Boolean(members && members.length > 0 && members.every((m) => m.is_ready))
+}
 
-  const allReady = members && members.length > 0 && members.every((m) => m.is_ready)
+// Stops a running countdown. Does nothing in any other phase, so a turn that is resolving is never touched.
+// With `onlyEndingAt`, it only stops the one countdown that was started with that end time.
+async function cancelCountdown(db: DbClient, tableId: string, onlyEndingAt?: string) {
+  let query = db
+    .from('tables')
+    .update({ turn_phase: 'drafting', countdown_end: null })
+    .eq('id', tableId)
+    .eq('turn_phase', 'countdown')
+  if (onlyEndingAt) query = query.eq('countdown_end', onlyEndingAt)
 
-  if (allReady) {
-    // 5-second synchronized countdown trigger
-    const countdownEnd = new Date(Date.now() + 5000).toISOString()
-    const { error: updateErr } = await supabase
+  const { data, error } = await query.select('turn_phase, countdown_end').maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data as TablePhase | null
+}
+
+/**
+ * Sets this player's Ready state. When `draft` is given it is saved in the same request,
+ * so pressing Ready costs one round trip instead of two.
+ * Returns the table's new phase when this call changed it, otherwise null.
+ *
+ * There is no revalidatePath here on purpose: the playground keeps its own live state, and
+ * re-rendering the whole page inside this request only made every Ready click slower.
+ */
+export async function toggleReadyStatus(
+  tableId: string,
+  isReady: boolean,
+  draft?: { turnNumber: number; text: string }
+): Promise<TablePhase | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  if (isReady && draft && draft.text.trim()) {
+    await saveActionDraft(supabase, user.id, tableId, draft.turnNumber, draft.text)
+  }
+
+  const { data: seat, error } = await supabase
+    .from('table_members')
+    .update({ is_ready: isReady })
+    .eq('table_id', tableId)
+    .eq('user_id', user.id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!seat) throw new Error('You are not a member of this table')
+
+  // The phase belongs to the whole table and several players can press Ready in the same moment.
+  // Every write below only applies from the phase it expects, so two requests can never undo each
+  // other: nobody restarts a countdown that is running, and nobody pulls a resolving turn back.
+  const db: DbClient = createAdminClient() ?? supabase
+
+  // Stepping back only ever needs to stop a countdown
+  if (!isReady) return cancelCountdown(db, tableId)
+
+  let changed: TablePhase | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (!(await everyoneReady(db, tableId))) return changed
+
+    // 5-second synchronized countdown trigger (only from drafting: the first request to get here wins)
+    const countdownEnd = new Date(Date.now() + COUNTDOWN_MS).toISOString()
+    const { data: started, error: startErr } = await db
       .from('tables')
       .update({
         turn_phase: 'countdown',
         countdown_end: countdownEnd,
       })
       .eq('id', tableId)
-    if (updateErr) throw new Error(updateErr.message)
-  } else {
-    // Reset phase if any player unreadies
-    const { error: updateErr } = await supabase
-      .from('tables')
-      .update({
-        turn_phase: 'drafting',
-        countdown_end: null,
-      })
-      .eq('id', tableId)
-    if (updateErr) throw new Error(updateErr.message)
+      .eq('turn_phase', 'drafting')
+      .select('turn_phase, countdown_end')
+      .maybeSingle()
+
+    if (startErr) throw new Error(startErr.message)
+    // Another request already started the countdown, or the turn is resolving
+    if (!started) return changed
+
+    if (await everyoneReady(db, tableId)) return started as TablePhase
+
+    // A player stepped back between the check and the write. Their own request ran before this
+    // countdown existed and had nothing to stop, so stop it here (this one only), then look again
+    // in case they are ready once more.
+    await cancelCountdown(db, tableId, countdownEnd)
+    changed = { turn_phase: 'drafting', countdown_end: null }
   }
 
-  revalidatePath(`/table/${tableId}`)
+  return changed
+}
+
+// The server's clock. countdown_end is stamped with it, so each browser asks for it once and
+// counts down from the same "now" even when the device's own clock is a few seconds off.
+export async function getServerTime(): Promise<number> {
+  return Date.now()
 }
 
 export async function resolveTurn(tableId: string) {

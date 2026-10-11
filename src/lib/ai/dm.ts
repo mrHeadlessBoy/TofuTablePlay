@@ -1,7 +1,13 @@
 import { GoogleGenAI } from '@google/genai'
 import { extractTriggeredLore, LoreEntry } from './lorebook'
+import { OPENING_TURN_NUMBER } from '@/lib/turns'
 
 const ai = new GoogleGenAI()
+
+// One model for every Dungeon Master call (turn narration and the opening scene)
+const DM_MODEL = 'gemini-3.5-flash-lite'
+// The opening scene is written while the host waits on the Launch button, so give up after this long
+const OPENING_TIMEOUT_MS = 15000
 
 export interface DmTurnInput {
   campaign: {
@@ -89,9 +95,13 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
   const contents: { role: 'user' | 'model'; parts: [{ text: string }] }[] = []
 
   for (const turn of turnsWindow) {
-    const userPrompt = turn.party_actions_summary
-      ? `[TURN ${turn.turn_number} PARTY ACTIONS]\n${turn.party_actions_summary}`
-      : `[TURN ${turn.turn_number}]: The party executes their declared actions.`
+    // Same numbers the players see: the opening narration is not a turn
+    const playedTurn = turn.turn_number - OPENING_TURN_NUMBER
+    const userPrompt = turn.turn_number === OPENING_TURN_NUMBER
+      ? '[OPENING]: The table has just opened and nobody has acted yet. Narrate the opening scene.'
+      : turn.party_actions_summary
+        ? `[TURN ${playedTurn} PARTY ACTIONS]\n${turn.party_actions_summary}`
+        : `[TURN ${playedTurn}]: The party executes their declared actions.`
 
     contents.push({
       role: 'user',
@@ -122,7 +132,7 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 
   // 6. ส่งคำขอไปยัง API พร้อม System Instruction แยกต่างหาก
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash-lite',
+    model: DM_MODEL,
     contents: contents,
     config: {
       systemInstruction: systemInstruction,
@@ -131,4 +141,70 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
   })
 
   return response.text || 'The Dungeon Master pauses as the dust settles around the party.'
+}
+
+/**
+ * The opening narration of a new table, written from the campaign sheet before any player has acted.
+ * It introduces the world and is not a played turn: Turn 1 is the first one the party resolves.
+ * Throws when the AI gives no answer, so the caller can fall back to a plain line.
+ */
+export async function generateOpeningNarrative(input: {
+  campaign: DmTurnInput['campaign']
+  loreEntries: LoreEntry[]
+}): Promise<string> {
+  const { campaign, loreEntries } = input
+
+  // Nobody has written anything yet, so the lore scan runs on the campaign sheet itself:
+  // "Always Active" entries plus any entry whose keyword already appears in the setting or story
+  const scanTargetText = `${campaign.world_setting}\n${campaign.core_description}`
+  const openingLore = extractTriggeredLore(loreEntries, scanTargetText, true)
+  const loreContext = openingLore.length > 0
+    ? openingLore.map((l) => `[LORE: ${l.title} (${l.category})]: ${l.content}`).join('\n')
+    : null
+
+  const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
+
+[WORLD SETTING & TONE]
+${campaign.world_setting}
+
+[OVERARCHING STORY]
+${campaign.core_description}
+
+[ACTIVE MECHANICS / RULES]
+${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
+
+[OPENING SCENE DIRECTIVES]
+1. นี่คือคำบรรยายเปิดเรื่องก่อนเริ่มเทิร์นแรก ยังไม่มีผู้เล่นคนใดส่งแอ็กชัน จงเปิดฉากแรกของการผจญภัยจากข้อมูลแคมเปญข้างต้น ให้ผู้เล่นเข้าใจว่าโลกนี้เป็นอย่างไรและตอนนี้กำลังเกิดอะไรขึ้น
+2. บรรยายสถานที่ เวลา บรรยากาศ และเหตุการณ์ที่กำลังเกิดขึ้นตรงหน้าปาร์ตี้ ให้มีจุดเริ่มเรื่องที่ชัดเจนพอให้ผู้เล่นตัดสินใจได้ว่าจะทำอะไรต่อ (กระชับแต่น่าติดตาม 2-3 ย่อหน้า)
+3. ผู้เล่นยังไม่ได้เลือกตัวละคร ห้ามตั้งชื่อ กำหนดอาชีพ หรือตัดสินใจแทนตัวละครผู้เล่น ให้เรียกรวมว่า "ปาร์ตี้" หรือ "พวกคุณ"
+4. ช่วงเปิดเรื่องยังไม่มีการทอยเต๋า ห้ามขอให้ทอยเต๋า และห้ามพิมพ์หัวข้อ [ Decision ] ออกมา
+5. จบคำบรรยายด้วยคำถามสั้นๆ ที่ชวนให้ผู้เล่นประกาศแอ็กชันแรกของตัวเอง
+
+[REQUIRED OUTPUT FORMAT]
+(เนื้อหาบรรยายฉากเปิดของเรื่อง)
+
+[ Overview ]
+สถานที่และเวลา : (ชื่อสถานที่และสภาพแวดล้อมโดยย่อและบอกเวลาอย่างชัดเจนว่ากี่นาฬิกา)
+สถานการณ์ปัจจุบัน: (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปให้เข้าใจ)`
+
+  const openingRequest = [
+    loreContext ? `[LORE FOR THE OPENING SCENE]\n${loreContext}\n` : '',
+    '[OPENING]: โต๊ะเพิ่งเปิด ปาร์ตี้มารวมตัวกันแล้ว จงบรรยายฉากเปิดของการผจญภัย',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const response = await ai.models.generateContent({
+    model: DM_MODEL,
+    contents: [{ role: 'user', parts: [{ text: openingRequest }] }],
+    config: {
+      systemInstruction: systemInstruction,
+      temperature: 0.7,
+      abortSignal: AbortSignal.timeout(OPENING_TIMEOUT_MS),
+    },
+  })
+
+  const text = response.text?.trim()
+  if (!text) throw new Error('The AI returned an empty opening scene')
+  return text
 }

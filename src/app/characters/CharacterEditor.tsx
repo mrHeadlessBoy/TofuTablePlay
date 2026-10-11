@@ -2,14 +2,52 @@
 
 import { useState } from 'react'
 import { saveCharacter, CharacterFormData, EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './actions'
+import { useRouter } from 'next/navigation'
+import { saveCharacter, deleteCharacter, CharacterFormData } from './actions'
+import { Trash2, Loader2 } from 'lucide-react'
 
 const defaultStats = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 }
 
-type CharacterRecord = CharacterFormData & { id?: string | number }
-
-export default function CharacterEditor({ characters }: { characters: CharacterRecord[] }) {
+type CharacterRecord = CharacterFormData & { id?: string | number; user_id?: string | null }
+/*  */
+export default function CharacterEditor({
+  characters,
+  currentUserId,
+}: {
+  characters: CharacterRecord[]
+  currentUserId?: string | null
+}) {
+  const router = useRouter()
   const [selectedChar, setSelectedChar] = useState<CharacterRecord | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const isOwner = (char: CharacterRecord) => {
+    if (!currentUserId || !char.user_id) return true
+    return char.user_id === currentUserId
+  }
+
+  const handleDelete = async (char: CharacterRecord) => {
+    if (!char.id) return
+    const charName = char.name?.trim() || 'this character'
+    if (!confirm(`Delete character "${charName}"? This sheet will be permanently removed. This cannot be undone.`)) {
+      return
+    }
+
+    setDeletingId(String(char.id))
+    try {
+      await deleteCharacter(String(char.id))
+      if (selectedChar?.id === char.id) {
+        setSelectedChar(null)
+      }
+      router.refresh()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete character.'
+      alert(message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const handleNew = () => {
     setSelectedChar({
@@ -44,6 +82,7 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
     try {
       await saveCharacter(selectedChar)
       setSelectedChar(null)
+      router.refresh()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save character.'
       alert(message)
@@ -74,11 +113,31 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
                   : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
               }`}
             >
-              <div className="flex justify-between items-start">
-                <h3 className="font-semibold text-white">{char.name}</h3>
-                <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                  {char.class_archetype}
-                </span>
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-white truncate">{char.name}</h3>
+                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 inline-block mt-1">
+                    {char.class_archetype}
+                  </span>
+                </div>
+                {char.id && isOwner(char) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(char)
+                    }}
+                    disabled={deletingId !== null}
+                    title="Delete character sheet"
+                    className="text-zinc-500 hover:text-red-400 p-1.5 rounded hover:bg-zinc-800 transition cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {deletingId === String(char.id) ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </div>
               <p className="text-xs text-zinc-400 mt-2">
                 HP: {char.current_hp}/{char.max_hp} | AC: {char.armor_class} | Status: {char.status_condition}
@@ -259,6 +318,40 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
               >
                 {isSaving ? 'Saving...' : 'Save Character Sheet'}
               </button>
+            <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
+              {selectedChar.id && isOwner(selectedChar) ? (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(selectedChar)}
+                  disabled={deletingId !== null || isSaving}
+                  className="px-3 py-2 text-xs bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 text-red-300 rounded-lg font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {deletingId === String(selectedChar.id) ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  Delete Character
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedChar(null)}
+                  className="px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving || deletingId !== null}
+                  className="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium cursor-pointer disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Character Sheet'}
+                </button>
+              </div>
             </div>
           </form>
         ) : (
