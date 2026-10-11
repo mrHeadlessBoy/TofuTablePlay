@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { saveCharacter, CharacterFormData, EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './actions'
 import { useRouter } from 'next/navigation'
-import { saveCharacter, deleteCharacter, CharacterFormData } from './actions'
+import { saveCharacter, deleteCharacter, CharacterFormData, EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './actions'
 import { Trash2, Loader2 } from 'lucide-react'
 
 const defaultStats = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 }
