@@ -317,7 +317,7 @@ export default function CharacterEditor({
               >
                 {isSaving ? 'Saving...' : 'Save Character Sheet'}
               </button>
-            <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
+            <div className="flex justify-between items-center pt-4 border-t border-zinc-800"/>
               {selectedChar.id && isOwner(selectedChar) ? (
                 <button
                   type="button"
