@@ -48,6 +48,7 @@ type Character = {
   status_condition?: string
   stats?: Record<string, number | string>
   inventory?: string
+  equipment?: string[]
 }
 
 type Member = {
@@ -91,6 +92,9 @@ type TablePlaygroundProps = {
   isHeadTable: boolean
 }
 
+const EQUIPMENT_LABELS = ['Head', 'Torso', 'Leg', 'Foot', 'Left Hand', 'Right Hand'] as const
+const EMPTY_EQUIPMENT = ['', '', '', '', '', '']
+
 const CONDITIONS = ['Normal', 'Bloodied', 'Poisoned', 'Stunned', 'Blinded', 'Unconscious', 'Blessed', 'Charmed', 'Exhausted']
 
 export default function TablePlayground({
@@ -133,6 +137,7 @@ export default function TablePlayground({
     armor_class: 10,
     status_condition: 'Normal',
     inventory: '',
+    equipment: [...EMPTY_EQUIPMENT] as string[],
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 } as Record<string, number | string>,
   })
 
@@ -175,6 +180,7 @@ export default function TablePlayground({
         armor_class: activeChar.armor_class ?? 10,
         status_condition: activeChar.status_condition || 'Normal',
         inventory: activeChar.inventory || '',
+        equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)] as string[],
         stats: activeChar.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
       })
     }
@@ -585,6 +591,29 @@ export default function TablePlayground({
                 />
               </div>
 
+              {/* Equipment Slots Editor */}
+              <div>
+                <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-1">Equipment Slots</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {EQUIPMENT_LABELS.map((label, idx) => (
+                    <div key={label}>
+                      <span className="text-[9px] text-zinc-500 uppercase block">{label}</span>
+                      <input
+                        type="text"
+                        placeholder={`${label}...`}
+                        value={(charForm.equipment ?? EMPTY_EQUIPMENT)[idx] || ''}
+                        onChange={(e) => {
+                          const next = [...(charForm.equipment ?? EMPTY_EQUIPMENT)]
+                          next[idx] = e.target.value
+                          setCharForm({ ...charForm, equipment: next })
+                        }}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded p-1 text-[11px] text-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
@@ -656,6 +685,22 @@ export default function TablePlayground({
                 <span className="text-[10px] uppercase font-mono text-zinc-400">Inventory</span>
                 <div className="mt-1 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-300 min-h-15 whitespace-pre-line text-[11px]">
                   {activeChar.inventory || 'Empty'}
+                </div>
+              </div>
+
+              {/* Equipment Slots */}
+              <div>
+                <span className="text-[10px] uppercase font-mono text-zinc-400">Equipment</span>
+                <div className="mt-1 grid grid-cols-2 gap-1.5">
+                  {EQUIPMENT_LABELS.map((label, idx) => {
+                    const item = (activeChar.equipment ?? EMPTY_EQUIPMENT)[idx]
+                    return (
+                      <div key={label} className="p-1.5 bg-zinc-950 border border-zinc-800 rounded text-[11px]">
+                        <span className="text-[9px] text-zinc-500 uppercase block">{label}</span>
+                        <span className="text-zinc-300">{item || '—'}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>

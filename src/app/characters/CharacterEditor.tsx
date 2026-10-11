@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { saveCharacter, CharacterFormData } from './actions'
+import { saveCharacter, CharacterFormData, EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './actions'
 
 const defaultStats = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 }
 
@@ -25,6 +25,7 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
       weaknesses: '',
       inventory: '',
       status_condition: 'Normal',
+      equipment: [...EMPTY_EQUIPMENT],
     })
   }
 
@@ -217,6 +218,29 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
                   onChange={(e) => setSelectedChar({ ...selectedChar, backstory: e.target.value })}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
+              </div>
+            </div>
+
+            {/* Equipment Slots */}
+            <div>
+              <label className="text-xs text-zinc-400 uppercase block mb-2">Equipment Slots</label>
+              <div className="grid grid-cols-2 gap-3">
+                {EQUIPMENT_LABELS.map((label, idx) => (
+                  <div key={label}>
+                    <label className="text-[10px] text-zinc-500 font-mono uppercase">{label}</label>
+                    <input
+                      type="text"
+                      placeholder={`${label} slot...`}
+                      value={(selectedChar.equipment ?? EMPTY_EQUIPMENT)[idx] || ''}
+                      onChange={(e) => {
+                        const next = [...(selectedChar.equipment ?? EMPTY_EQUIPMENT)] as CharacterFormData['equipment']
+                        next[idx] = e.target.value
+                        setSelectedChar({ ...selectedChar, equipment: next })
+                      }}
+                      className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
