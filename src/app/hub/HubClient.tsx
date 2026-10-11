@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from './actions'
-import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices } from 'lucide-react'
+import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil } from 'lucide-react'
 import Link from 'next/link'
 
 type PublicCampaign = {
@@ -192,6 +192,22 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                   <Play className="w-3.5 h-3.5" /> Launch as Head Table
                 </button>
               </form>
+              <div className="mt-2 flex gap-2">
+                <Link
+                  href={`/campaigns/${camp.id}`}
+                  className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition flex items-center justify-center gap-1.5"
+                >
+                  <Info className="w-3.5 h-3.5" /> Details
+                </Link>
+                {currentUserId && camp.creator_id === currentUserId && (
+                  <Link
+                    href={`/campaigns/${camp.id}/edit`}
+                    className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </Link>
+                )}
+              </div>
               {currentUserId && camp.creator_id === currentUserId && (
                 <button
                   type="button"

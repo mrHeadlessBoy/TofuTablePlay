@@ -1,10 +1,11 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export interface CharacterFormData {
   id?: string
+  user_id?: string
   name: string
   class_archetype: string
   current_hp: number
@@ -63,4 +64,40 @@ export async function saveCharacter(data: CharacterFormData) {
   }
 
   revalidatePath('/characters')
+}
+
+export async function deleteCharacter(characterId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: character } = await supabase
+    .from('characters')
+    .select('id, user_id')
+    .eq('id', characterId)
+    .single()
+
+  if (!character) throw new Error('Character not found')
+  if (character.user_id !== user.id) {
+    throw new Error('Only the character owner can delete this character sheet')
+  }
+
+  const admin = createAdminClient() || supabase
+
+  // Detach this character from any active table seats first
+  await admin
+    .from('table_members')
+    .update({ character_id: null })
+    .eq('character_id', character.id)
+
+  const { error } = await admin
+    .from('characters')
+    .delete()
+    .eq('id', character.id)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/characters')
+  return { success: true }
 }
