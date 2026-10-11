@@ -2,13 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-
-/** Equipment slots: [head, torso, leg, foot, left hand, right hand] */
-export type EquipmentSlots = [string, string, string, string, string, string]
-
-export const EQUIPMENT_LABELS = ['Head', 'Torso', 'Leg', 'Foot', 'Left Hand', 'Right Hand'] as const
-
-export const EMPTY_EQUIPMENT: EquipmentSlots = ['', '', '', '', '', '']
+import type { EquipmentSlots } from './equipment'
 
 export interface CharacterFormData {
   id?: string
