@@ -1,4 +1,4 @@
-'use client'
+'use server'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -302,21 +302,6 @@ export default function CharacterEditor({
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setSelectedChar(null)}
-                className="px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium cursor-pointer"
-              >
-                {isSaving ? 'Saving...' : 'Save Character Sheet'}
-              </button>
             <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
               {selectedChar.id && isOwner(selectedChar) ? (
                 <button
