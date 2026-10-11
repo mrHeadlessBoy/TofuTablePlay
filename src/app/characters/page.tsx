@@ -14,7 +14,7 @@ async function CharacterList() {
     .eq('user_id', user?.id)
     .order('created_at', { ascending: false })
 
-  return <CharacterEditor characters={characters || []} />
+  return <CharacterEditor characters={characters || []} currentUserId={user?.id ?? null} />
 }
 
 export default function CharactersPage() {
