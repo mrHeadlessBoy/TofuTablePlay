@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useMemo, useRef, type FormEvent } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from './actions'
-import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil } from 'lucide-react'
+import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 type PublicCampaign = {
@@ -53,11 +53,101 @@ function LaunchButton() {
   )
 }
 
+function CampaignCard({
+  camp,
+  currentUserId,
+  deletingId,
+  onDelete,
+}: {
+  camp: PublicCampaign
+  currentUserId: string | null
+  deletingId: string | null
+  onDelete: (camp: PublicCampaign) => void
+}) {
+  return (
+    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
+      <div>
+        <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
+        <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
+        <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3">{camp.core_description}</p>
+      </div>
+      <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
+        <LaunchButton />
+      </form>
+      {/* Details Button - Only shown if user is NOT the owner */}
+      {camp.creator_id !== currentUserId && (
+        <Link
+          href={`/campaigns/${camp.id}`}
+          className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition flex items-center justify-center gap-1.5"
+        >
+          <Info className="w-3.5 h-3.5" /> Details
+        </Link>
+      )}
+
+      {/* Edit Button - Only shown if user IS the owner */}
+      {currentUserId && camp.creator_id === currentUserId && (
+        <Link
+          href={`/campaigns/${camp.id}/edit`}
+          className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
+        >
+          <Pencil className="w-3.5 h-3.5" /> Edit
+        </Link>
+      )}
+      {currentUserId && camp.creator_id === currentUserId && (
+        <button
+          type="button"
+          onClick={() => onDelete(camp)}
+          disabled={deletingId !== null}
+          className="mt-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+        >
+          {deletingId === `campaign:${camp.id}` ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5" />
+          )}
+          Delete Campaign
+        </button>
+      )}
+    </div>
+  )
+}
+
+const CAMPAIGNS_PER_PAGE = 6
+
 export default function HubClient({ publicCampaigns, activeTables, currentUserId }: HubClientProps) {
   const router = useRouter()
   const [tableCode, setTableCode] = useState('')
   const [joining, setJoining] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isExtended, setIsExtended] = useState(true)
+  const [currentPage, setCurrentPage] = useState(0)
+  const touchStartX = useRef<number | null>(null)
+
+  const totalPages = Math.max(1, Math.ceil(publicCampaigns.length / CAMPAIGNS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, Math.max(0, totalPages - 1))
+
+  const campaignPages = useMemo(() => {
+    const pages: PublicCampaign[][] = []
+    for (let i = 0; i < publicCampaigns.length; i += CAMPAIGNS_PER_PAGE) {
+      pages.push(publicCampaigns.slice(i, i + CAMPAIGNS_PER_PAGE))
+    }
+    return pages
+  }, [publicCampaigns])
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const diffX = touchStartX.current - e.changedTouches[0].clientX
+    if (diffX > 50 && safeCurrentPage < totalPages - 1) {
+      setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
+    } else if (diffX < -50 && safeCurrentPage > 0) {
+      setCurrentPage((p) => Math.max(0, p - 1))
+    }
+    touchStartX.current = null
+  }
 
   const handleDeleteTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
@@ -197,57 +287,167 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
       {/* Public Campaigns */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Compass className="w-5 h-5 text-amber-500" /> Explore Campaigns
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {publicCampaigns.map((camp) => (
-            <div key={camp.id} className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
-              <div>
-                <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
-                <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
-                <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3">{camp.core_description}</p>
-              </div>
-              <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
-                <LaunchButton />
-              </form>
-              {/* Details Button - Only shown if user is NOT the owner */}
-{camp.creator_id !== currentUserId && (
-  <Link
-    href={`/campaigns/${camp.id}`}
-    className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition flex items-center justify-center gap-1.5"
-  >
-    <Info className="w-3.5 h-3.5" /> Details
-  </Link>
-)}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+          <button
+            type="button"
+            onClick={() => setIsExtended((prev) => !prev)}
+            aria-expanded={isExtended}
+            aria-controls="explore-campaigns-section"
+            className="flex items-center gap-2.5 text-lg font-semibold text-white hover:text-amber-400 transition cursor-pointer select-none group text-left"
+          >
+            <Compass className="w-5 h-5 text-amber-500 group-hover:rotate-12 transition-transform" />
+            <span>Explore Campaigns</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 group-hover:text-zinc-200 font-normal">
+              {publicCampaigns.length}
+            </span>
+            <span className="text-xs text-zinc-400 group-hover:text-amber-400 flex items-center gap-1 ml-1 font-normal">
+              {isExtended ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  <span className="hidden sm:inline">Collapse</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">Extend</span>
+                </>
+              )}
+            </span>
+          </button>
 
-{/* Edit Button - Only shown if user IS the owner */}
-{currentUserId && camp.creator_id === currentUserId && (
-  <Link
-    href={`/campaigns/${camp.id}/edit`}
-    className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
-  >
-    <Pencil className="w-3.5 h-3.5" /> Edit
-  </Link>
-)}
-              {currentUserId && camp.creator_id === currentUserId && (
+          <div className="flex items-center gap-2">
+            {isExtended && totalPages > 1 && (
+              <div className="flex items-center gap-1.5 text-xs bg-zinc-900/80 border border-zinc-800 rounded-lg p-1">
                 <button
                   type="button"
-                  onClick={() => handleDeleteCampaign(camp)}
-                  disabled={deletingId !== null}
-                  className="mt-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                  disabled={safeCurrentPage === 0}
+                  aria-label="Previous campaigns"
+                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400 disabled:cursor-not-allowed transition cursor-pointer"
                 >
-                  {deletingId === `campaign:${camp.id}` ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-3.5 h-3.5" />
-                  )}
-                  Delete Campaign
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
+                <span className="px-1.5 text-zinc-300 font-mono text-[11px] select-none">
+                  {safeCurrentPage + 1} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={safeCurrentPage >= totalPages - 1}
+                  aria-label="Next campaigns"
+                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsExtended((prev) => !prev)}
+              aria-expanded={isExtended}
+              aria-controls="explore-campaigns-section"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 rounded-lg transition cursor-pointer"
+            >
+              {isExtended ? (
+                <>
+                  <span>Collapse</span>
+                  <ChevronUp className="w-3.5 h-3.5 text-zinc-400" />
+                </>
+              ) : (
+                <>
+                  <span>Extend</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                </>
               )}
-            </div>
-          ))}
+            </button>
+          </div>
         </div>
+
+        {isExtended ? (
+          <div id="explore-campaigns-section" className="space-y-4">
+            {publicCampaigns.length === 0 ? (
+              <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-8 text-center text-zinc-500 text-sm">
+                No public campaigns available yet.
+              </div>
+            ) : (
+              <>
+                <div
+                  className="relative overflow-hidden"
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <div
+                    className="flex transition-transform duration-300 ease-out items-start"
+                    style={{ transform: `translateX(-${safeCurrentPage * 100}%)` }}
+                  >
+                    {campaignPages.map((pageCamps, pageIndex) => (
+                      <div
+                        key={pageIndex}
+                        className="w-full shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                      >
+                        {pageCamps.map((camp) => (
+                          <CampaignCard
+                            key={camp.id}
+                            camp={camp}
+                            currentUserId={currentUserId}
+                            deletingId={deletingId}
+                            onDelete={handleDeleteCampaign}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 px-1">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                      disabled={safeCurrentPage === 0}
+                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" /> Previous
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      {Array.from({ length: totalPages }).map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCurrentPage(idx)}
+                          aria-label={`Go to slide ${idx + 1}`}
+                          className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                            idx === safeCurrentPage
+                              ? 'w-6 bg-amber-500'
+                              : 'w-2 bg-zinc-700 hover:bg-zinc-500'
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={safeCurrentPage >= totalPages - 1}
+                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                    >
+                      Next <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div
+            onClick={() => setIsExtended(true)}
+            className="bg-zinc-900/20 border border-zinc-800/60 border-dashed rounded-xl p-4 text-center text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>Explore Campaigns is collapsed ({publicCampaigns.length} campaigns available). Click to extend.</span>
+          </div>
+        )}
       </div>
 
       {/* Battle Board entry: floats in the bottom-right corner of the hub */}
