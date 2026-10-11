@@ -56,7 +56,7 @@ export default function StoryLog({ entries, onClose }: StoryLogProps) {
         <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-amber-400">
           <ScrollText className="h-4 w-4" /> Story Log
         </span>
-        <button type="button" onClick={onClose} aria-label="Close story log" className="text-white/50 hover:text-white">
+        <button type="button" onClick={onClose} aria-label="Close story log" className="text-white/50 hover:text-white cursor-pointer">
           <X className="h-4 w-4" />
         </button>
       </header>
@@ -69,7 +69,7 @@ export default function StoryLog({ entries, onClose }: StoryLogProps) {
             onClick={() => setFilter(option.id)}
             className={`rounded px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition ${
               filter === option.id ? 'bg-white/15 text-white' : 'text-white/50 hover:bg-white/10'
-            }`}
+            } cursor-pointer`}
           >
             {option.label}
           </button>

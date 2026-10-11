@@ -245,7 +245,7 @@ export default function NewCampaignPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveLoreEntry(idx)}
-                      className="text-zinc-500 hover:text-red-400 p-1"
+                      className="text-zinc-500 hover:text-red-400 p-1 cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -314,7 +314,7 @@ export default function NewCampaignPage() {
                     <button
                       type="button"
                       onClick={addTriggerKey}
-                      className="bg-zinc-800 hover:bg-zinc-700 px-3 py-1 text-xs rounded text-zinc-200"
+                      className="bg-zinc-800 hover:bg-zinc-700 px-3 py-1 text-xs rounded text-zinc-200 cursor-pointer"
                     >
                       Add Keys
                     </button>
@@ -337,7 +337,7 @@ export default function NewCampaignPage() {
               <button
                 type="button"
                 onClick={handleAddLoreEntry}
-                className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 font-medium rounded flex items-center justify-center gap-1.5 transition"
+                className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 font-medium rounded flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> Attach Entry to Lorebook
               </button>
@@ -347,7 +347,7 @@ export default function NewCampaignPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-sm transition disabled:opacity-50"
+            className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-sm transition disabled:opacity-50 cursor-pointer"
           >
             {loading ? 'Creating Campaign...' : 'Publish Campaign'}
           </button>

@@ -56,7 +56,7 @@ export default function LandingPage() {
           <button
             disabled
             title="Grid-Box Walking Mode coming in future releases"
-            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 font-semibold text-sm cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 font-semibold text-sm cursor-not-allowed cursor-pointer"
           >
             <Play className="w-4 h-4" /> Live Campaign (Grid Mode)
             <span className="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono">Soon</span>

@@ -449,13 +449,13 @@ export default function TablePlayground({
                         handleOpenEdit()
                       }
                     }}
-                    className="text-[10px] text-zinc-400 hover:text-amber-400 flex items-center gap-1"
+                    className="text-[10px] text-zinc-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer"
                   >
                     <Edit3 className="w-3 h-3" /> {isEditingChar ? 'Close' : 'Edit'}
                   </button>
                   <button
                     onClick={() => setIsSwitchingChar(true)}
-                    className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1"
+                    className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" /> Switch
                   </button>
@@ -479,7 +479,7 @@ export default function TablePlayground({
                 {isSwitchingChar && (
                   <button
                     onClick={() => setIsSwitchingChar(false)}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300 cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -489,7 +489,7 @@ export default function TablePlayground({
                 <button
                   key={char.id}
                   onClick={() => handleSelectCharacter(char.id)}
-                  className="w-full text-left p-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-amber-500 text-xs transition"
+                  className="w-full text-left p-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-amber-500 text-xs transition cursor-pointer"
                 >
                   <p className="font-semibold text-white">{char.name}</p>
                   <p className="text-zinc-500">
@@ -590,14 +590,14 @@ export default function TablePlayground({
                   type="button"
                   onClick={handleSaveCharEdits}
                   disabled={isSavingChar}
-                  className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-xs font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-xs font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" /> {isSavingChar ? 'Saving...' : 'Save Sheet'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsEditingChar(false)}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300"
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -698,7 +698,7 @@ export default function TablePlayground({
                           setEditingTurnId(turn.id)
                           setEditText(turn.narrative_output)
                         }}
-                        className="text-zinc-500 hover:text-zinc-300 text-xs flex items-center gap-1 transition"
+                        className="text-zinc-500 hover:text-zinc-300 text-xs flex items-center gap-1 transition cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" /> Edit
                       </button>
@@ -717,13 +717,13 @@ export default function TablePlayground({
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setEditingTurnId(null)}
-                        className="px-3 py-1 text-xs text-zinc-400 hover:text-white flex items-center gap-1"
+                        className="px-3 py-1 text-xs text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
                       >
                         <X className="w-3 h-3" /> Cancel
                       </button>
                       <button
                         onClick={() => handleSaveHostEdit(turn.id)}
-                        className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs flex items-center gap-1"
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs flex items-center gap-1 cursor-pointer"
                       >
                         <Check className="w-3 h-3" /> Save Changes
                       </button>
@@ -785,7 +785,7 @@ export default function TablePlayground({
                     diceOpen && !draftLocked
                       ? 'border-amber-500 bg-amber-950/40 text-amber-400'
                       : 'border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400'
-                  }`}
+                  } cursor-pointer`}
                 >
                   <Dices className="w-4 h-4" />
                 </button>
@@ -809,7 +809,7 @@ export default function TablePlayground({
                   activeMember?.is_ready
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                     : 'bg-amber-600 hover:bg-amber-500 text-white'
-                }`}
+                } cursor-pointer`}
               >
                 <CheckCircle2 className="w-4 h-4" />
                 {activeMember?.is_ready ? 'Ready!' : 'Ready Up'}
@@ -878,7 +878,7 @@ export default function TablePlayground({
                         <button
                           onClick={() => handleKick(m.user_id, charName)}
                           title="Kick Player (Host)"
-                          className="text-zinc-600 hover:text-red-400 transition"
+                          className="text-zinc-600 hover:text-red-400 transition cursor-pointer"
                         >
                           <UserX className="w-3.5 h-3.5" />
                         </button>

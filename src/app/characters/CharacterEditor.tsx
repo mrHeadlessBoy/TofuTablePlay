@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { saveCharacter, CharacterFormData } from './actions'
 
-const defaultStats = { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }
+const defaultStats = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 }
 
 type CharacterRecord = CharacterFormData & { id?: string | number }
 
@@ -17,7 +17,7 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
       class_archetype: '',
       current_hp: 10,
       max_hp: 10,
-      armor_class: 10,
+      armor_class: 14,
       stats: { ...defaultStats },
       appearance: '',
       backstory: '',
@@ -57,7 +57,7 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
       <div className="md:col-span-1 space-y-4">
         <button
           onClick={handleNew}
-          className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg text-sm transition"
+          className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg text-sm transition cursor-pointer"
         >
           + Create New Character
         </button>
@@ -224,14 +224,14 @@ export default function CharacterEditor({ characters }: { characters: CharacterR
               <button
                 type="button"
                 onClick={() => setSelectedChar(null)}
-                className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
+                className="px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium"
+                className="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium cursor-pointer"
               >
                 {isSaving ? 'Saving...' : 'Save Character Sheet'}
               </button>

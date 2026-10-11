@@ -87,7 +87,7 @@ export function PartyRoster({
                   hero.id === selectedId ? 'border-amber-400/70 bg-amber-400/10' : 'border-white/10 bg-black/30 hover:border-white/25'
                 }`}
               >
-                <button type="button" onClick={() => onSelect(hero.id)} className="min-w-0 flex-1 text-left">
+                <button type="button" onClick={() => onSelect(hero.id)} className="min-w-0 flex-1 text-left cursor-pointer">
                   <span className="flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: hero.color }} />
                     <span className="truncate text-xs font-semibold text-white">{hero.name}</span>
@@ -111,7 +111,7 @@ export function PartyRoster({
                     isReady
                       ? 'border border-emerald-400/50 bg-emerald-400/15 text-emerald-300'
                       : 'border border-white/10 bg-white/5 text-white/55 hover:text-white'
-                  }`}
+                  } cursor-pointer`}
                 >
                   {isReady ? 'READY' : 'DRAFTING'}
                 </button>
@@ -127,7 +127,7 @@ export function PartyRoster({
           type="button"
           disabled={locked || heroes.length === 0 || readyCount === heroes.length}
           onClick={onReadyAll}
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:opacity-40"
+          className="flex-1 rounded-lg border border-white/10 bg-white/5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:opacity-40 cursor-pointer"
         >
           Ready all
         </button>
@@ -135,7 +135,7 @@ export function PartyRoster({
           type="button"
           disabled={locked}
           onClick={() => setAdding((open) => !open)}
-          className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:opacity-40"
+          className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:opacity-40 cursor-pointer"
         >
           {adding ? <X className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />} Hero
         </button>
@@ -154,7 +154,7 @@ export function PartyRoster({
                     onAddCharacter(character)
                     setAdding(false)
                   }}
-                  className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1 text-left text-xs text-white/80 hover:border-amber-400/60"
+                  className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1 text-left text-xs text-white/80 hover:border-amber-400/60 cursor-pointer"
                 >
                   <span className="truncate">{character.name}</span>
                   <span className="shrink-0 text-[10px] text-white/45">{character.class_archetype || 'No class'}</span>
@@ -179,7 +179,7 @@ export function PartyRoster({
                 placeholder="Class"
                 className="min-w-0 flex-1 rounded border border-white/15 bg-black/60 px-2 py-1 text-xs text-white placeholder-white/30 outline-none focus:border-amber-400"
               />
-              <button type="submit" className="rounded bg-amber-500 px-2.5 py-1 text-xs font-semibold text-black hover:bg-amber-400">
+              <button type="submit" className="rounded bg-amber-500 px-2.5 py-1 text-xs font-semibold text-black hover:bg-amber-400 cursor-pointer">
                 Add
               </button>
             </div>
@@ -237,7 +237,7 @@ export function ThreatList({ tokens, selectedId, locked, onSelect, onRemove, onS
               onClick={() => setFormKind((current) => (current === kind ? null : kind))}
               className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider transition disabled:opacity-40 ${
                 formKind === kind ? 'border-amber-400/70 text-amber-300' : 'border-white/10 text-white/60 hover:text-white'
-              }`}
+              } cursor-pointer`}
             >
               <Plus className="h-3 w-3" /> {kind}
             </button>
@@ -275,7 +275,7 @@ export function ThreatList({ tokens, selectedId, locked, onSelect, onRemove, onS
             </label>
             <button
               type="submit"
-              className="ml-auto flex items-center gap-1 rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-black hover:bg-amber-400"
+              className="ml-auto flex items-center gap-1 rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-black hover:bg-amber-400 cursor-pointer"
             >
               <MapPin className="h-3 w-3" /> Place
             </button>
@@ -291,7 +291,7 @@ export function ThreatList({ tokens, selectedId, locked, onSelect, onRemove, onS
               token.id === selectedId ? 'border-amber-400/70 bg-amber-400/10' : 'border-white/10 bg-black/30'
             }`}
           >
-            <button type="button" onClick={() => onSelect(token.id)} className="min-w-0 flex-1 text-left">
+            <button type="button" onClick={() => onSelect(token.id)} className="min-w-0 flex-1 text-left cursor-pointer">
               <span className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${token.kind === 'enemy' ? 'bg-red-400' : 'bg-slate-400'}`} />
                 <span className="truncate text-xs font-medium text-white">{token.name}</span>
@@ -308,7 +308,7 @@ export function ThreatList({ tokens, selectedId, locked, onSelect, onRemove, onS
               disabled={locked}
               onClick={() => onRemove(token.id)}
               aria-label={`Remove ${token.name}`}
-              className="shrink-0 text-white/35 transition hover:text-red-400 disabled:opacity-40"
+              className="shrink-0 text-white/35 transition hover:text-red-400 disabled:opacity-40 cursor-pointer"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -356,7 +356,7 @@ export function RollRequests({ requests, heroes, locked, onRoll, onDismiss }: Ro
                   type="button"
                   onClick={() => onDismiss(request)}
                   aria-label="Skip this roll"
-                  className="shrink-0 text-white/35 hover:text-white"
+                  className="shrink-0 text-white/35 hover:text-white cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -366,7 +366,7 @@ export function RollRequests({ requests, heroes, locked, onRoll, onDismiss }: Ro
                 type="button"
                 disabled={locked}
                 onClick={() => onRoll(request)}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded bg-amber-500 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-black transition hover:bg-amber-400 disabled:opacity-50"
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded bg-amber-500 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-black transition hover:bg-amber-400 disabled:opacity-50 cursor-pointer"
               >
                 <Dices className="h-3 w-3" /> Roll d20 {formatModifier(modifier)}
               </button>
@@ -420,7 +420,7 @@ export function TokenInspector({ token, remainingFeet, locked, onHp, onRemove, o
               disabled={locked}
               onClick={() => onHp(-1)}
               aria-label="Lower HP"
-              className="grid h-5 w-5 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-40"
+              className="grid h-5 w-5 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-40 cursor-pointer"
             >
               <Minus className="h-3 w-3" />
             </button>
@@ -432,7 +432,7 @@ export function TokenInspector({ token, remainingFeet, locked, onHp, onRemove, o
               disabled={locked}
               onClick={() => onHp(1)}
               aria-label="Raise HP"
-              className="grid h-5 w-5 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-40"
+              className="grid h-5 w-5 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-40 cursor-pointer"
             >
               <Plus className="h-3 w-3" />
             </button>
@@ -467,7 +467,7 @@ export function TokenInspector({ token, remainingFeet, locked, onHp, onRemove, o
             type="button"
             disabled={locked}
             onClick={() => onCheck(key)}
-            className="rounded-lg border border-white/10 bg-black/30 py-1.5 text-center transition hover:border-amber-400/60 hover:bg-amber-400/10 disabled:opacity-50"
+            className="rounded-lg border border-white/10 bg-black/30 py-1.5 text-center transition hover:border-amber-400/60 hover:bg-amber-400/10 disabled:opacity-50 cursor-pointer"
           >
             <span className="block font-mono text-[9px] uppercase tracking-wider text-white/45">{key}</span>
             <span className="block text-sm font-bold leading-tight text-white">{token.stats[key]}</span>
@@ -480,7 +480,7 @@ export function TokenInspector({ token, remainingFeet, locked, onHp, onRemove, o
         type="button"
         disabled={locked}
         onClick={onRemove}
-        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45 transition hover:border-red-400/50 hover:text-red-300 disabled:opacity-40"
+        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45 transition hover:border-red-400/50 hover:text-red-300 disabled:opacity-40 cursor-pointer"
       >
         <Trash2 className="h-3 w-3" /> Remove from board
       </button>

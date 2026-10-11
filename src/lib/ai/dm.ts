@@ -110,7 +110,7 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
     `[CURRENT TURN: SUBMITTED PARTY ACTIONS (${partyActions.length} Members)]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE]
 - จงบรรยายผลลัพธ์ของสมาชิกทุกคนที่มีชื่อด้านบนให้ครบถ้วน
-- สรุปผลท้ายข้อความตามรูปแบบ [NARRATIVE], [CURRENT STATE & SUMMARY], และ [ACTION / DICE REQUIREMENT] เท่านั้น`,
+- สรุปผลท้ายข้อความตามรูปแบบ [NARRATIVE], [Overview], และ [Decision] เท่านั้น`,
   ]
     .filter(Boolean)
     .join('\n')

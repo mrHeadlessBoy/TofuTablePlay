@@ -387,7 +387,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
             disabled={locked}
             onClick={() => startNewTable(session.theme)}
             title="New table on a fresh map"
-            className="hidden items-center gap-1 rounded border border-white/15 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 disabled:opacity-50 lg:flex"
+            className="hidden items-center gap-1 rounded border border-white/15 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 disabled:opacity-50 lg:flex cursor-pointer"
           >
             <RotateCcw className="h-3 w-3" /> New table
           </button>
@@ -424,14 +424,14 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
           </label>
 
           <div className="flex items-center overflow-hidden rounded border border-white/15">
-            <button type="button" onClick={() => sceneRef.current?.zoomBy(1 / 1.25)} aria-label="Zoom out" className="grid h-7 w-7 place-items-center text-white/70 hover:bg-white/10">
+            <button type="button" onClick={() => sceneRef.current?.zoomBy(1 / 1.25)} aria-label="Zoom out" className="grid h-7 w-7 place-items-center text-white/70 hover:bg-white/10 cursor-pointer">
               <Minus className="h-3.5 w-3.5" />
             </button>
             <span className="w-12 border-x border-white/15 text-center font-mono text-[11px] tabular-nums text-white/80">{zoom}%</span>
-            <button type="button" onClick={() => sceneRef.current?.fit()} className="border-r border-white/15 px-2 font-mono text-[10px] uppercase tracking-wider text-white/70 hover:bg-white/10">
+            <button type="button" onClick={() => sceneRef.current?.fit()} className="border-r border-white/15 px-2 font-mono text-[10px] uppercase tracking-wider text-white/70 hover:bg-white/10 cursor-pointer">
               Fit
             </button>
-            <button type="button" onClick={() => sceneRef.current?.zoomBy(1.25)} aria-label="Zoom in" className="grid h-7 w-7 place-items-center text-white/70 hover:bg-white/10">
+            <button type="button" onClick={() => sceneRef.current?.zoomBy(1.25)} aria-label="Zoom in" className="grid h-7 w-7 place-items-center text-white/70 hover:bg-white/10 cursor-pointer">
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -441,7 +441,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
             onClick={() => setLogOpen((open) => !open)}
             className={`flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs transition ${
               logOpen ? 'border-amber-400/70 bg-amber-400/15 text-amber-200' : 'border-white/15 text-white/70 hover:bg-white/10'
-            }`}
+            } cursor-pointer`}
           >
             <ScrollText className="h-3.5 w-3.5" /> Log
           </button>
@@ -509,7 +509,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
               >
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span className="flex-1">{notice.text}</span>
-                <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">
+                <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100 cursor-pointer">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -520,7 +520,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
                 <span>
                   คลิกช่องว่างบนแมพเพื่อวาง <strong>{placing.name}</strong> ({placing.kind})
                 </span>
-                <button type="button" onClick={() => setPlacing(null)} className="font-mono text-[10px] uppercase tracking-wider text-amber-200/80 hover:text-white">
+                <button type="button" onClick={() => setPlacing(null)} className="font-mono text-[10px] uppercase tracking-wider text-amber-200/80 hover:text-white cursor-pointer">
                   Esc · cancel
                 </button>
               </div>
@@ -565,7 +565,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
                 onClick={() => activeHero && toggleReady(activeHero.id)}
                 className={`flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.16em] transition disabled:opacity-50 ${
                   activeReady ? 'bg-emerald-500 text-black hover:bg-emerald-400' : 'bg-amber-500 text-black hover:bg-amber-400'
-                }`}
+                } cursor-pointer`}
               >
                 <CheckCircle2 className="h-4 w-4" />
                 {activeReady ? 'Ready!' : 'Ready up'}
@@ -599,7 +599,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
             onClick={() => setDiceOpen((open) => !open)}
             className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.18em] shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition ${
               diceOpen ? 'border-amber-400/70 bg-amber-400/20 text-amber-200' : 'border-white/15 bg-black/55 text-white/85 hover:border-amber-400/60'
-            }`}
+            } cursor-pointer`}
           >
             <Dices className="h-4 w-4 text-amber-400" /> Dice
             {session.rollRequests.length > 0 && (

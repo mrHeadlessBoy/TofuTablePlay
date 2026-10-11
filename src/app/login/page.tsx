@@ -79,7 +79,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-50"
+            className="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-50 cursor-pointer"
           >
             {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Log In'}
           </button>
@@ -88,7 +88,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center text-xs text-zinc-500">
           <button
             onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); }}
-            className="hover:text-amber-400 underline underline-offset-4"
+            className="hover:text-amber-400 underline underline-offset-4 cursor-pointer"
           >
             {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
           </button>

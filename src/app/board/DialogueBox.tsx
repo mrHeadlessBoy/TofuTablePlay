@@ -82,7 +82,7 @@ export default function DialogueBox({ speaker, pages, busy = false, onOpenLog }:
           event.stopPropagation()
           onOpenLog()
         }}
-        className="absolute -top-3 right-4 z-10 flex items-center gap-1.5 border-2 border-white bg-black px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/80 hover:bg-white hover:text-black"
+        className="absolute -top-3 right-4 z-10 flex items-center gap-1.5 border-2 border-white bg-black px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/80 hover:bg-white hover:text-black cursor-pointer"
       >
         <ScrollText className="h-3 w-3" /> Log
       </button>

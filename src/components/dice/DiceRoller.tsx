@@ -93,7 +93,7 @@ function Stepper({ label, value, onChange, min, max, format }: {
           type="button"
           aria-label={`Decrease ${label}`}
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10"
+          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 cursor-pointer"
         >
           <Minus className="h-3 w-3" />
         </button>
@@ -102,7 +102,7 @@ function Stepper({ label, value, onChange, min, max, format }: {
           type="button"
           aria-label={`Increase ${label}`}
           onClick={() => onChange(Math.min(max, value + 1))}
-          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10"
+          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 cursor-pointer"
         >
           <Plus className="h-3 w-3" />
         </button>
@@ -181,7 +181,7 @@ export default function DiceRoller({
           <Dices className="h-4 w-4" /> {title}
         </span>
         {onClose && (
-          <button type="button" onClick={onClose} aria-label="Close dice tray" className="text-white/50 hover:text-white">
+          <button type="button" onClick={onClose} aria-label="Close dice tray" className="text-white/50 hover:text-white cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         )}
@@ -221,7 +221,7 @@ export default function DiceRoller({
             onClick={() => setSides(value)}
             className={`rounded py-1.5 font-mono text-[11px] transition ${
               sides === value ? 'bg-amber-500 text-black' : 'border border-white/15 text-white/70 hover:bg-white/10'
-            }`}
+            } cursor-pointer`}
           >
             d{value}
           </button>
@@ -243,7 +243,7 @@ export default function DiceRoller({
                 onClick={() => setMode(value)}
                 className={`px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition disabled:opacity-35 ${
                   modeAllowed && mode === value ? 'bg-white/20 text-white' : 'text-white/55 hover:bg-white/10'
-                }`}
+                } cursor-pointer`}
               >
                 {value === 'normal' ? 'Normal' : value === 'advantage' ? 'Adv' : 'Dis'}
               </button>
@@ -307,7 +307,7 @@ export default function DiceRoller({
       <button
         type="button"
         onClick={submit}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-2 font-mono text-xs font-bold uppercase tracking-[0.2em] text-black transition hover:bg-amber-400"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-2 font-mono text-xs font-bold uppercase tracking-[0.2em] text-black transition hover:bg-amber-400 cursor-pointer"
       >
         <Dices className="h-4 w-4" />
         Roll {count > 1 ? count : ''}d{sides}

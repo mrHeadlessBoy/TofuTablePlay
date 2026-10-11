@@ -111,7 +111,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           <button
             type="submit"
             disabled={joining}
-            className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5"
+            className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 cursor-pointer"
           >
             <LogIn className="w-4 h-4" /> Join
           </button>
@@ -141,7 +141,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                     type="button"
                     onClick={() => handleDeleteTable(tbl)}
                     disabled={deletingId !== null}
-                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition disabled:opacity-50"
+                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition disabled:opacity-50 cursor-pointer"
                   >
                     {deletingId === `table:${tbl.id}` ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -155,7 +155,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                     type="button"
                     onClick={() => handleLeaveTable(tbl)}
                     disabled={deletingId !== null}
-                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition disabled:opacity-50"
+                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition disabled:opacity-50 cursor-pointer"
                   >
                     {deletingId === `leave:${tbl.id}` ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -187,7 +187,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
               <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
                 <button
                   type="submit"
-                  className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5"
+                  className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Play className="w-3.5 h-3.5" /> Launch as Head Table
                 </button>
@@ -197,7 +197,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                   type="button"
                   onClick={() => handleDeleteCampaign(camp)}
                   disabled={deletingId !== null}
-                  className="mt-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="mt-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   {deletingId === `campaign:${camp.id}` ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
