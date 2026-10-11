@@ -152,10 +152,10 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             <p className="text-zinc-400 text-sm">Author your campaign universe and configure context triggers for the AI DM.</p>
           </div>
           <Link
-            href={isEdit ? `/campaigns/${campaignId}` : '/hub'}
+            href="/hub"
             className="text-xs text-amber-500 hover:text-amber-400 underline"
           >
-            &larr; {isEdit ? 'Back to Details' : 'Back to Hub'}
+            &larr; Back to Hub
           </Link>
         </div>
 

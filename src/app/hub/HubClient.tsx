@@ -38,7 +38,7 @@ function LaunchButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+      className="w-full  py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
     >
       {pending ? (
         <>
@@ -206,27 +206,30 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
               <div>
                 <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
                 <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
-                <p className="text-xs text-zinc-400 mt-2 line-clamp-3">{camp.core_description}</p>
+                <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3">{camp.core_description}</p>
               </div>
               <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
                 <LaunchButton />
               </form>
-              <div className="mt-2 flex gap-2">
-                <Link
-                  href={`/campaigns/${camp.id}`}
-                  className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition flex items-center justify-center gap-1.5"
-                >
-                  <Info className="w-3.5 h-3.5" /> Details
-                </Link>
-                {currentUserId && camp.creator_id === currentUserId && (
-                  <Link
-                    href={`/campaigns/${camp.id}/edit`}
-                    className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Edit
-                  </Link>
-                )}
-              </div>
+              {/* Details Button - Only shown if user is NOT the owner */}
+{camp.creator_id !== currentUserId && (
+  <Link
+    href={`/campaigns/${camp.id}`}
+    className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition flex items-center justify-center gap-1.5"
+  >
+    <Info className="w-3.5 h-3.5" /> Details
+  </Link>
+)}
+
+{/* Edit Button - Only shown if user IS the owner */}
+{currentUserId && camp.creator_id === currentUserId && (
+  <Link
+    href={`/campaigns/${camp.id}/edit`}
+    className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
+  >
+    <Pencil className="w-3.5 h-3.5" /> Edit
+  </Link>
+)}
               {currentUserId && camp.creator_id === currentUserId && (
                 <button
                   type="button"
