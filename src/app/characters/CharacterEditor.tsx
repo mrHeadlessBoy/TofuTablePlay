@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { saveCharacter, CharacterFormData, EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './actions'
 import { useRouter } from 'next/navigation'
 import { saveCharacter, deleteCharacter, CharacterFormData, EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './actions'
 import { Trash2, Loader2 } from 'lucide-react'
