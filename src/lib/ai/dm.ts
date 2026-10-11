@@ -122,7 +122,7 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 
   // 6. ส่งคำขอไปยัง API พร้อม System Instruction แยกต่างหาก
   const response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
+    model: 'gemini-3.5-flash-lite',
     contents: contents,
     config: {
       systemInstruction: systemInstruction,
