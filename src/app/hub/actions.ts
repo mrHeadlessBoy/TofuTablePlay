@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { generateOpeningNarrative } from '@/lib/ai/dm'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
 
@@ -223,4 +224,16 @@ export async function deleteCampaign(campaignId: string) {
   }
 
   revalidatePath('/hub')
+}
+
+export async function signOut() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  try {
+    const cookieStore = await cookies()
+    cookieStore.set('dnd_session_start', '', { path: '/', maxAge: 0 })
+  } catch {
+    // Ignore if running where cookies cannot be directly set
+  }
+  redirect('/login')
 }

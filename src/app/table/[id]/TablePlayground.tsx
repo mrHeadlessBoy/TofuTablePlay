@@ -974,7 +974,7 @@ export default function TablePlayground({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm leading-relaxed text-zinc-200 whitespace-pre-line">
+                  <div className="text-2xl leading-relaxed text-zinc-200 whitespace-pre-line">
                     {turn.narrative_output}
                   </div>
                 )}

@@ -3,6 +3,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { connection } from 'next/server'
 
+const SIX_HOURS_IN_SECONDS = 6 * 60 * 60 // 21,600 seconds (6 hours)
+
 export async function createClient() {
   // Supabase auth uses Date.now() internally (e.g. session expiry checks).
   // connection() tells Next.js the rest only runs at request time, so those
@@ -14,6 +16,9 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: {
+        maxAge: SIX_HOURS_IN_SECONDS,
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -21,7 +26,10 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                ...options,
+                maxAge: SIX_HOURS_IN_SECONDS,
+              })
             )
           } catch {
             // Handled in Next.js Server Components / Middleware

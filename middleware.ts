@@ -1,6 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const SIX_HOURS_IN_SECONDS = 6 * 60 * 60 // 21,600 seconds (6 hours)
+const SIX_HOURS_IN_MS = SIX_HOURS_IN_SECONDS * 1000
+const SESSION_START_COOKIE = 'dnd_session_start'
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -8,6 +12,9 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: {
+        maxAge: SIX_HOURS_IN_SECONDS,
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -16,7 +23,10 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              maxAge: SIX_HOURS_IN_SECONDS,
+            })
           )
         },
       },
@@ -33,6 +43,58 @@ export async function middleware(request: NextRequest) {
   const isProtected = protectedPrefixes.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )
+
+  // 6-hour session expiration enforcement
+  if (user) {
+    const sessionStartStr = request.cookies.get(SESSION_START_COOKIE)?.value
+    let isExpired = false
+
+    if (sessionStartStr) {
+      const sessionStart = parseInt(sessionStartStr, 10)
+      if (isNaN(sessionStart) || Date.now() - sessionStart > SIX_HOURS_IN_MS) {
+        isExpired = true
+      }
+    } else if (user.last_sign_in_at) {
+      const lastSignIn = new Date(user.last_sign_in_at).getTime()
+      if (!isNaN(lastSignIn) && Date.now() - lastSignIn > SIX_HOURS_IN_MS) {
+        isExpired = true
+      } else {
+        // Stamp session start time cookie if not already set
+        supabaseResponse.cookies.set(SESSION_START_COOKIE, (lastSignIn || Date.now()).toString(), {
+          path: '/',
+          maxAge: SIX_HOURS_IN_SECONDS,
+          httpOnly: true,
+          sameSite: 'lax',
+        })
+      }
+    } else {
+      supabaseResponse.cookies.set(SESSION_START_COOKIE, Date.now().toString(), {
+        path: '/',
+        maxAge: SIX_HOURS_IN_SECONDS,
+        httpOnly: true,
+        sameSite: 'lax',
+      })
+    }
+
+    if (isExpired) {
+      await supabase.auth.signOut()
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('reason', 'session-expired')
+
+      const redirectResponse = NextResponse.redirect(url)
+      redirectResponse.cookies.set(SESSION_START_COOKIE, '', { path: '/', maxAge: 0 })
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value)
+      })
+      return redirectResponse
+    }
+  } else {
+    // If no authenticated user, ensure session cookie is cleared
+    if (request.cookies.get(SESSION_START_COOKIE)) {
+      supabaseResponse.cookies.set(SESSION_START_COOKIE, '', { path: '/', maxAge: 0 })
+    }
+  }
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone()
