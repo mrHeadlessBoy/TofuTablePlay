@@ -71,7 +71,7 @@ export function clampModifier(modifier: number): number {
 export function abilityModifier(score: number | string | undefined): number {
   const value = Number(score)
   if (!Number.isFinite(value)) return 0
-  return clampModifier(Math.floor((value - 10) / 2))
+  return clampModifier(Math.floor((value) / 2))
 }
 
 export function formatModifier(modifier: number): string {
