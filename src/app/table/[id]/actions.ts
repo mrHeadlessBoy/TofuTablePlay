@@ -61,7 +61,7 @@ export async function getTableMembers(tableId: string) {
 
   const { data: partyCharacters, error: charactersErr } = await admin
     .from('characters')
-    .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition')
+    .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, strengths, weaknesses, backstory')
     .in('id', characterIds)
 
   if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
@@ -355,6 +355,9 @@ const partyActions = (seats || []).flatMap((seat, index) => {
           condition: character?.status_condition || 'Normal',
           inventory: character?.inventory || '',
           equipment: Array.isArray(character?.equipment) ? character.equipment : [],
+          strengths: character?.strengths || '',
+          weaknesses: character?.weaknesses || '',
+          backstory: character?.backstory || '',
           action,
         },
       ]
@@ -506,9 +509,19 @@ export async function updateCharacterCombatState(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  const payloadUpdates = { ...updates }
+  if (updates.stats) {
+    const clampedStats: Record<string, number> = {}
+    for (const [k, v] of Object.entries(updates.stats)) {
+      const num = Number(v)
+      clampedStats[k] = Number.isFinite(num) ? Math.min(17, num) : 0
+    }
+    payloadUpdates.stats = clampedStats
+  }
+
   const { error } = await supabase
     .from('characters')
-    .update(updates)
+    .update(payloadUpdates)
     .eq('id', characterId)
     .eq('user_id', user.id)
 
