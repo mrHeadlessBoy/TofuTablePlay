@@ -35,30 +35,33 @@ export async function saveCharacter(data: CharacterFormData) {
 
   if (!user) throw new Error('Not authenticated')
 
-  const clampStat = (val: unknown): number => {
+  const normalizeStat = (val: unknown): number => {
     const num = Number(val)
-    return Number.isFinite(num) ? Math.min(17, num) : 0
+    return Number.isFinite(num) ? num : 0
   }
 
-  const clampedStats = data.stats
+  const normalizedStats = data.stats
     ? {
-        STR: clampStat(data.stats.STR),
-        DEX: clampStat(data.stats.DEX),
-        CON: clampStat(data.stats.CON),
-        INT: clampStat(data.stats.INT),
-        WIS: clampStat(data.stats.WIS),
-        CHA: clampStat(data.stats.CHA),
+        STR: normalizeStat(data.stats.STR),
+        DEX: normalizeStat(data.stats.DEX),
+        CON: normalizeStat(data.stats.CON),
+        INT: normalizeStat(data.stats.INT),
+        WIS: normalizeStat(data.stats.WIS),
+        CHA: normalizeStat(data.stats.CHA),
       }
     : data.stats
+
+  const maxHp = Number(data.max_hp) || 1
+  const currentHp = Math.min(maxHp, Number(data.current_hp) || 0)
 
   const payload = {
     user_id: user.id,
     name: data.name,
     class_archetype: data.class_archetype,
-    current_hp: data.current_hp,
-    max_hp: data.max_hp,
+    current_hp: currentHp,
+    max_hp: maxHp,
     armor_class: data.armor_class,
-    stats: clampedStats,
+    stats: normalizedStats,
     appearance: data.appearance,
     backstory: data.backstory,
     strengths: data.strengths,

@@ -544,9 +544,16 @@ export default function TablePlayground({
       const sanitizedStats: Record<string, number> = {}
       for (const [k, v] of Object.entries(charForm.stats || {})) {
         const num = Number(v)
-        sanitizedStats[k] = Number.isFinite(num) ? Math.min(17, num) : 0
+        sanitizedStats[k] = Number.isFinite(num) ? num : 0
       }
-      const formToSave = { ...charForm, stats: sanitizedStats }
+      const maxHp = Number(charForm.max_hp) || 1
+      const currentHp = Math.min(maxHp, Number(charForm.current_hp) || 0)
+      const formToSave = {
+        ...charForm,
+        current_hp: currentHp,
+        max_hp: maxHp,
+        stats: sanitizedStats,
+      }
 
       await updateCharacterCombatState(table.id, activeChar.id, formToSave)
 
@@ -676,8 +683,15 @@ export default function TablePlayground({
                   <label className="text-[10px] text-zinc-400 uppercase font-mono">Current HP</label>
                   <input
                     type="number"
+                    max={charForm.max_hp}
                     value={charForm.current_hp}
-                    onChange={(e) => setCharForm({ ...charForm, current_hp: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setCharForm({
+                        ...charForm,
+                        current_hp: Number.isNaN(val) ? 0 : Math.min(charForm.max_hp, val),
+                      })
+                    }}
                     className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
                   />
                 </div>
@@ -685,8 +699,17 @@ export default function TablePlayground({
                   <label className="text-[10px] text-zinc-400 uppercase font-mono">Max HP</label>
                   <input
                     type="number"
+                    min={1}
                     value={charForm.max_hp}
-                    onChange={(e) => setCharForm({ ...charForm, max_hp: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const newMax = Number(e.target.value)
+                      const clampedMax = Number.isNaN(newMax) ? 1 : newMax
+                      setCharForm({
+                        ...charForm,
+                        max_hp: clampedMax,
+                        current_hp: Math.min(clampedMax, charForm.current_hp),
+                      })
+                    }}
                     className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
                   />
                 </div>
@@ -720,7 +743,7 @@ export default function TablePlayground({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] text-zinc-400 uppercase font-mono block">Ability Scores</label>
-                  <span className="text-[9px] text-zinc-500 font-mono">Allows negative · Max 17</span>
+                  <span className="text-[9px] text-zinc-500 font-mono">Allows negative</span>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {Object.keys(charForm.stats || {}).map((stat) => (
@@ -728,7 +751,6 @@ export default function TablePlayground({
                       <span className="text-[9px] text-zinc-500 uppercase block">{stat}</span>
                       <input
                         type="number"
-                        max={17}
                         value={charForm.stats[stat] ?? 10}
                         onChange={(e) => {
                           const raw = e.target.value
@@ -743,7 +765,7 @@ export default function TablePlayground({
                           if (!Number.isNaN(val)) {
                             setCharForm({
                               ...charForm,
-                              stats: { ...charForm.stats, [stat]: Math.min(17, val) },
+                              stats: { ...charForm.stats, [stat]: val },
                             })
                           }
                         }}
