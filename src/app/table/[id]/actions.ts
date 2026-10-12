@@ -511,12 +511,15 @@ export async function updateCharacterCombatState(
 
   const payloadUpdates = { ...updates }
   if (updates.stats) {
-    const clampedStats: Record<string, number> = {}
+    const normalizedStats: Record<string, number> = {}
     for (const [k, v] of Object.entries(updates.stats)) {
       const num = Number(v)
-      clampedStats[k] = Number.isFinite(num) ? Math.min(17, num) : 0
+      normalizedStats[k] = Number.isFinite(num) ? num : 0
     }
-    payloadUpdates.stats = clampedStats
+    payloadUpdates.stats = normalizedStats
+  }
+  if (updates.max_hp !== undefined && updates.current_hp !== undefined) {
+    payloadUpdates.current_hp = Math.min(updates.max_hp, updates.current_hp)
   }
 
   const { error } = await supabase

@@ -78,10 +78,9 @@ export default function CharacterEditor({
     }
     const num = Number(rawValue)
     if (!Number.isNaN(num)) {
-      const clamped = Math.min(17, num)
       setSelectedChar({
         ...selectedChar,
-        stats: { ...selectedChar.stats, [stat]: clamped },
+        stats: { ...selectedChar.stats, [stat]: num },
       })
     }
   }
@@ -91,15 +90,22 @@ export default function CharacterEditor({
     if (!selectedChar) return
     setIsSaving(true)
     try {
+      const maxHp = Number(selectedChar.max_hp) || 1
+      const currentHp = Math.min(maxHp, Number(selectedChar.current_hp) || 0)
       const sanitizedStats = {
-        STR: Number.isFinite(Number(selectedChar.stats.STR)) ? Math.min(17, Number(selectedChar.stats.STR)) : 0,
-        DEX: Number.isFinite(Number(selectedChar.stats.DEX)) ? Math.min(17, Number(selectedChar.stats.DEX)) : 0,
-        CON: Number.isFinite(Number(selectedChar.stats.CON)) ? Math.min(17, Number(selectedChar.stats.CON)) : 0,
-        INT: Number.isFinite(Number(selectedChar.stats.INT)) ? Math.min(17, Number(selectedChar.stats.INT)) : 0,
-        WIS: Number.isFinite(Number(selectedChar.stats.WIS)) ? Math.min(17, Number(selectedChar.stats.WIS)) : 0,
-        CHA: Number.isFinite(Number(selectedChar.stats.CHA)) ? Math.min(17, Number(selectedChar.stats.CHA)) : 0,
+        STR: Number.isFinite(Number(selectedChar.stats.STR)) ? Number(selectedChar.stats.STR) : 0,
+        DEX: Number.isFinite(Number(selectedChar.stats.DEX)) ? Number(selectedChar.stats.DEX) : 0,
+        CON: Number.isFinite(Number(selectedChar.stats.CON)) ? Number(selectedChar.stats.CON) : 0,
+        INT: Number.isFinite(Number(selectedChar.stats.INT)) ? Number(selectedChar.stats.INT) : 0,
+        WIS: Number.isFinite(Number(selectedChar.stats.WIS)) ? Number(selectedChar.stats.WIS) : 0,
+        CHA: Number.isFinite(Number(selectedChar.stats.CHA)) ? Number(selectedChar.stats.CHA) : 0,
       }
-      await saveCharacter({ ...selectedChar, stats: sanitizedStats })
+      await saveCharacter({
+        ...selectedChar,
+        current_hp: currentHp,
+        max_hp: maxHp,
+        stats: sanitizedStats,
+      })
       setSelectedChar(null)
       router.refresh()
     } catch (err: unknown) {
@@ -202,8 +208,15 @@ export default function CharacterEditor({
                 <label className="text-xs text-zinc-400 uppercase">Current HP</label>
                 <input
                   type="number"
+                  max={selectedChar.max_hp}
                   value={selectedChar.current_hp}
-                  onChange={(e) => setSelectedChar({ ...selectedChar, current_hp: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const val = Number(e.target.value)
+                    setSelectedChar({
+                      ...selectedChar,
+                      current_hp: Number.isNaN(val) ? 0 : Math.min(selectedChar.max_hp, val),
+                    })
+                  }}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
                 />
               </div>
@@ -211,8 +224,17 @@ export default function CharacterEditor({
                 <label className="text-xs text-zinc-400 uppercase">Max HP</label>
                 <input
                   type="number"
+                  min={1}
                   value={selectedChar.max_hp}
-                  onChange={(e) => setSelectedChar({ ...selectedChar, max_hp: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const newMax = Number(e.target.value)
+                    const clampedMax = Number.isNaN(newMax) ? 1 : newMax
+                    setSelectedChar({
+                      ...selectedChar,
+                      max_hp: clampedMax,
+                      current_hp: Math.min(clampedMax, selectedChar.current_hp),
+                    })
+                  }}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
                 />
               </div>
@@ -231,7 +253,7 @@ export default function CharacterEditor({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs text-zinc-400 uppercase block">Attributes (Stats)</label>
-                <span className="text-[11px] text-zinc-500 font-mono">Allows negative · Max 17</span>
+                <span className="text-[11px] text-zinc-500 font-mono">Allows negative</span>
               </div>
               <div className="grid grid-cols-6 gap-2">
                 {(['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const).map((stat) => (
@@ -239,7 +261,6 @@ export default function CharacterEditor({
                     <span className="text-[10px] text-zinc-500 font-bold block">{stat}</span>
                     <input
                       type="number"
-                      max={17}
                       value={selectedChar.stats[stat]}
                       onChange={(e) => handleStatChange(stat, e.target.value)}
                       className="w-full text-center bg-transparent text-sm font-semibold text-amber-400 outline-none"
