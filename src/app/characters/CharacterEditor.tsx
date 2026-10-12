@@ -53,8 +53,8 @@ export default function CharacterEditor({
     setSelectedChar({
       name: '',
       class_archetype: '',
-      current_hp: 10,
-      max_hp: 10,
+      current_hp: 100,
+      max_hp: 100,
       armor_class: 14,
       stats: { ...defaultStats },
       appearance: '',
