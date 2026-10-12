@@ -65,15 +65,15 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
         detailLines.push(`   - [อุปกรณ์/ไอเทม]: ${gear}`)
       }
       if (a.strengths?.trim()) {
-        detailLines.push(`   - [จุดเด่น (Strengths)]: ${a.strengths.trim()}`)
+        detailLines.push(`   - [จุดเด่น (Strengths)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูลพอ กล่าวถึงเมื่อจำเป็น): ${a.strengths.trim()}`)
       }
       if (a.weaknesses?.trim()) {
-        detailLines.push(`   - [จุดอ่อน (Weaknesses)]: ${a.weaknesses.trim()}`)
+        detailLines.push(`   - [จุดอ่อน (Weaknesses)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูลพอ กล่าวถึงเมื่อจำเป็น): ${a.weaknesses.trim()}`)
       }
       if (a.backstory?.trim()) {
-        detailLines.push(`   - [ปูมหลัง (Backstory)]: ${a.backstory.trim()}`)
+        detailLines.push(`   - [ปูมหลัง (Backstory)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูลพอ กล่าวถึงเมื่อจำเป็น): ${a.backstory.trim()}`)
       }
-      detailLines.push(`   - [แอ็กชันและผลเต๋า]: ${a.action || NO_ACTION_TEXT}`)
+      detailLines.push(`   - [แอ็กชันและผลเต๋า] (ไม่จำเป็นต้องบอกผู้เล่นซ้ำในการตอบกลับว่าทอยได้เท่าใด): ${a.action || NO_ACTION_TEXT}`)
 
       return `${i + 1}. ${a.characterName} (${a.classType})\n${detailLines.join('\n')}`
     })
@@ -130,6 +130,9 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 [ Overview ]
 สถานที่และเวลา : (ชื่อสถานที่และสภาพแวดล้อมโดยย่อและบอกเวลาอย่างชัดเจนว่ากี่นาฬิกา)
 สถานการณ์ปัจจุบัน: (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปมห้เข้าใจ)
+
+[สภาพร่างกาย]
+สภาพร่างกาย: HP
 
 [ Decision ]
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ข้ามและ "ห้ามพิมพ์หัวข้อ [ Decision ] ออกมาเด็ดขาด")*
