@@ -67,12 +67,23 @@ export default function CharacterEditor({
     })
   }
 
-  const handleStatChange = (stat: keyof typeof defaultStats, value: number) => {
+  const handleStatChange = (stat: keyof typeof defaultStats, rawValue: string) => {
     if (!selectedChar) return
-    setSelectedChar({
-      ...selectedChar,
-      stats: { ...selectedChar.stats, [stat]: value },
-    })
+    if (rawValue === '' || rawValue === '-') {
+      setSelectedChar({
+        ...selectedChar,
+        stats: { ...selectedChar.stats, [stat]: rawValue as unknown as number },
+      })
+      return
+    }
+    const num = Number(rawValue)
+    if (!Number.isNaN(num)) {
+      const clamped = Math.min(17, num)
+      setSelectedChar({
+        ...selectedChar,
+        stats: { ...selectedChar.stats, [stat]: clamped },
+      })
+    }
   }
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -80,7 +91,15 @@ export default function CharacterEditor({
     if (!selectedChar) return
     setIsSaving(true)
     try {
-      await saveCharacter(selectedChar)
+      const sanitizedStats = {
+        STR: Number.isFinite(Number(selectedChar.stats.STR)) ? Math.min(17, Number(selectedChar.stats.STR)) : 0,
+        DEX: Number.isFinite(Number(selectedChar.stats.DEX)) ? Math.min(17, Number(selectedChar.stats.DEX)) : 0,
+        CON: Number.isFinite(Number(selectedChar.stats.CON)) ? Math.min(17, Number(selectedChar.stats.CON)) : 0,
+        INT: Number.isFinite(Number(selectedChar.stats.INT)) ? Math.min(17, Number(selectedChar.stats.INT)) : 0,
+        WIS: Number.isFinite(Number(selectedChar.stats.WIS)) ? Math.min(17, Number(selectedChar.stats.WIS)) : 0,
+        CHA: Number.isFinite(Number(selectedChar.stats.CHA)) ? Math.min(17, Number(selectedChar.stats.CHA)) : 0,
+      }
+      await saveCharacter({ ...selectedChar, stats: sanitizedStats })
       setSelectedChar(null)
       router.refresh()
     } catch (err: unknown) {
@@ -210,15 +229,19 @@ export default function CharacterEditor({
 
             {/* Attributes */}
             <div>
-              <label className="text-xs text-zinc-400 uppercase block mb-2">Attributes (Stats)</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-zinc-400 uppercase block">Attributes (Stats)</label>
+                <span className="text-[11px] text-zinc-500 font-mono">Allows negative · Max 17</span>
+              </div>
               <div className="grid grid-cols-6 gap-2">
                 {(['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const).map((stat) => (
                   <div key={stat} className="bg-zinc-950 border border-zinc-800 rounded p-2 text-center">
                     <span className="text-[10px] text-zinc-500 font-bold block">{stat}</span>
                     <input
                       type="number"
+                      max={17}
                       value={selectedChar.stats[stat]}
-                      onChange={(e) => handleStatChange(stat, Number(e.target.value))}
+                      onChange={(e) => handleStatChange(stat, e.target.value)}
                       className="w-full text-center bg-transparent text-sm font-semibold text-amber-400 outline-none"
                     />
                   </div>

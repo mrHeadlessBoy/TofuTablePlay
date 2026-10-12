@@ -51,6 +51,10 @@ type Character = {
   stats?: Record<string, number | string>
   inventory?: string
   equipment?: string[]
+  strengths?: string
+  weaknesses?: string
+  backstory?: string
+  appearance?: string
 }
 
 type Member = {
@@ -537,7 +541,14 @@ export default function TablePlayground({
     if (!activeChar) return
     setIsSavingChar(true)
     try {
-      await updateCharacterCombatState(table.id, activeChar.id, charForm)
+      const sanitizedStats: Record<string, number> = {}
+      for (const [k, v] of Object.entries(charForm.stats || {})) {
+        const num = Number(v)
+        sanitizedStats[k] = Number.isFinite(num) ? Math.min(17, num) : 0
+      }
+      const formToSave = { ...charForm, stats: sanitizedStats }
+
+      await updateCharacterCombatState(table.id, activeChar.id, formToSave)
 
       // Optimistic update
       setMembers((prev) =>
@@ -548,7 +559,7 @@ export default function TablePlayground({
                 characters: m.characters
                   ? {
                       ...m.characters,
-                      ...charForm,
+                      ...formToSave,
                     }
                   : null,
               }
@@ -707,20 +718,35 @@ export default function TablePlayground({
 
               {/* Stats Editor */}
               <div>
-                <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-1">Ability Scores</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono block">Ability Scores</label>
+                  <span className="text-[9px] text-zinc-500 font-mono">Allows negative · Max 17</span>
+                </div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {Object.keys(charForm.stats || {}).map((stat) => (
                     <div key={stat} className="bg-zinc-950 border border-zinc-800 rounded p-1 text-center">
                       <span className="text-[9px] text-zinc-500 uppercase block">{stat}</span>
                       <input
                         type="number"
+                        max={17}
                         value={charForm.stats[stat] ?? 10}
-                        onChange={(e) =>
-                          setCharForm({
-                            ...charForm,
-                            stats: { ...charForm.stats, [stat]: Number(e.target.value) },
-                          })
-                        }
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (raw === '' || raw === '-') {
+                            setCharForm({
+                              ...charForm,
+                              stats: { ...charForm.stats, [stat]: raw },
+                            })
+                            return
+                          }
+                          const val = Number(raw)
+                          if (!Number.isNaN(val)) {
+                            setCharForm({
+                              ...charForm,
+                              stats: { ...charForm.stats, [stat]: Math.min(17, val) },
+                            })
+                          }
+                        }}
                         className="w-full bg-transparent text-center font-bold text-xs text-white outline-none"
                       />
                     </div>

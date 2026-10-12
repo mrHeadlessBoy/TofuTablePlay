@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Dices, Minus, Plus, X } from 'lucide-react'
 import { twMerge } from 'tailwind-merge'
 import Die3D, { ROLL_ANIMATION_MS } from './Die3D'
-import { DIE_SIDES, describeRoll, formatModifier, rollDice, rollDie, type DiceRoll, type DieSides, type RollMode } from './dice'
+import { DIE_SIDES, describeRoll, formatModifier, rollDice, rollDie, clampModifier, MIN_DICE_MODIFIER, MAX_DICE_MODIFIER, type DiceRoll, type DieSides, type RollMode } from './dice'
 
 /**
  * Shared dice tray: d4 to d100, several dice at once, a modifier, advantage / disadvantage and an optional DC.
@@ -92,8 +92,9 @@ function Stepper({ label, value, onChange, min, max, format }: {
         <button
           type="button"
           aria-label={`Decrease ${label}`}
+          disabled={value <= min}
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 cursor-pointer"
+          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
         >
           <Minus className="h-3 w-3" />
         </button>
@@ -101,8 +102,9 @@ function Stepper({ label, value, onChange, min, max, format }: {
         <button
           type="button"
           aria-label={`Increase ${label}`}
+          disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
-          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 cursor-pointer"
+          className="grid h-6 w-6 place-items-center rounded border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
         >
           <Plus className="h-3 w-3" />
         </button>
@@ -147,7 +149,7 @@ export default function DiceRoller({
   const bonusKeys = Object.keys(actor?.modifiers ?? {})
   // A bonus only counts while the selected actor really has it, so switching back to a free roll drops it.
   const activeBonus = actor && bonusKeys.includes(bonusKey) ? bonusKey : ''
-  const totalModifier = modifier + (activeBonus ? actor?.modifiers?.[activeBonus] ?? 0 : 0)
+  const totalModifier = clampModifier(modifier + (activeBonus ? actor?.modifiers?.[activeBonus] ?? 0 : 0))
   const modeAllowed = sides === 20 && count === 1
 
   const submit = () => {
@@ -230,7 +232,7 @@ export default function DiceRoller({
 
       <div className="mt-3 space-y-2">
         <Stepper label="Dice" value={count} onChange={setCount} min={1} max={10} />
-        <Stepper label="Modifier" value={modifier} onChange={setModifier} min={-10} max={20} format={formatModifier} />
+        <Stepper label="Modifier" value={modifier} onChange={setModifier} min={MIN_DICE_MODIFIER} max={MAX_DICE_MODIFIER} format={formatModifier} />
 
         <div className="flex items-center justify-between gap-2">
           <span className={LABEL}>Mode</span>

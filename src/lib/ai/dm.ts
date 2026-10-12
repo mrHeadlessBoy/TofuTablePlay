@@ -9,15 +9,19 @@ const DM_MODEL = 'gemini-3.5-flash-lite'
 // The opening scene is written while the host waits on the Launch button, so give up after this long
 const OPENING_TIMEOUT_MS = 15000
 
-// ปรับ Type ให้รองรับ Combat & Inventory State
+// ปรับ Type ให้รองรับ Combat, Inventory และ Character Profile (Strengths, Weaknesses, Backstory)
 export interface PartyMemberAction {
   characterName: string
   classType: string
   currentHp?: number
   maxHp?: number
   ac?: number
+  condition?: string
   inventory?: string
   equipment?: string[]
+  strengths?: string
+  weaknesses?: string
+  backstory?: string
   action: string | null
 }
 
@@ -44,7 +48,7 @@ const NO_ACTION_TEXT =
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const { campaign, loreEntries, recentTurns, partyActions } = input
 
-// จัดรูปแบบสรุปสภาพตัวละคร + แอ็กชันให้ AI เข้าใจบริบททางกายภาพ
+  // จัดรูปแบบสรุปสภาพตัวละคร ข้อมูลประวัติ/จุดเด่น/จุดอ่อน + แอ็กชันให้ AI เข้าใจบริบท
   const actionsSummary = partyActions
     .map((a, i) => {
       const hpText = `HP ${a.currentHp ?? '?'}/${a.maxHp ?? '?'}`
@@ -55,9 +59,23 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
         .filter(Boolean)
         .join(' | ')
 
-      return `${i + 1}. ${a.characterName} (${a.classType})
-   - [สภาพร่างกาย]: ${hpText} | ${acText} }${gear ? `\n   - [อุปกรณ์/ไอเทม]: ${gear}` : ''}
-   - [แอ็กชันและผลเต๋า]: ${a.action || NO_ACTION_TEXT}`
+      const detailLines: string[] = []
+      detailLines.push(`   - [สภาพร่างกาย]: ${hpText} | ${acText}`)
+      if (gear) {
+        detailLines.push(`   - [อุปกรณ์/ไอเทม]: ${gear}`)
+      }
+      if (a.strengths?.trim()) {
+        detailLines.push(`   - [จุดเด่น (Strengths)]: ${a.strengths.trim()}`)
+      }
+      if (a.weaknesses?.trim()) {
+        detailLines.push(`   - [จุดอ่อน (Weaknesses)]: ${a.weaknesses.trim()}`)
+      }
+      if (a.backstory?.trim()) {
+        detailLines.push(`   - [ปูมหลัง (Backstory)]: ${a.backstory.trim()}`)
+      }
+      detailLines.push(`   - [แอ็กชันและผลเต๋า]: ${a.action || NO_ACTION_TEXT}`)
+
+      return `${i + 1}. ${a.characterName} (${a.classType})\n${detailLines.join('\n')}`
     })
     .join('\n\n')
 
@@ -66,11 +84,15 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
     .filter((a) => a.action)
     .map((a) => `${a.characterName}: ${a.action}`)
     .join('\n')
+  const characterBioText = partyActions
+    .map((a) => [a.backstory, a.strengths, a.weaknesses].filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join('\n')
   const recentHistoryForScan = recentTurns
     .slice(-4)
     .map((t) => `Turn ${t.turn_number}:\n${t.narrative_output}`)
     .join('\n\n')
-  const scanTargetText = `${recentHistoryForScan}\n${submittedText}`
+  const scanTargetText = `${recentHistoryForScan}\n${submittedText}\n${characterBioText}`
 
   const triggeredLore = extractTriggeredLore(loreEntries, scanTargetText, true)
   const loreContext = triggeredLore.length > 0
@@ -99,6 +121,8 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
    - [กรณีไม่ส่งคำตอบ/ไม่ส่งแอ็กชัน]: ให้บรรยายว่าตัวละครนั้น "ยืนนิ่ง ชะงัก หรือลังเลอยู่กับที่" โดยห้ามตัดสินใจเคลื่อนไหวแทนผู้เล่น
    - [กรณีมีเป้าหมายแต่ไม่ระบุแต้มเต๋า]: หากแอ็กชันนั้นต้องอาศัยการทอยสุ่ม แต่ผู้เล่นไม่ระบุแต้มเต๋าที่ทอยได้มา ให้ตัดสินว่า "ล้มเหลวโดยอัตโนมัติ (Automatic Failure)" ทันที และบรรยายผลลัพธ์เชิงลบตามสถานการณ์
 5. ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในปาร์ตี้ให้ครบตามเงื่อนไขข้างต้น
+6. กฎการสะท้อนข้อมูลตัวละคร (Character Strengths, Weaknesses & Backstory):
+   - นำ จุดเด่น (Strengths), จุดอ่อน (Weaknesses), และ ปูมหลัง (Backstory) ของตัวละครมาใช้สร้างมิติ อุปสรรค และความได้เปรียบ/เสียเปรียบตามธรรมชาติของตัวละคร ให้โลกและศัตรูมีปฏิกิริยาสอดคล้องกับภูมิหลังของพวกเขา
 
 [REQUIRED OUTPUT FORMAT]
 (เนื้อหาบรรยายเรื่องราวการกระทำและผลลัพธ์ของเทิร์นนี้ โดยที่ไม่ต้องใส่ว่าเป็นหัวข้อ [NARRATIVE] ตอนบรรยายเนื้อหา แต่ [ Overview ], [ Decision ] )
@@ -137,7 +161,8 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
     `[CURRENT TURN: SUBMITTED PARTY ACTIONS (${partyActions.length} Members)]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE]
 - จงบรรยายผลลัพธ์ของสมาชิกทุกคนที่มีชื่อด้านบนให้ครบถ้วน
-- สรุปผลท้ายข้อความตามรูปแบบ [NARRATIVE], [Overview], และ [Decision] เท่านั้น`,
+- นำจุดเด่น จุดอ่อน และปูมหลังของตัวละครมาสะท้อนในเนื้อเรื่องและการตัดสินผลอย่างเหมาะสม
+- สรุปผลท้ายข้อความตามรูปแบบ [Overview] และ [Decision] เท่านั้น`,
   ]
     .filter(Boolean)
     .join('\n')

@@ -60,11 +60,18 @@ export function rollDie(sides: number): number {
   return (value % sides) + 1
 }
 
-/** D&D 5e ability modifier: 10 -> +0, 14 -> +2, 8 -> -1. */
+export const MIN_DICE_MODIFIER = -3
+export const MAX_DICE_MODIFIER = 3
+
+export function clampModifier(modifier: number): number {
+  return Math.max(MIN_DICE_MODIFIER, Math.min(MAX_DICE_MODIFIER, modifier))
+}
+
+/** D&D ability modifier: 10 -> +0, 14 -> +2, 8 -> -1, clamped between MIN_DICE_MODIFIER (-3) and MAX_DICE_MODIFIER (+3). */
 export function abilityModifier(score: number | string | undefined): number {
   const value = Number(score)
   if (!Number.isFinite(value)) return 0
-  return Math.floor((value - 10) / 2)
+  return clampModifier(Math.floor((value - 10) / 2))
 }
 
 export function formatModifier(modifier: number): string {
@@ -72,7 +79,8 @@ export function formatModifier(modifier: number): string {
 }
 
 export function rollDice(options: RollOptions): DiceRoll {
-  const { sides, modifier = 0, roller = '', dc = null } = options
+  const { sides, roller = '', dc = null } = options
+  const modifier = clampModifier(options.modifier ?? 0)
   // Advantage and disadvantage only exist for a single d20.
   const mode: RollMode = sides === 20 && (options.count ?? 1) === 1 ? options.mode ?? 'normal' : 'normal'
   const count = Math.max(1, Math.min(20, Math.floor(options.count ?? 1)))
