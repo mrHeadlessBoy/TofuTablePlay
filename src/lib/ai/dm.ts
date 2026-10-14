@@ -71,7 +71,7 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
         detailLines.push(`   - [จุดอ่อน (Weaknesses)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูลพอ กล่าวถึงเมื่อจำเป็น): ${a.weaknesses.trim()}`)
       }
       if (a.backstory?.trim()) {
-        detailLines.push(`   - [ปูมหลัง (Backstory)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูลพอ กล่าวถึงเมื่อจำเป็น): ${a.backstory.trim()}`)
+        detailLines.push(`   - [ปูมหลัง (Backstory)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูลพอ): ${a.backstory.trim()}`)
       }
       detailLines.push(`   - [แอ็กชันและผลเต๋า] (ไม่จำเป็นต้องบอกผู้เล่นซ้ำในการตอบกลับว่าทอยได้เท่าใด): ${a.action || NO_ACTION_TEXT}`)
 
