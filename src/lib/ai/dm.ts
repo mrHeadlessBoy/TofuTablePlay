@@ -5,11 +5,10 @@ import { OPENING_TURN_NUMBER } from '@/lib/turns'
 const ai = new GoogleGenAI()
 
 // One model for every Dungeon Master call (turn narration and the opening scene)
-const DM_MODEL = 'gemini-3.5-flash-lite'
+const DM_MODEL = 'gemini-3.5-flash-lite' // or 'gemini-2.5-flash-lite'
 // The opening scene is written while the host waits on the Launch button, so give up after this long
 const OPENING_TIMEOUT_MS = 15000
 
-// ปรับ Type ให้รองรับ Combat, Inventory และ Character Profile (Strengths, Weaknesses, Backstory)
 export interface PartyMemberAction {
   characterName: string
   classType: string
@@ -39,7 +38,7 @@ export interface DmTurnInput {
     narrative_output: string
     party_actions_summary?: string
   }[]
-  partyActions: PartyMemberAction[] // ใช้ Type ใหม่
+  partyActions: PartyMemberAction[]
 }
 
 const NO_ACTION_TEXT =
@@ -48,7 +47,23 @@ const NO_ACTION_TEXT =
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const { campaign, loreEntries, recentTurns, partyActions } = input
 
-  // จัดรูปแบบสรุปสภาพตัวละคร ข้อมูลประวัติ/จุดเด่น/จุดอ่อน + แอ็กชันให้ AI เข้าใจบริบท
+  // 1. แยก Profile ข้อมูลคงที่ (Strengths, Weaknesses, Backstory) ออกมาเก็บเป็น Reference Sheet
+  // ส่งเข้าไปใน System Instruction เพื่อให้ AI รู้ภูมิหลังโดยไม่มองว่าเป็นสิ่งที่เกิดขึ้นในเทิร์นนี้
+  const partyProfiles = partyActions
+    .map((a) => {
+      const traits = [
+        a.strengths?.trim() && `จุดเด่น: ${a.strengths.trim()}`,
+        a.weaknesses?.trim() && `จุดอ่อน: ${a.weaknesses.trim()}`,
+        a.backstory?.trim() && `ปูมหลัง: ${a.backstory.trim()}`,
+      ]
+        .filter(Boolean)
+        .join(' | ')
+
+      return `- ${a.characterName} (${a.classType}): ${traits || 'ไม่มีข้อมูลเพิ่มเติม'}`
+    })
+    .join('\n')
+
+  // 2. จัดรูปแบบ Turn Payload สรุปเฉพาะสถานะทางกายภาพ อุปกรณ์ และ "แอ็กชันในเทิร์นนี้" เท่านั้น
   const actionsSummary = partyActions
     .map((a, i) => {
       const hpText = `HP ${a.currentHp ?? '?'}/${a.maxHp ?? '?'}`
@@ -64,42 +79,29 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
       if (gear) {
         detailLines.push(`   - [อุปกรณ์/ไอเทม]: ${gear}`)
       }
-      if (a.strengths?.trim()) {
-        detailLines.push(`   - [จุดเด่น (Strengths)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูล ไม่จำเป็นต้องนำมากล่าวในเนื้อเรื่อง): ${a.strengths.trim()}`)
-      }
-      if (a.weaknesses?.trim()) {
-        detailLines.push(`   - [จุดอ่อน (Weaknesses)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูล ไม่จำเป็นต้องนำมากล่าวในเนื้อเรื่อง): ${a.weaknesses.trim()}`)
-      }
-      if (a.backstory?.trim()) {
-        detailLines.push(`   - [ปูมหลัง (Backstory)] (ไม่ต้องกล่าวถึง รับไว้เป็นข้อมูล ไม่จำเป็นต้องนำมากล่าวในเนื้อเรื่อง): ${a.backstory.trim()}`)
-      }
-      detailLines.push(`   - [แอ็กชันและผลเต๋า] (ไม่จำเป็นต้องบอกผู้เล่นซ้ำในการตอบกลับว่าทอยได้เท่าใด): ${a.action || NO_ACTION_TEXT}`)
+      detailLines.push(`   - [แอ็กชันในเทิร์นนี้]: ${a.action || NO_ACTION_TEXT}`)
 
       return `${i + 1}. ${a.characterName} (${a.classType})\n${detailLines.join('\n')}`
     })
     .join('\n\n')
 
-  // สแกน Lorebook ดึงข้อมูลแบบ Dynamic เฉพาะคำที่ถูก Trigger
+  // 3. สแกน Lorebook โดยตัด characterBioText ออก เพื่อป้องกัน Lore ติดลูปทุกเทิร์น
   const submittedText = partyActions
     .filter((a) => a.action)
     .map((a) => `${a.characterName}: ${a.action}`)
-    .join('\n')
-  const characterBioText = partyActions
-    .map((a) => [a.backstory, a.strengths, a.weaknesses].filter(Boolean).join(' '))
-    .filter(Boolean)
     .join('\n')
   const recentHistoryForScan = recentTurns
     .slice(-4)
     .map((t) => `Turn ${t.turn_number}:\n${t.narrative_output}`)
     .join('\n\n')
-  const scanTargetText = `${recentHistoryForScan}\n${submittedText}\n${characterBioText}`
+  const scanTargetText = `${recentHistoryForScan}\n${submittedText}`
 
   const triggeredLore = extractTriggeredLore(loreEntries, scanTargetText, true)
   const loreContext = triggeredLore.length > 0
     ? triggeredLore.map((l) => `[LORE: ${l.title} (${l.category})]: ${l.content}`).join('\n')
     : null
 
-  // STATIC SYSTEM INSTRUCTION (คงที่ 100% ตลอดทั้งแคมเปญ เพื่อให้เกิด Prompt Caching)
+  // STATIC SYSTEM INSTRUCTION
   const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
 [WORLD SETTING & TONE]
@@ -111,9 +113,12 @@ ${campaign.core_description}
 [ACTIVE MECHANICS / RULES]
 ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 
+[PARTY REFERENCE SHEET (PASSIVE LORE ONLY)]
+${partyProfiles}
+
 [CORE DIRECTIVES & RESOLUTION RULES]
-1. ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่อง ห้ามรีเซ็ตหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
-2. บรรยายผลลัพธ์ อุปสรรค และบรรยากาศ (กระชับแต่น่าติดตาม)
+1. ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่องและเป็นธรรมชาติ ห้ามรีเซ็ตหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
+2. บรรยายผลลัพธ์ อุปสรรค และบรรยากาศ (กระชับ น่าติดตาม ดำเนินเรื่องแบบ cinematic และร้อยเรียงฉากเข้าด้วยกัน)
 3. กฎความเด็ดขาดและความตาย (High Stakes & Lethality):
    - ห้ามมี Plot Armor หรือปกป้องผู้เล่น: หากการกระทำนั้นมีความเสี่ยงสูง บ้าระห่ำ หรือผลลัพธ์ตามตรรกะนำไปสู่ความตาย ให้บรรยายความร้ายแรงตามความเป็นจริงได้ทันที (บาดเจ็บสาหัส สูญเสียอวัยวะ หรือตัวละครตายถาวร)
    - ผลลัพธ์ความล้มเหลว AI เป็นผู้กำหนดแต่เพียงผู้เดียว: ผู้เล่นจะรู้ผลลัพธ์ก็ต่อเมื่อทอยเสร็จและ AI บรรยายในเทิร์นถัดไปเท่านั้น
@@ -121,18 +126,20 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
    - [กรณีไม่ส่งคำตอบ/ไม่ส่งแอ็กชัน]: ให้บรรยายว่าตัวละครนั้น "ยืนนิ่ง ชะงัก หรือลังเลอยู่กับที่" โดยห้ามตัดสินใจเคลื่อนไหวแทนผู้เล่น
    - [กรณีมีเป้าหมายแต่ไม่ระบุแต้มเต๋า]: หากแอ็กชันนั้นต้องอาศัยการทอยสุ่ม แต่ผู้เล่นไม่ระบุแต้มเต๋าที่ทอยได้มา ให้ตัดสินว่า "ล้มเหลวโดยอัตโนมัติ (Automatic Failure)" ทันที และบรรยายผลลัพธ์เชิงลบตามสถานการณ์
 5. ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในปาร์ตี้ให้ครบตามเงื่อนไขข้างต้น
-6. กฎการสะท้อนข้อมูลตัวละคร (Character Strengths, Weaknesses & Backstory):
-   - นำ จุดเด่น (Strengths), จุดอ่อน (Weaknesses), และ ปูมหลัง (Backstory) ของตัวละครมาใช้สร้างมิติ อุปสรรค และความได้เปรียบ/เสียเปรียบตามธรรมชาติของตัวละคร ให้โลกและศัตรูมีปฏิกิริยาสอดคล้องกับภูมิหลังของพวกเขา แต่ไม่จำเป็นต้องนำมากล่าวในการเล่าเรื่อง
+6. กฎการใช้ข้อมูลตัวละคร (Strict Anti-Repetition Rule):
+   - ข้อมูลใน [PARTY REFERENCE SHEET] เป็นเพียงข้อมูลอ้างอิงเบื้องหลังสำหรับใช้คำนวณความได้เปรียบ/เสียเปรียบเมื่อเกิดสถานการณ์ที่เกี่ยวข้องโดยตรงเท่านั้น
+   - ห้ามหยิบยก จุดเด่น, จุดอ่อน, มุกเดิมๆ หรือปูมหลัง มากล่าวซ้ำซากในทุกๆ เทิร์นเด็ดขาด (เช่น ห้ามพูดซ้ำเรื่องกลัวเมีย, กลิ่นเหล้า, ซุ่มซ่ามทำของตก, หรือกลัวความสูง หากเหตุการณ์หรือแอ็กชันในเทิร์นนั้นไม่ได้กระตุ้นเรื่องดังกล่าวโดยตรง)
+   - มุ่งเน้นการบรรยายที่ "แอ็กชันปัจจุบัน" และ "สิ่งที่อยู่ตรงหน้า" ของตัวละครเป็นหลัก เพื่อให้เรื่องราวดำเนินไปข้างหน้าอย่างเป็นธรรมชาติ
 
 [REQUIRED OUTPUT FORMAT]
-(เนื้อหาบรรยายเรื่องราวการกระทำและผลลัพธ์ของเทิร์นนี้ โดยที่ไม่ต้องใส่ว่าเป็นหัวข้อ [NARRATIVE] ตอนบรรยายเนื้อหา แต่ [ Overview ], [ Decision ] )
+(เนื้อหาบรรยายเรื่องราวการกระทำและผลลัพธ์ของเทิร์นนี้ โดยไม่ต้องใส่หัวข้อนำหน้า)
 
 [ Overview ]
-สถานที่และเวลา : (ชื่อสถานที่และสภาพแวดล้อมโดยย่อและบอกเวลาอย่างชัดเจนว่ากี่นาฬิกา)
-สถานการณ์ปัจจุบัน: (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปมห้เข้าใจ)
+สถานที่และเวลา : (ชื่อสถานที่และสภาพแวดล้อมโดยย่อ และระบุเวลา เช่น 00:30 น.)
+สถานการณ์ปัจจุบัน: (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปให้ชัดเจน)
 
 [สภาพร่างกาย]
-สภาพร่างกาย: HP
+(ระบุเฉพาะ HP และ AC ของตัวละครทุกคน เช่น - Oracle: HP 100/100 | AC 14)
 
 [ Decision ]
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ข้ามและ "ห้ามพิมพ์หัวข้อ [ Decision ] ออกมาเด็ดขาด")*
@@ -140,12 +147,10 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 - [ชื่อตัวละคร]: สิ่งที่ทำ(ห้ามบอกว่าผู้เล่นควรทำอะไร): | [ประเภทเต๋าที่เหมาะสม เช่น d20/d12/d8/d6 + สเตตัส]`
 
   // CONSTRUCT MULTI-TURN CONTENTS (Sliding Window 4 เทิร์นล่าสุด)
-  // แยกบทบาท user/model ชัดเจนเพื่อให้ AI จำสไตล์การบรรยายของตัวเองได้
   const turnsWindow = recentTurns.slice(-4)
   const contents: { role: 'user' | 'model'; parts: [{ text: string }] }[] = []
 
   for (const turn of turnsWindow) {
-    // Same numbers the players see: the opening narration is not a turn
     const playedTurn = turn.turn_number - OPENING_TURN_NUMBER
     const userPrompt = turn.turn_number === OPENING_TURN_NUMBER
       ? '[OPENING]: The table has just opened and nobody has acted yet. Narrate the opening scene.'
@@ -153,19 +158,18 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
         ? `[TURN ${playedTurn} PARTY ACTIONS]\n${turn.party_actions_summary}`
         : `[TURN ${playedTurn}]: The party executes their declared actions.`
 
- contents.push({ role: 'user', parts: [{ text: userPrompt }] })
+    contents.push({ role: 'user', parts: [{ text: userPrompt }] })
     contents.push({ role: 'model', parts: [{ text: turn.narrative_output }] })
   }
 
   // CURRENT TURN PAYLOAD + AUTHOR'S NOTE REMINDER
-  // รวม Dynamic Lore + Actions + ตอกย้ำ Format ที่จุดสุดท้ายเพื่อป้องกัน Format หลุด
   const currentTurnUserParts = [
     loreContext ? `[DYNAMIC LORE INJECTION FOR THIS TURN]\n${loreContext}\n` : '',
     `[CURRENT TURN: SUBMITTED PARTY ACTIONS (${partyActions.length} Members)]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE]
-- จงบรรยายผลลัพธ์ของสมาชิกทุกคนที่มีชื่อด้านบนให้ครบถ้วน
-- นำจุดเด่น จุดอ่อน และปูมหลังของตัวละครมาสะท้อนในเนื้อเรื่องและการตัดสินผลอย่างเหมาะสม
-- สรุปผลท้ายข้อความตามรูปแบบ [Overview] และ [Decision] เท่านั้น`,
+- จงบรรยายผลลัพธ์ของสมาชิกทุกคนตาม [แอ็กชันในเทิร์นนี้] ให้ครบถ้วนและลื่นไหล
+- ห้ามคัดลอกแพทเทิร์นหรือกล่าวซ้ำจุดเด่น/จุดอ่อน/ปูมหลังเดิมๆ จากเทิร์นก่อนหน้า ให้โฟกัสที่การตอบสนองต่อแอ็กชันและเหตุการณ์ปัจจุบัน
+- แสดงผลสรุปท้ายข้อความตามรูปแบบ [ Overview ], [สภาพร่างกาย] และ [ Decision ] (ถ้ามี) เท่านั้น`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -175,7 +179,6 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
     parts: [{ text: currentTurnUserParts }],
   })
 
-  // ส่งคำขอไปยัง API พร้อม System Instruction แยกต่างหาก
   const response = await ai.models.generateContent({
     model: DM_MODEL,
     contents: contents,
@@ -188,19 +191,12 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
   return response.text || 'The Dungeon Master pauses as the dust settles around the party.'
 }
 
-/**
- * The opening narration of a new table, written from the campaign sheet before any player has acted.
- * It introduces the world and is not a played turn: Turn 1 is the first one the party resolves.
- * Throws when the AI gives no answer, so the caller can fall back to a plain line.
- */
 export async function generateOpeningNarrative(input: {
   campaign: DmTurnInput['campaign']
   loreEntries: LoreEntry[]
 }): Promise<string> {
   const { campaign, loreEntries } = input
 
-  // Nobody has written anything yet, so the lore scan runs on the campaign sheet itself:
-  // "Always Active" entries plus any entry whose keyword already appears in the setting or story
   const scanTargetText = `${campaign.world_setting}\n${campaign.core_description}`
   const openingLore = extractTriggeredLore(loreEntries, scanTargetText, true)
   const loreContext = openingLore.length > 0
