@@ -5,7 +5,7 @@ import { OPENING_TURN_NUMBER } from '@/lib/turns'
 const ai = new GoogleGenAI()
 
 // One model for every Dungeon Master call (turn narration and the opening scene)
-const DM_MODEL = 'gemini-4-argon'
+const DM_MODEL = 'gemini-3.8-flash'
 // The opening scene is written while the host waits on the Launch button, so give up after this long
 const OPENING_TIMEOUT_MS = 15000
 
