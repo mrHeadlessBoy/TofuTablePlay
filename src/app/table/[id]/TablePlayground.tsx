@@ -61,6 +61,7 @@ type Member = {
   id: string
   user_id: string
   is_ready: boolean
+  action_text?: string | null
   characters?: Character | null
 }
 
@@ -106,7 +107,12 @@ const READY_CLAIM_TTL_MS = 6000
 
 // A Ready click that the roster on screen already shows, before the server's copy has caught up.
 // settledAt is set once the request behind it has finished (null while it is still running).
-type ReadyClaim = { ready: boolean; settledAt: number | null; expiresAt: number }
+type ReadyClaim = {
+  ready: boolean
+  actionText?: string | null
+  settledAt: number | null
+  expiresAt: number
+}
 type ReadyClaims = Map<string, ReadyClaim>
 
 // Lays those clicks over a roster that just came from the server. A reload that was asked for
@@ -122,7 +128,12 @@ function withReadyClaims(list: Member[], claims: ReadyClaims, reloadStartedAt: n
   }
   return list.map((m) => {
     const claim = claims.get(m.user_id)
-    return claim ? { ...m, is_ready: claim.ready } : m
+    if (!claim) return m
+    return {
+      ...m,
+      is_ready: claim.ready,
+      action_text: claim.ready ? (claim.actionText ?? m.action_text ?? null) : null,
+    }
   })
 }
 
@@ -348,9 +359,22 @@ export default function TablePlayground({
         // Another player just pressed Ready: show it at once. Their confirmed state follows with table_sync.
         const memberUserId: unknown = payload?.userId
         const ready: unknown = payload?.ready
+        const actionText: unknown = payload?.actionText
         if (typeof memberUserId !== 'string' || typeof ready !== 'boolean' || memberUserId === userId) return
-        readyClaimsRef.current.set(memberUserId, { ready, settledAt: null, expiresAt: Date.now() + READY_CLAIM_TTL_MS })
-        setMembers((prev) => prev.map((m) => (m.user_id === memberUserId ? { ...m, is_ready: ready } : m)))
+        const safeActionText = typeof actionText === 'string' ? actionText : null
+        readyClaimsRef.current.set(memberUserId, {
+          ready,
+          actionText: safeActionText,
+          settledAt: null,
+          expiresAt: Date.now() + READY_CLAIM_TTL_MS,
+        })
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.user_id === memberUserId
+              ? { ...m, is_ready: ready, action_text: ready ? safeActionText : null }
+              : m
+          )
+        )
       })
       .on('broadcast', { event: 'table_sync' }, ({ payload }) => {
         // The sender's request has finished: the reload below is the truth for them again
@@ -382,6 +406,7 @@ export default function TablePlayground({
     const phaseKey = `${table.turn_phase}:${table.current_turn}`
     if (phaseKey === seenPhaseRef.current) return
     seenPhaseRef.current = phaseKey
+    readyClaimsRef.current.clear()
     void refreshMembers()
   }, [table.turn_phase, table.current_turn, refreshMembers])
 
@@ -413,7 +438,9 @@ export default function TablePlayground({
       tableSetAtRef.current = Date.now()
       if (result.resolved && typeof result.turnNumber === 'number') {
         const nextTurn = result.turnNumber
+        readyClaimsRef.current.clear()
         setTable((prev) => ({ ...prev, current_turn: nextTurn, turn_phase: 'drafting', countdown_end: null }))
+        setMembers((prev) => prev.map((m) => ({ ...m, is_ready: false, action_text: null })))
       } else {
         // Another request holds this turn: keep showing the loader until its result arrives
         setTable((prev) => ({ ...prev, turn_phase: 'resolving' }))
@@ -488,15 +515,27 @@ export default function TablePlayground({
     if (typeof table.current_turn !== 'number') return
 
     const nextState = !activeMember.is_ready
-    const setOwnReady = (ready: boolean) =>
-      setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, is_ready: ready } : m)))
+    const submittedAction = nextState ? draftAction.trim() : null
+    const setOwnReady = (ready: boolean, actionText?: string | null) =>
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.user_id === userId
+            ? { ...m, is_ready: ready, action_text: ready ? (actionText ?? m.action_text ?? null) : null }
+            : m
+        )
+      )
 
     // Show it right away, on this screen and on the other players' screens.
     // The server's answer follows, and table_sync below replaces the guess with the saved state.
-    const claim: ReadyClaim = { ready: nextState, settledAt: null, expiresAt: Infinity }
+    const claim: ReadyClaim = {
+      ready: nextState,
+      actionText: submittedAction,
+      settledAt: null,
+      expiresAt: Infinity,
+    }
     readyClaimsRef.current.set(userId, claim)
-    setOwnReady(nextState)
-    broadcast('member_ready', { ready: nextState })
+    setOwnReady(nextState, submittedAction)
+    broadcast('member_ready', { ready: nextState, actionText: submittedAction })
 
     let failure: string | null = null
     try {
@@ -514,7 +553,8 @@ export default function TablePlayground({
       // Roll back so the roster never shows READY for a draft that was not saved
       failure = err instanceof Error ? err.message : 'Failed to submit your action'
       readyClaimsRef.current.delete(userId)
-      setOwnReady(!nextState)
+      setOwnReady(!nextState, null)
+      broadcast('member_ready', { ready: !nextState, actionText: null })
     }
 
     // Saved (or rolled back). The claim stays until a roster reload that started after this moment arrives.
@@ -1082,52 +1122,71 @@ export default function TablePlayground({
                 return (
                   <div
                     key={m.id}
-                    className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80 flex justify-between items-center text-xs"
+                    className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80 flex flex-col gap-2 text-xs"
                   >
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-white block">{charName}</span>
-                        {m.user_id === table.head_table_id && (
-                          <span className="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded">
-                            HOST
-                          </span>
-                        )}
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-white block">{charName}</span>
+                          {m.user_id === table.head_table_id && (
+                            <span className="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded">
+                              HOST
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-500">
+                          <span>{char?.class_archetype || 'No class'}</span>
+                          {char?.current_hp !== undefined && (
+                            <span className="text-red-400 font-mono">
+                              HP: {char.current_hp}/{char.max_hp}
+                            </span>
+                          )}
+                          {char?.status_condition && char.status_condition !== 'Normal' && (
+                            <span className="text-amber-400 font-mono">
+                              [{char.status_condition}]
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-500">
-                        <span>{char?.class_archetype || 'No class'}</span>
-                        {char?.current_hp !== undefined && (
-                          <span className="text-red-400 font-mono">
-                            HP: {char.current_hp}/{char.max_hp}
-                          </span>
-                        )}
-                        {char?.status_condition && char.status_condition !== 'Normal' && (
-                          <span className="text-amber-400 font-mono">
-                            [{char.status_condition}]
-                          </span>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                            m.is_ready
+                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              : 'bg-zinc-800 text-zinc-400'
+                          }`}
+                        >
+                          {m.is_ready ? 'READY' : 'DRAFTING'}
+                        </span>
+                        {isHeadTable && m.user_id !== userId && (
+                          <button
+                            onClick={() => handleKick(m.user_id, charName)}
+                            title="Kick Player (Host)"
+                            className="text-zinc-600 hover:text-red-400 transition cursor-pointer"
+                          >
+                            <UserX className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-                          m.is_ready
-                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                            : 'bg-zinc-800 text-zinc-400'
-                        }`}
-                      >
-                        {m.is_ready ? 'READY' : 'DRAFTING'}
-                      </span>
-                      {isHeadTable && m.user_id !== userId && (
-                        <button
-                          onClick={() => handleKick(m.user_id, charName)}
-                          title="Kick Player (Host)"
-                          className="text-zinc-600 hover:text-red-400 transition cursor-pointer"
-                        >
-                          <UserX className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                    {/* Real-time declared action shown when player is READY */}
+                    {m.is_ready && (
+                      <div className="p-2 rounded bg-zinc-900/90 border border-emerald-900/40 text-[11px] text-zinc-300">
+                        <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium mb-1">
+                          <Check className="w-3 h-3 shrink-0" />
+                          <span>Declared Action:</span>
+                        </div>
+                        {m.action_text ? (
+                          <p className="italic text-zinc-300 whitespace-pre-wrap break-words leading-relaxed">
+                            &ldquo;{m.action_text}&rdquo;
+                          </p>
+                        ) : (
+                          <p className="italic text-zinc-500 text-[10px]">(Ready without action)</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}

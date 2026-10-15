@@ -43,52 +43,88 @@ export async function getTableMembers(tableId: string) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is required to display party character names.')
   }
 
-  const { data: members, error: membersErr } = await admin
-    .from('table_members')
-    .select('id, user_id, is_ready, character_id')
-    .eq('table_id', tableId)
-    .order('joined_at', { ascending: true })
+  const [membersRes, tableRes] = await Promise.all([
+    admin
+      .from('table_members')
+      .select('id, user_id, is_ready, character_id')
+      .eq('table_id', tableId)
+      .order('joined_at', { ascending: true }),
+    admin
+      .from('tables')
+      .select('current_turn')
+      .eq('id', tableId)
+      .single(),
+  ])
 
-  if (membersErr) throw new Error(`Failed to fetch table members: ${membersErr.message}`)
+  if (membersRes.error) throw new Error(`Failed to fetch table members: ${membersRes.error.message}`)
+  const members = membersRes.data ?? []
 
-  const characterIds = [...new Set((members ?? []).flatMap((member) => (
-    member.character_id ? [member.character_id] : []
-  )))]
+  const draftByMemberId = new Map<string, string>()
+  const currentTurn = tableRes.data?.current_turn
+  if (typeof currentTurn === 'number') {
+    const { data: turn } = await admin
+      .from('turns')
+      .select('id')
+      .eq('table_id', tableId)
+      .eq('turn_number', currentTurn)
+      .maybeSingle()
 
-  if (characterIds.length === 0) {
-    return (members ?? []).map((member) => ({ ...member, characters: null }))
-  }
+    if (turn?.id) {
+      const { data: actions } = await admin
+        .from('turn_actions')
+        .select('member_id, action_text')
+        .eq('turn_id', turn.id)
 
-  const { data: partyCharacters, error: charactersErr } = await admin
-    .from('characters')
-    .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, strengths, weaknesses, backstory')
-    .in('id', characterIds)
-
-  if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
-
-  const charactersById = new Map((partyCharacters ?? []).map((character) => [character.id, character]))
-  const ownCharacterIds = (members ?? [])
-    .filter((member) => member.user_id === user.id && member.character_id)
-    .map((member) => member.character_id)
-
-  if (ownCharacterIds.length > 0) {
-    const { data: ownCharacters, error: ownCharactersErr } = await supabase
-      .from('characters')
-      .select('*')
-      .in('id', ownCharacterIds)
-      .eq('user_id', user.id)
-
-    if (ownCharactersErr) throw new Error(`Failed to fetch your character sheet: ${ownCharactersErr.message}`)
-
-    for (const character of ownCharacters ?? []) {
-      charactersById.set(character.id, character)
+      for (const act of actions ?? []) {
+        if (act.action_text) {
+          draftByMemberId.set(act.member_id, act.action_text)
+        }
+      }
     }
   }
 
-  return (members ?? []).map((member) => ({
+  const characterIds = [...new Set(members.flatMap((member) => (
+    member.character_id ? [member.character_id] : []
+  )))]
+
+  const charactersById = new Map()
+
+  if (characterIds.length > 0) {
+    const { data: partyCharacters, error: charactersErr } = await admin
+      .from('characters')
+      .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, strengths, weaknesses, backstory')
+      .in('id', characterIds)
+
+    if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
+
+    for (const character of partyCharacters ?? []) {
+      charactersById.set(character.id, character)
+    }
+
+    const ownCharacterIds = members
+      .filter((member) => member.user_id === user.id && member.character_id)
+      .map((member) => member.character_id)
+
+    if (ownCharacterIds.length > 0) {
+      const { data: ownCharacters, error: ownCharactersErr } = await supabase
+        .from('characters')
+        .select('*')
+        .in('id', ownCharacterIds)
+        .eq('user_id', user.id)
+
+      if (ownCharactersErr) throw new Error(`Failed to fetch your character sheet: ${ownCharactersErr.message}`)
+
+      for (const character of ownCharacters ?? []) {
+        charactersById.set(character.id, character)
+      }
+    }
+  }
+
+  return members.map((member) => ({
     id: member.id,
     user_id: member.user_id,
     is_ready: member.is_ready,
+    action_text: member.is_ready ? draftByMemberId.get(member.id) ?? null : null,
     characters: member.character_id ? charactersById.get(member.character_id) ?? null : null,
   }))
 }
