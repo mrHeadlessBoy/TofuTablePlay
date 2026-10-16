@@ -7,6 +7,8 @@ import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable }
 import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
+import { playSystemSound } from '@/lib/sound'
+
 type PublicCampaign = {
   id: string | number
   category: string
@@ -50,6 +52,69 @@ function LaunchButton() {
         </>
       )}
     </button>
+  )
+}
+
+function ActiveTableCard({
+  tbl,
+  currentUserId,
+  deletingId,
+  onDelete,
+  onLeave,
+}: {
+  tbl: ActiveTable
+  currentUserId: string | null
+  deletingId: string | null
+  onDelete: (tbl: ActiveTable) => void
+  onLeave: (tbl: ActiveTable) => void
+}) {
+  return (
+    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
+      <div>
+        <span className="text-[10px] uppercase font-mono tracking-widest text-amber-500">
+          CODE: {tbl.table_code}
+        </span>
+        <h3 className="text-base font-semibold text-white mt-1">{tbl.campaigns?.title}</h3>
+        <p className="text-xs text-zinc-400 mt-1">
+          Turn: {tbl.current_turn} | Phase: {tbl.turn_phase}
+        </p>
+      </div>
+      <Link
+        href={`/table/${tbl.id}`}
+        className="mt-4 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition"
+      >
+        <Play className="w-3.5 h-3.5" /> Re-enter Table
+      </Link>
+      {currentUserId && tbl.head_table_id === currentUserId ? (
+        <button
+          type="button"
+          onClick={() => onDelete(tbl)}
+          disabled={deletingId !== null}
+          className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition disabled:opacity-50 cursor-pointer"
+        >
+          {deletingId === `table:${tbl.id}` ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5" />
+          )}
+          Delete Table
+        </button>
+      ) : currentUserId ? (
+        <button
+          type="button"
+          onClick={() => onLeave(tbl)}
+          disabled={deletingId !== null}
+          className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition disabled:opacity-50 cursor-pointer"
+        >
+          {deletingId === `leave:${tbl.id}` ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <LogOut className="w-3.5 h-3.5" />
+          )}
+          Leave Table
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -157,6 +222,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       await deleteTable(String(tbl.id))
       router.refresh()
     } catch (err: unknown) {
+      playSystemSound('error')
       alert(err instanceof Error ? err.message : 'Failed to delete table.')
     } finally {
       setDeletingId(null)
@@ -171,6 +237,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       await leaveTable(String(tbl.id))
       router.refresh()
     } catch (err: unknown) {
+      playSystemSound('error')
       alert(err instanceof Error ? err.message : 'Failed to leave table.')
     } finally {
       setDeletingId(null)
@@ -185,6 +252,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       await deleteCampaign(String(camp.id))
       router.refresh()
     } catch (err: unknown) {
+      playSystemSound('error')
       alert(err instanceof Error ? err.message : 'Failed to delete campaign.')
     } finally {
       setDeletingId(null)
@@ -198,6 +266,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
     try {
       await joinTableByCode(tableCode)
     } catch (err: unknown) {
+      playSystemSound('error')
       const message = err instanceof Error ? err.message : 'Failed to join table.'
       alert(message)
     } finally {
@@ -238,48 +307,14 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           <h2 className="text-lg font-semibold text-white">Your Active Tables</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {activeTables.map((tbl) => (
-              <div key={tbl.id} className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-widest text-amber-500">CODE: {tbl.table_code}</span>
-                  <h3 className="text-base font-semibold text-white mt-1">{tbl.campaigns?.title}</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Turn: {tbl.current_turn} | Phase: {tbl.turn_phase}</p>
-                </div>
-                <Link
-                  href={`/table/${tbl.id}`}
-                  className="mt-4 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition"
-                >
-                  <Play className="w-3.5 h-3.5" /> Re-enter Table
-                </Link>
-                {currentUserId && tbl.head_table_id === currentUserId ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteTable(tbl)}
-                    disabled={deletingId !== null}
-                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {deletingId === `table:${tbl.id}` ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                    Delete Table
-                  </button>
-                ) : currentUserId ? (
-                  <button
-                    type="button"
-                    onClick={() => handleLeaveTable(tbl)}
-                    disabled={deletingId !== null}
-                    className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {deletingId === `leave:${tbl.id}` ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <LogOut className="w-3.5 h-3.5" />
-                    )}
-                    Leave Table
-                  </button>
-                ) : null}
-              </div>
+              <ActiveTableCard
+                key={tbl.id}
+                tbl={tbl}
+                currentUserId={currentUserId}
+                deletingId={deletingId}
+                onDelete={handleDeleteTable}
+                onLeave={handleLeaveTable}
+              />
             ))}
           </div>
         </div>

@@ -8,10 +8,30 @@ import { COUNTDOWN_MS, type TablePhase } from './countdown'
 type SessionClient = Awaited<ReturnType<typeof createClient>>
 type DbClient = SessionClient | NonNullable<ReturnType<typeof createAdminClient>>
 
-export async function linkCharacterToTable(tableId: string, characterId: string) {
+async function requireAuthenticatedUser() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  return { supabase, user }
+}
+
+async function assertHeadTable(supabase: SessionClient, tableId: string, userId: string, errorMessage: string) {
+  const { data: table, error: tableErr } = await supabase
+    .from('tables')
+    .select('head_table_id')
+    .eq('id', tableId)
+    .single()
+
+  if (tableErr || !table) throw new Error('Table not found')
+  if (table.head_table_id !== userId) {
+    throw new Error(errorMessage)
+  }
+}
+
+export async function linkCharacterToTable(tableId: string, characterId: string) {
+  const { supabase, user } = await requireAuthenticatedUser()
 
   const { error } = await supabase
     .from('table_members')
@@ -24,9 +44,7 @@ export async function linkCharacterToTable(tableId: string, characterId: string)
 }
 
 export async function getTableMembers(tableId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const { supabase, user } = await requireAuthenticatedUser()
 
   const { data: ownSeat, error: ownSeatErr } = await supabase
     .from('table_members')
@@ -175,9 +193,7 @@ async function saveActionDraft(
 }
 
 export async function submitActionDraft(tableId: string, currentTurnNumber: number, actionText: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const { supabase, user } = await requireAuthenticatedUser()
 
   await saveActionDraft(supabase, user.id, tableId, currentTurnNumber, actionText)
   revalidatePath(`/table/${tableId}`)
@@ -222,9 +238,7 @@ export async function toggleReadyStatus(
   isReady: boolean,
   draft?: { turnNumber: number; text: string }
 ): Promise<TablePhase | null> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const { supabase, user } = await requireAuthenticatedUser()
 
   if (isReady && draft && draft.text.trim()) {
     await saveActionDraft(supabase, user.id, tableId, draft.turnNumber, draft.text)
@@ -289,9 +303,7 @@ export async function getServerTime(): Promise<number> {
 }
 
 export async function resolveTurn(tableId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const { supabase, user } = await requireAuthenticatedUser()
 
   // Fetch table and campaign settings
   const { data: table, error: tableErr } = await supabase
@@ -376,11 +388,11 @@ export async function resolveTurn(tableId: string) {
 
     // One entry per seated player, in join order — the party size is whatever the table holds.
     // A seat with neither a character nor a draft is a spectator and is left out.
-const partyActions = (seats || []).flatMap((seat, index) => { 
+    const partyActions = (seats || []).flatMap((seat, index) => {
       const character = Array.isArray(seat.characters) ? seat.characters[0] : seat.characters
       const action = draftByMember.get(seat.id) ?? null
       if (!character && !action) return []
-      
+
       return [
         {
           characterName: character?.name || `Unknown Adventurer ${index + 1}`,
@@ -468,22 +480,8 @@ const partyActions = (seats || []).flatMap((seat, index) => {
 }
 
 export async function hostOverrideNarrative(turnId: string, updatedNarrative: string, tableId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-
-  // Validate Head Table permissions
-  const { data: table, error: tableErr } = await supabase
-    .from('tables')
-    .select('head_table_id')
-    .eq('id', tableId)
-    .single()
-
-  if (tableErr || !table) throw new Error('Table not found')
-
-  if (table.head_table_id !== user.id) {
-    throw new Error('Only the Head Table can edit AI narrative blocks')
-  }
+  const { supabase, user } = await requireAuthenticatedUser()
+  await assertHeadTable(supabase, tableId, user.id, 'Only the Head Table can edit AI narrative blocks')
 
   const { error: updateErr } = await supabase
     .from('turns')
@@ -498,21 +496,9 @@ export async function hostOverrideNarrative(turnId: string, updatedNarrative: st
 }
 
 export async function voteKickMember(tableId: string, targetUserId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const { supabase, user } = await requireAuthenticatedUser()
+  await assertHeadTable(supabase, tableId, user.id, 'Only the Head Table has permission to kick players from the room')
 
-  // Verify that only the Head Table has authority to kick players
-  const { data: table, error: tableErr } = await supabase
-    .from('tables')
-    .select('head_table_id')
-    .eq('id', tableId)
-    .single()
-
-  if (tableErr || !table) throw new Error('Table not found')
-  if (table.head_table_id !== user.id) {
-    throw new Error('Only the Head Table has permission to kick players from the room')
-  }
   if (targetUserId === user.id) {
     throw new Error('Head Table cannot kick themselves')
   }
@@ -541,9 +527,7 @@ export async function updateCharacterCombatState(
     stats?: Record<string, number | string>
   }
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const { supabase, user } = await requireAuthenticatedUser()
 
   const payloadUpdates = { ...updates }
   if (updates.stats) {

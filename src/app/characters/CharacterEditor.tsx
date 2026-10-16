@@ -3,13 +3,21 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveCharacter, deleteCharacter, CharacterFormData } from './actions'
-import { EMPTY_EQUIPMENT, EQUIPMENT_LABELS } from './equipment'
+import {
+  ABILITY_SCORE_KEYS,
+  EMPTY_EQUIPMENT,
+  EQUIPMENT_LABELS,
+  clampHpValues,
+  sanitizeAbilityScores,
+  type AbilityScoreKey,
+} from './equipment'
+import { playSystemSound } from '@/lib/sound'
 import { Trash2, Loader2 } from 'lucide-react'
 
-const defaultStats = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 }
+const defaultStats: Record<AbilityScoreKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 }
 
 type CharacterRecord = CharacterFormData & { id?: string | number; user_id?: string | null }
-/*  */
+
 export default function CharacterEditor({
   characters,
   currentUserId,
@@ -42,6 +50,7 @@ export default function CharacterEditor({
       }
       router.refresh()
     } catch (err: unknown) {
+      playSystemSound('error')
       const message = err instanceof Error ? err.message : 'Failed to delete character.'
       alert(message)
     } finally {
@@ -67,7 +76,7 @@ export default function CharacterEditor({
     })
   }
 
-  const handleStatChange = (stat: keyof typeof defaultStats, rawValue: string) => {
+  const handleStatChange = (stat: AbilityScoreKey, rawValue: string) => {
     if (!selectedChar) return
     if (rawValue === '' || rawValue === '-') {
       setSelectedChar({
@@ -90,16 +99,8 @@ export default function CharacterEditor({
     if (!selectedChar) return
     setIsSaving(true)
     try {
-      const maxHp = Number(selectedChar.max_hp) || 1
-      const currentHp = Math.min(maxHp, Number(selectedChar.current_hp) || 0)
-      const sanitizedStats = {
-        STR: Number.isFinite(Number(selectedChar.stats.STR)) ? Number(selectedChar.stats.STR) : 0,
-        DEX: Number.isFinite(Number(selectedChar.stats.DEX)) ? Number(selectedChar.stats.DEX) : 0,
-        CON: Number.isFinite(Number(selectedChar.stats.CON)) ? Number(selectedChar.stats.CON) : 0,
-        INT: Number.isFinite(Number(selectedChar.stats.INT)) ? Number(selectedChar.stats.INT) : 0,
-        WIS: Number.isFinite(Number(selectedChar.stats.WIS)) ? Number(selectedChar.stats.WIS) : 0,
-        CHA: Number.isFinite(Number(selectedChar.stats.CHA)) ? Number(selectedChar.stats.CHA) : 0,
-      }
+      const { currentHp, maxHp } = clampHpValues(selectedChar.current_hp, selectedChar.max_hp)
+      const sanitizedStats = sanitizeAbilityScores(selectedChar.stats, 0)
       await saveCharacter({
         ...selectedChar,
         current_hp: currentHp,
@@ -109,6 +110,7 @@ export default function CharacterEditor({
       setSelectedChar(null)
       router.refresh()
     } catch (err: unknown) {
+      playSystemSound('error')
       const message = err instanceof Error ? err.message : 'Failed to save character.'
       alert(message)
     } finally {
@@ -256,7 +258,7 @@ export default function CharacterEditor({
                 <span className="text-[11px] text-zinc-500 font-mono">Allows negative</span>
               </div>
               <div className="grid grid-cols-6 gap-2">
-                {(['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const).map((stat) => (
+                {ABILITY_SCORE_KEYS.map((stat) => (
                   <div key={stat} className="bg-zinc-950 border border-zinc-800 rounded p-2 text-center">
                     <span className="text-[10px] text-zinc-500 font-bold block">{stat}</span>
                     <input
