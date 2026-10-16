@@ -8,6 +8,7 @@ import DialogueBox from './DialogueBox'
 import StoryLog from './StoryLog'
 import { GLASS, LABEL, PartyRoster, RollRequests, SceneCard, ThreatList, TokenInspector, type PlacingDraft } from './BoardPanels'
 import { DiceRoller, abilityModifier, describeRoll, rollDice, type DiceActor, type DiceRoll } from '@/components/dice'
+import { playDiceRollSound, playSystemSound } from '@/lib/sound'
 import { FEET_PER_TILE, MAP_THEMES, findFreeTiles, generateMap, reachableTiles, tileAt, tileIndex } from '@/lib/board/maps'
 import {
   appendLog,
@@ -94,6 +95,10 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
     return characters.filter((character) => !seated.has(character.id))
   }, [characters, tokens])
 
+  useEffect(() => {
+    playSystemSound('player_enter_table')
+  }, [])
+
   // Keep the table in localStorage so a reload picks up where it left off.
   useEffect(() => {
     const timer = window.setTimeout(() => saveSession(userId, session), 300)
@@ -101,6 +106,9 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
   }, [userId, session])
 
   const flash = (tone: Notice['tone'], text: string) => {
+    if (tone === 'error') {
+      playSystemSound('error')
+    }
     setNotice({ tone, text })
     window.setTimeout(() => setNotice((current) => (current?.text === text ? null : current)), 6000)
   }
@@ -116,6 +124,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
       const result = await narrateAction(input)
       setSession((current) => applyDmResult(current, map, input, result))
       setSelectedId(heroes[0]?.id ?? null)
+      playSystemSound('ai_reply')
     } catch (error: unknown) {
       console.error(error)
       setSession((current) => ({ ...current, ready: {} }))
@@ -274,6 +283,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
 
   /** Every roll at the table ends up here: show it in the tray, log it, and queue it for the DM. */
   const recordRoll = (roll: DiceRoll, context = '') => {
+    playDiceRollSound(roll.total)
     const who = roll.roller || 'Party'
     const what = context ? `${roll.label} · ${context}` : roll.label
     setActiveRoll(roll)
@@ -448,7 +458,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
         </header>
 
         {/* Left column: what is selected, and where the story stands (wide screens only) */}
-        <aside className="pointer-events-auto absolute left-3 top-[3.75rem] hidden max-h-[calc(100%-4.5rem)] w-60 flex-col gap-3 overflow-y-auto pb-1 lg:flex">
+        <aside className="pointer-events-auto absolute left-3 top-15 hidden max-h-[calc(100%-4.5rem)] w-60 flex-col gap-3 overflow-y-auto pb-1 lg:flex">
           {selected ? (
             <TokenInspector
               token={selected}
@@ -468,7 +478,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
         </aside>
 
         {/* Right column: who is at the table (hidden on very narrow windows) */}
-        <aside className="pointer-events-auto absolute right-3 top-[3.75rem] hidden max-h-[calc(100%-22.5rem)] w-72 flex-col gap-3 overflow-y-auto pb-1 md:flex lg:max-h-[calc(100%-8rem)]">
+        <aside className="pointer-events-auto absolute right-3 top-15 hidden max-h-[calc(100%-22.5rem)] w-72 flex-col gap-3 overflow-y-auto pb-1 md:flex lg:max-h-[calc(100%-8rem)]">
           <RollRequests requests={session.rollRequests} heroes={heroes} locked={locked} onRoll={answerRequest} onDismiss={dismissRequest} />
           <PartyRoster
             heroes={heroes}
@@ -499,7 +509,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
         </aside>
 
         {/* Bottom centre: narration text box and the action bar */}
-        <div className="absolute inset-x-0 bottom-3 flex justify-center px-3 lg:left-64 lg:right-[19rem]">
+        <div className="absolute inset-x-0 bottom-3 flex justify-center px-3 lg:left-64 lg:right-76">
           <div className="pointer-events-auto w-full max-w-3xl space-y-2">
             {notice && (
               <div
@@ -583,7 +593,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
         </div>
 
         {/* Bottom right: dice */}
-        <div className="pointer-events-auto absolute bottom-[15.5rem] right-3 flex flex-col items-end gap-2 lg:bottom-3">
+        <div className="pointer-events-auto absolute bottom-62 right-3 flex flex-col items-end gap-2 lg:bottom-3">
           {diceOpen && (
             <DiceRoller
               actors={diceActors}
@@ -610,7 +620,7 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
 
         {/* Story log drawer */}
         {logOpen && (
-          <div className="pointer-events-auto absolute bottom-3 right-3 top-[3.75rem] z-10">
+          <div className="pointer-events-auto absolute bottom-3 right-3 top-15 z-10">
             <StoryLog entries={session.log} onClose={() => setLogOpen(false)} />
           </div>
         )}

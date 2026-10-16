@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -8,18 +8,17 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-
-  useEffect(() => {
+  const [errorMsg, setErrorMsg] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       if (params.get('reason') === 'session-expired') {
-        setErrorMsg('Your session has timed out (6-hour limit). Please log in again.')
+        return 'Your session has timed out (6-hour limit). Please log in again.'
       }
     }
-  }, [])
+    return ''
+  })
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()

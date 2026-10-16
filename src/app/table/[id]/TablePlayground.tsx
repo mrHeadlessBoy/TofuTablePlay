@@ -36,6 +36,7 @@ import {
 import Link from 'next/link'
 import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
+import { playDiceRollSound, playSystemSound } from '@/lib/sound'
 
 // The dice tray draws a 3D die with three.js, so it is only downloaded when a player opens it
 const DiceRoller = dynamic(() => import('@/components/dice/DiceRoller'), { ssr: false })
@@ -197,6 +198,43 @@ export default function TablePlayground({
   // Ref to hold the Supabase channel for broadcasting
   const channelRef = useRef<RealtimeChannel | null>(null)
 
+  // Track known turns and members so sound notifications fire only on new arrivals
+  const knownTurnIdsRef = useRef<Set<string>>(new Set(initialTurns.map((t) => t.id)))
+  const knownMemberIdsRef = useRef<Set<string>>(new Set(initialMembers.map((m) => m.user_id)))
+
+  // Play sound when player enters the table playground page
+  useEffect(() => {
+    playSystemSound('player_enter_table')
+  }, [])
+
+  // Play sound when another player enters the table
+  useEffect(() => {
+    let newPlayerEntered = false
+    for (const m of members) {
+      if (!knownMemberIdsRef.current.has(m.user_id)) {
+        knownMemberIdsRef.current.add(m.user_id)
+        newPlayerEntered = true
+      }
+    }
+    if (newPlayerEntered) {
+      playSystemSound('player_enter_table')
+    }
+  }, [members])
+
+  // Play sound when AI replies with a new turn
+  useEffect(() => {
+    let hasNewTurn = false
+    for (const t of turns) {
+      if (!knownTurnIdsRef.current.has(t.id)) {
+        knownTurnIdsRef.current.add(t.id)
+        hasNewTurn = true
+      }
+    }
+    if (hasNewTurn) {
+      playSystemSound('ai_reply')
+    }
+  }, [turns])
+
   // Derive the active member and character dynamically from live members state
   const activeMember = members.find((m) => m.user_id === userId) || currentMember
   const activeChar = activeMember?.characters
@@ -228,6 +266,7 @@ export default function TablePlayground({
   // Write the roll into the draft so the Dungeon Master reads the number when the turn resolves
   const handleDiceRoll = (roll: DiceRoll) => {
     if (draftLocked) return
+    playDiceRollSound(roll.total)
     const result = describeRoll(roll)
     const text = result.startsWith(roll.label) ? `[ทอยเต๋า ${result}]` : `[ทอยเต๋า ${roll.label}: ${result}]`
     setDraftAction((current) => (current.trim() ? `${current.trim()} ${text}` : text))
@@ -297,6 +336,7 @@ export default function TablePlayground({
         const message = err instanceof Error ? err.message : 'Failed to refresh party members'
         console.error(message)
         setMemberLoadError(message)
+        playSystemSound('error')
       }
     } while (refresh.again)
     refresh.running = false
@@ -441,6 +481,14 @@ export default function TablePlayground({
         readyClaimsRef.current.clear()
         setTable((prev) => ({ ...prev, current_turn: nextTurn, turn_phase: 'drafting', countdown_end: null }))
         setMembers((prev) => prev.map((m) => ({ ...m, is_ready: false, action_text: null })))
+        // Immediately fetch the newly written turn so the host sees it and hears Ai_reply.wav right away
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('turns')
+          .select('*')
+          .eq('table_id', table.id)
+          .order('turn_number', { ascending: true })
+        if (data) setTurns(data)
       } else {
         // Another request holds this turn: keep showing the loader until its result arrives
         setTable((prev) => ({ ...prev, turn_phase: 'resolving' }))
@@ -455,7 +503,10 @@ export default function TablePlayground({
     setIsResolving(false)
     // Tell the other players either way, so their loader ends with the new turn or with the retry
     broadcastSync()
-    if (failure) alert(failure)
+    if (failure) {
+      playSystemSound('error')
+      alert(failure)
+    }
   }, [table.id, broadcastSync])
 
   // Synchronized countdown timer
@@ -560,7 +611,10 @@ export default function TablePlayground({
     // Saved (or rolled back). The claim stays until a roster reload that started after this moment arrives.
     claim.settledAt = Date.now()
     broadcastSync()
-    if (failure) alert(failure)
+    if (failure) {
+      playSystemSound('error')
+      alert(failure)
+    }
   }
 
   const handleSelectCharacter = async (charId: string) => {
@@ -573,6 +627,7 @@ export default function TablePlayground({
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to select character'
       console.error(message)
+      playSystemSound('error')
       alert(message)
     }
   }
@@ -616,6 +671,7 @@ export default function TablePlayground({
       setIsEditingChar(false)
       broadcastSync()
     } catch (err: unknown) {
+      playSystemSound('error')
       alert(err instanceof Error ? err.message : 'Failed to update character')
     } finally {
       setIsSavingChar(false)
@@ -623,15 +679,25 @@ export default function TablePlayground({
   }
 
   const handleSaveHostEdit = async (turnId: string) => {
-    await hostOverrideNarrative(turnId, editText, table.id)
-    setEditingTurnId(null)
-    broadcastSync()
+    try {
+      await hostOverrideNarrative(turnId, editText, table.id)
+      setEditingTurnId(null)
+      broadcastSync()
+    } catch (err: unknown) {
+      playSystemSound('error')
+      alert(err instanceof Error ? err.message : 'Failed to save narrative edit')
+    }
   }
 
   const handleKick = async (targetUserId: string, targetName: string) => {
     if (confirm(`Remove ${targetName} from this table?`)) {
-      await voteKickMember(table.id, targetUserId)
-      broadcastSync()
+      try {
+        await voteKickMember(table.id, targetUserId)
+        broadcastSync()
+      } catch (err: unknown) {
+        playSystemSound('error')
+        alert(err instanceof Error ? err.message : 'Failed to remove member')
+      }
     }
   }
 
@@ -1179,7 +1245,7 @@ export default function TablePlayground({
                           <span>Declared Action:</span>
                         </div>
                         {m.action_text ? (
-                          <p className="italic text-zinc-300 whitespace-pre-wrap break-words leading-relaxed">
+                          <p className="italic text-zinc-300 whitespace-pre-wrap wrap-break-words leading-relaxed">
                             &ldquo;{m.action_text}&rdquo;
                           </p>
                         ) : (
