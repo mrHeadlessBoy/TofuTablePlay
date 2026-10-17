@@ -13,6 +13,7 @@ import {
 } from './equipment'
 import { playSystemSound } from '@/lib/sound'
 import { Trash2, Loader2 } from 'lucide-react'
+import { useAlert } from '@/components/ui/AlertModal'
 
 const defaultStats: Record<AbilityScoreKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 }
 
@@ -26,6 +27,7 @@ export default function CharacterEditor({
   currentUserId?: string | null
 }) {
   const router = useRouter()
+  const { showAlert, showConfirm } = useAlert()
   const [selectedChar, setSelectedChar] = useState<CharacterRecord | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -38,7 +40,8 @@ export default function CharacterEditor({
   const handleDelete = async (char: CharacterRecord) => {
     if (!char.id) return
     const charName = char.name?.trim() || 'this character'
-    if (!confirm(`Delete character "${charName}"? This sheet will be permanently removed. This cannot be undone.`)) {
+    const confirmed = await showConfirm(`Delete character "${charName}"? This sheet will be permanently removed. This cannot be undone.`)
+    if (!confirmed) {
       return
     }
 
@@ -52,7 +55,7 @@ export default function CharacterEditor({
     } catch (err: unknown) {
       playSystemSound('error')
       const message = err instanceof Error ? err.message : 'Failed to delete character.'
-      alert(message)
+      showAlert(message)
     } finally {
       setDeletingId(null)
     }
@@ -112,7 +115,7 @@ export default function CharacterEditor({
     } catch (err: unknown) {
       playSystemSound('error')
       const message = err instanceof Error ? err.message : 'Failed to save character.'
-      alert(message)
+      showAlert(message)
     } finally {
       setIsSaving(false)
     }

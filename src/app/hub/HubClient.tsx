@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, type FormEvent } from 'react'
+import { useState, useMemo, useRef, useEffect, type FormEvent } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from './actions'
@@ -8,6 +8,7 @@ import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, Che
 import Link from 'next/link'
 
 import { playSystemSound } from '@/lib/sound'
+import { AlertModal, useAlert } from '@/components/ui/AlertModal'
 
 type PublicCampaign = {
   id: string | number
@@ -181,12 +182,33 @@ const CAMPAIGNS_PER_PAGE = 6
 
 export default function HubClient({ publicCampaigns, activeTables, currentUserId }: HubClientProps) {
   const router = useRouter()
+  const { showAlert, showConfirm } = useAlert()
   const [tableCode, setTableCode] = useState('')
   const [joining, setJoining] = useState(false)
+  const [joinModal, setJoinModal] = useState<{
+    open: boolean
+    status: 'loading' | 'success' | 'error'
+    message?: string
+    code?: string
+  }>({ open: false, status: 'loading' })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isExtended, setIsExtended] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
   const touchStartX = useRef<number | null>(null)
+
+  // Ensure join modal is closed when returning to the hub via browser back/forward buttons
+  useEffect(() => {
+    const handleReset = () => {
+      setJoinModal({ open: false, status: 'loading' })
+      setJoining(false)
+    }
+    window.addEventListener('popstate', handleReset)
+    window.addEventListener('pageshow', handleReset)
+    return () => {
+      window.removeEventListener('popstate', handleReset)
+      window.removeEventListener('pageshow', handleReset)
+    }
+  }, [])
 
   const totalPages = Math.max(1, Math.ceil(publicCampaigns.length / CAMPAIGNS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, Math.max(0, totalPages - 1))
@@ -216,14 +238,14 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleDeleteTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
-    if (!confirm(`Delete table "${name}" (${tbl.table_code})? All turns and members will be removed. This cannot be undone.`)) return
+    const confirmed = await showConfirm(`Delete table "${name}" (${tbl.table_code})? All turns and members will be removed. This cannot be undone.`)
+    if (!confirmed) return
     setDeletingId(`table:${tbl.id}`)
     try {
       await deleteTable(String(tbl.id))
       router.refresh()
     } catch (err: unknown) {
-      playSystemSound('error')
-      alert(err instanceof Error ? err.message : 'Failed to delete table.')
+      showAlert(err instanceof Error ? err.message : 'Failed to delete table.')
     } finally {
       setDeletingId(null)
     }
@@ -231,14 +253,14 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleLeaveTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
-    if (!confirm(`Leave table "${name}" (${tbl.table_code})?`)) return
+    const confirmed = await showConfirm(`Leave table "${name}" (${tbl.table_code})?`)
+    if (!confirmed) return
     setDeletingId(`leave:${tbl.id}`)
     try {
       await leaveTable(String(tbl.id))
       router.refresh()
     } catch (err: unknown) {
-      playSystemSound('error')
-      alert(err instanceof Error ? err.message : 'Failed to leave table.')
+      showAlert(err instanceof Error ? err.message : 'Failed to leave table.')
     } finally {
       setDeletingId(null)
     }
@@ -246,14 +268,14 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleDeleteCampaign = async (camp: PublicCampaign) => {
     const title = camp.title || 'Untitled Campaign'
-    if (!confirm(`Delete campaign "${title}"? Its lorebook and every table running it will be removed. This cannot be undone.`)) return
+    const confirmed = await showConfirm(`Delete campaign "${title}"? Its lorebook and every table running it will be removed. This cannot be undone.`)
+    if (!confirmed) return
     setDeletingId(`campaign:${camp.id}`)
     try {
       await deleteCampaign(String(camp.id))
       router.refresh()
     } catch (err: unknown) {
-      playSystemSound('error')
-      alert(err instanceof Error ? err.message : 'Failed to delete campaign.')
+      showAlert(err instanceof Error ? err.message : 'Failed to delete campaign.')
     } finally {
       setDeletingId(null)
     }
@@ -261,14 +283,51 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleJoin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!tableCode.trim()) return
+    const cleanCode = tableCode.trim().toUpperCase()
+    if (!cleanCode) return
+
     setJoining(true)
+    setJoinModal({
+      open: true,
+      status: 'loading',
+      code: cleanCode,
+      message: 'กำลังตรวจสอบรหัสโต๊ะและจัดเตรียมที่นั่งสำหรับคุณ...',
+    })
+
     try {
-      await joinTableByCode(tableCode)
+      const res = await joinTableByCode(cleanCode)
+      if (res.success && res.tableId) {
+        setJoinModal({
+          open: true,
+          status: 'success',
+          code: cleanCode,
+          message: 'เข้าร่วมโต๊ะสำเร็จ! กำลังพาท่านเดินทางเข้าสู่ห้องเล่น...',
+        })
+        const targetTableId = res.tableId
+        router.push(`/table/${targetTableId}`)
+        // Reset modal and inputs after starting navigation so returning via Back button is clean
+        setTimeout(() => {
+          setJoinModal({ open: false, status: 'loading' })
+          setJoining(false)
+          setTableCode('')
+        }, 1200)
+      } else {
+        playSystemSound('error')
+        setJoinModal({
+          open: true,
+          status: 'error',
+          code: cleanCode,
+          message: res.error || 'ไม่พบโต๊ะดังกล่าว กรุณาตรวจสอบ Table Code อีกครั้ง',
+        })
+      }
     } catch (err: unknown) {
       playSystemSound('error')
-      const message = err instanceof Error ? err.message : 'Failed to join table.'
-      alert(message)
+      setJoinModal({
+        open: true,
+        status: 'error',
+        code: cleanCode,
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเชื่อมต่อเข้าโต๊ะ',
+      })
     } finally {
       setJoining(false)
     }
@@ -498,6 +557,23 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           <span className="block text-[11px] text-zinc-400">3D grid tabletop · solo prototype</span>
         </span>
       </Link>
+
+      {/* Join Table Status Modal */}
+      <AlertModal
+        isOpen={joinModal.open}
+        onClose={() => setJoinModal((prev) => ({ ...prev, open: false }))}
+        status={joinModal.status}
+        title={
+          joinModal.status === 'loading'
+            ? 'กำลังเข้าสู่โต๊ะ...'
+            : joinModal.status === 'success'
+            ? 'เข้าร่วมสำเร็จ!'
+            : 'ไม่สามารถเข้าห้องได้'
+        }
+        badge={joinModal.code ? `CODE: ${joinModal.code}` : undefined}
+        message={joinModal.message}
+        playSound={false}
+      />
     </div>
   )
 }
