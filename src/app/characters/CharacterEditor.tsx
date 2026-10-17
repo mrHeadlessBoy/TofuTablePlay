@@ -8,6 +8,8 @@ import {
   EMPTY_EQUIPMENT,
   EQUIPMENT_LABELS,
   clampHpValues,
+  clampSkillCostValues,
+  extractCharacterSkillCost,
   extractCharacterSkills,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
@@ -69,7 +71,9 @@ export default function CharacterEditor({
       class_archetype: '',
       current_hp: 100,
       max_hp: 100,
-      armor_class: 14,
+      armor_class: 10,
+      current_skill_cost: 10,
+      max_skill_cost: 10,
       stats: { ...defaultStats },
       appearance: '',
       backstory: '',
@@ -105,11 +109,15 @@ export default function CharacterEditor({
     const currentSkills = selectedChar.skills ?? extractCharacterSkills(selectedChar)
     setSelectedChar({
       ...selectedChar,
-      skills: [...currentSkills, { name: '', description: '' }],
+      skills: [...currentSkills, { name: '', cost: 0, description: '' }],
     })
   }
 
-  const handleSkillChange = (index: number, field: 'name' | 'description', value: string) => {
+  const handleSkillChange = (
+    index: number,
+    field: 'name' | 'cost' | 'description',
+    value: string | number
+  ) => {
     if (!selectedChar) return
     const currentSkills = [...(selectedChar.skills ?? extractCharacterSkills(selectedChar))]
     currentSkills[index] = {
@@ -139,6 +147,10 @@ export default function CharacterEditor({
     setIsSaving(true)
     try {
       const { currentHp, maxHp } = clampHpValues(selectedChar.current_hp, selectedChar.max_hp)
+      const { currentSkillCost, maxSkillCost } = clampSkillCostValues(
+        selectedChar.current_skill_cost ?? selectedChar.armor_class,
+        selectedChar.max_skill_cost ?? selectedChar.armor_class
+      )
       const sanitizedStats = sanitizeAbilityScores(selectedChar.stats, 0)
       const sanitizedSkills = sanitizeCharacterSkills(
         selectedChar.skills ?? extractCharacterSkills(selectedChar)
@@ -147,6 +159,9 @@ export default function CharacterEditor({
         ...selectedChar,
         current_hp: currentHp,
         max_hp: maxHp,
+        armor_class: currentSkillCost,
+        current_skill_cost: currentSkillCost,
+        max_skill_cost: maxSkillCost,
         stats: sanitizedStats,
         skills: sanitizedSkills,
       })
@@ -173,52 +188,57 @@ export default function CharacterEditor({
         </button>
 
         <div className="space-y-3">
-          {characters.map((char) => (
-            <div
-              key={char.id}
-              onClick={() =>
-                setSelectedChar({
-                  ...char,
-                  skills: extractCharacterSkills(char),
-                })
-              }
-              className={`p-4 rounded-lg border cursor-pointer transition ${
-                selectedChar?.id === char.id
-                  ? 'border-amber-500 bg-zinc-900'
-                  : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
-              }`}
-            >
-              <div className="flex justify-between items-start gap-2">
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-white truncate">{char.name}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 inline-block mt-1">
-                    {char.class_archetype}
-                  </span>
+          {characters.map((char) => {
+            const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(char)
+            return (
+              <div
+                key={char.id}
+                onClick={() =>
+                  setSelectedChar({
+                    ...char,
+                    current_skill_cost: currentSkillCost,
+                    max_skill_cost: maxSkillCost,
+                    skills: extractCharacterSkills(char),
+                  })
+                }
+                className={`p-4 rounded-lg border cursor-pointer transition ${
+                  selectedChar?.id === char.id
+                    ? 'border-amber-500 bg-zinc-900'
+                    : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-white truncate">{char.name}</h3>
+                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 inline-block mt-1">
+                      {char.class_archetype}
+                    </span>
+                  </div>
+                  {char.id && isOwner(char) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(char)
+                      }}
+                      disabled={deletingId !== null}
+                      title="Delete character sheet"
+                      className="text-zinc-500 hover:text-red-400 p-1.5 rounded hover:bg-zinc-800 transition cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      {deletingId === String(char.id) ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
                 </div>
-                {char.id && isOwner(char) && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(char)
-                    }}
-                    disabled={deletingId !== null}
-                    title="Delete character sheet"
-                    className="text-zinc-500 hover:text-red-400 p-1.5 rounded hover:bg-zinc-800 transition cursor-pointer disabled:opacity-50 shrink-0"
-                  >
-                    {deletingId === String(char.id) ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-red-400" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
-                )}
+                <p className="text-xs text-zinc-400 mt-2">
+                  HP: {char.current_hp}/{char.max_hp} | Skill Cost: {currentSkillCost}/{maxSkillCost} | Status: {char.status_condition}
+                </p>
               </div>
-              <p className="text-xs text-zinc-400 mt-2">
-                HP: {char.current_hp}/{char.max_hp} | AC: {char.armor_class} | Status: {char.status_condition}
-              </p>
-            </div>
-          ))}
+            )
+          })}
           {characters.length === 0 && (
             <p className="text-zinc-500 text-xs italic">No characters saved yet.</p>
           )}
@@ -253,7 +273,7 @@ export default function CharacterEditor({
             </div>
 
             {/* Combat Vitals */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
                 <label className="text-xs text-zinc-400 uppercase">Current HP</label>
                 <input
@@ -289,11 +309,43 @@ export default function CharacterEditor({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 uppercase">Armor Class (AC)</label>
+                <label className="text-xs text-zinc-400 uppercase">Current Skill Cost</label>
                 <input
                   type="number"
-                  value={selectedChar.armor_class}
-                  onChange={(e) => setSelectedChar({ ...selectedChar, armor_class: Number(e.target.value) })}
+                  min={0}
+                  max={selectedChar.max_skill_cost ?? 10}
+                  value={selectedChar.current_skill_cost ?? selectedChar.armor_class ?? 10}
+                  onChange={(e) => {
+                    const maxCost = selectedChar.max_skill_cost ?? 10
+                    const val = Number(e.target.value)
+                    const clamped = Number.isNaN(val) ? 0 : Math.max(0, Math.min(maxCost, val))
+                    setSelectedChar({
+                      ...selectedChar,
+                      current_skill_cost: clamped,
+                      armor_class: clamped,
+                    })
+                  }}
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 uppercase">Max Skill Cost</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={selectedChar.max_skill_cost ?? selectedChar.armor_class ?? 10}
+                  onChange={(e) => {
+                    const newMax = Number(e.target.value)
+                    const clampedMax = Number.isNaN(newMax) ? 0 : Math.max(0, newMax)
+                    const curCost = selectedChar.current_skill_cost ?? selectedChar.armor_class ?? 10
+                    const nextCur = Math.min(clampedMax, curCost)
+                    setSelectedChar({
+                      ...selectedChar,
+                      max_skill_cost: clampedMax,
+                      current_skill_cost: nextCur,
+                      armor_class: nextCur,
+                    })
+                  }}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
                 />
               </div>
@@ -425,7 +477,7 @@ export default function CharacterEditor({
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <div className="md:col-span-1">
                         <label className="text-[10px] text-zinc-400 font-mono uppercase block">
                           Skill Name :
@@ -435,6 +487,22 @@ export default function CharacterEditor({
                           placeholder="e.g., Fireball, Shadow Step..."
                           value={skill.name}
                           onChange={(e) => handleSkillChange(idx, 'name', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Skill Cost :
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          placeholder="0"
+                          value={skill.cost ?? 0}
+                          onChange={(e) => {
+                            const val = Number(e.target.value)
+                            handleSkillChange(idx, 'cost', Number.isNaN(val) ? 0 : Math.max(0, val))
+                          }}
                           className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                         />
                       </div>

@@ -7,8 +7,12 @@ export type Character = {
   current_hp?: number
   max_hp?: number
   armor_class?: number
+  current_skill_cost?: number
+  max_skill_cost?: number
   status_condition?: string
   stats?: Partial<Record<AbilityScoreKey, number | string>> & {
+    current_skill_cost?: number
+    max_skill_cost?: number
     skills?: CharacterSkill[]
     [key: string]: unknown
   }
@@ -67,6 +71,8 @@ export type CharacterCombatFormState = {
   current_hp: number
   max_hp: number
   armor_class: number
+  current_skill_cost: number
+  max_skill_cost: number
   status_condition: string
   inventory: string
   equipment: string[]

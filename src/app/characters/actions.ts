@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import {
+  extractCharacterSkillCost,
   extractCharacterSkills,
   sanitizeCharacterSkills,
   type CharacterSkill,
@@ -17,6 +18,8 @@ export interface CharacterFormData {
   current_hp: number
   max_hp: number
   armor_class: number
+  current_skill_cost?: number
+  max_skill_cost?: number
   stats: {
     STR: number
     DEX: number
@@ -24,6 +27,8 @@ export interface CharacterFormData {
     INT: number
     WIS: number
     CHA: number
+    current_skill_cost?: number
+    max_skill_cost?: number
     skills?: CharacterSkill[]
   }
   appearance: string
@@ -52,6 +57,8 @@ export async function saveCharacter(data: CharacterFormData) {
       ? sanitizeCharacterSkills(data.skills)
       : extractCharacterSkills(data)
 
+  const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(data)
+
   const normalizedStats = {
     STR: normalizeStat(data.stats?.STR),
     DEX: normalizeStat(data.stats?.DEX),
@@ -59,6 +66,8 @@ export async function saveCharacter(data: CharacterFormData) {
     INT: normalizeStat(data.stats?.INT),
     WIS: normalizeStat(data.stats?.WIS),
     CHA: normalizeStat(data.stats?.CHA),
+    current_skill_cost: currentSkillCost,
+    max_skill_cost: maxSkillCost,
     skills: sanitizedSkills,
   }
 
@@ -71,7 +80,7 @@ export async function saveCharacter(data: CharacterFormData) {
     class_archetype: data.class_archetype,
     current_hp: currentHp,
     max_hp: maxHp,
-    armor_class: data.armor_class,
+    armor_class: currentSkillCost,
     stats: normalizedStats,
     appearance: data.appearance,
     backstory: data.backstory,

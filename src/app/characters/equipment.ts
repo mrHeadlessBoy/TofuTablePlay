@@ -35,6 +35,7 @@ export const DEFAULT_ABILITY_SCORES: Record<AbilityScoreKey, number> = {
 
 export interface CharacterSkill {
   name: string
+  cost: number
   description: string
 }
 
@@ -42,10 +43,14 @@ export function sanitizeCharacterSkills(skills: unknown): CharacterSkill[] {
   if (!Array.isArray(skills)) return []
   return skills
     .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
-    .map((item) => ({
-      name: typeof item.name === 'string' ? item.name.trim() : '',
-      description: typeof item.description === 'string' ? item.description.trim() : '',
-    }))
+    .map((item) => {
+      const parsedCost = Number(item.cost)
+      return {
+        name: typeof item.name === 'string' ? item.name.trim() : '',
+        cost: Number.isFinite(parsedCost) ? Math.max(0, parsedCost) : 0,
+        description: typeof item.description === 'string' ? item.description.trim() : '',
+      }
+    })
     .filter((skill) => skill.name.length > 0 || skill.description.length > 0)
 }
 
@@ -87,4 +92,44 @@ export function clampHpValues(currentHpInput: number | string | undefined, maxHp
   const currentHp = Math.max(0, Math.min(maxHp, Number(currentHpInput) || 0))
   return { currentHp, maxHp }
 }
+
+export function clampSkillCostValues(
+  currentCostInput: number | string | undefined,
+  maxCostInput: number | string | undefined
+) {
+  const parsedMax = Number(maxCostInput)
+  const maxSkillCost = Number.isFinite(parsedMax) ? Math.max(0, parsedMax) : 10
+  const parsedCurrent = Number(currentCostInput)
+  const currentSkillCost = Number.isFinite(parsedCurrent)
+    ? Math.max(0, Math.min(maxSkillCost, parsedCurrent))
+    : maxSkillCost
+  return { currentSkillCost, maxSkillCost }
+}
+
+export function extractCharacterSkillCost(
+  character:
+    | {
+        armor_class?: number | null
+        current_skill_cost?: number | null
+        max_skill_cost?: number | null
+        stats?: Record<string, unknown> | null
+      }
+    | null
+    | undefined
+): { currentSkillCost: number; maxSkillCost: number } {
+  if (!character) return { currentSkillCost: 10, maxSkillCost: 10 }
+  const statsObj = character.stats && typeof character.stats === 'object' ? character.stats : undefined
+  const rawMax =
+    character.max_skill_cost ??
+    (statsObj?.max_skill_cost as number | string | undefined) ??
+    character.armor_class ??
+    10
+  const rawCurrent =
+    character.current_skill_cost ??
+    (statsObj?.current_skill_cost as number | string | undefined) ??
+    character.armor_class ??
+    rawMax
+  return clampSkillCostValues(rawCurrent, rawMax)
+}
+
 

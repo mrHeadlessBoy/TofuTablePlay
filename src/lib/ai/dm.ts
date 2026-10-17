@@ -14,14 +14,15 @@ export interface PartyMemberAction {
   classType: string
   currentHp?: number
   maxHp?: number
-  ac?: number
+  currentSkillCost?: number
+  maxSkillCost?: number
   condition?: string
   inventory?: string
   equipment?: string[]
   strengths?: string
   weaknesses?: string
   backstory?: string
-  skills?: { name: string; description: string }[]
+  skills?: { name: string; cost?: number; description: string }[]
   action: string | null
 }
 
@@ -56,8 +57,11 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
         .filter((s) => s.name?.trim() || s.description?.trim())
         .map((s) => {
           const name = s.name?.trim() || 'Unnamed Skill'
+          const cost = Number.isFinite(Number(s.cost)) ? Number(s.cost) : 0
           const desc = s.description?.trim()
-          return desc ? `${name}: ${desc}` : name
+          return desc
+            ? `${name} (Skill Cost: ${cost}, Description: ${desc})`
+            : `${name} (Skill Cost: ${cost})`
         })
         .join(', ')
 
@@ -78,7 +82,7 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const actionsSummary = partyActions
     .map((a, i) => {
       const hpText = `HP ${a.currentHp ?? '?'}/${a.maxHp ?? '?'}`
-      const acText = `AC ${a.ac ?? 10}`
+      const skillCostText = `Skill Cost ${a.currentSkillCost ?? '?'}/${a.maxSkillCost ?? '?'}`
       const equipList = (a.equipment || []).filter(Boolean).join(', ')
       const invPreview = a.inventory ? a.inventory.replace(/\n+/g, ', ').slice(0, 120) : ''
       const gear = [equipList && `สวมใส่: ${equipList}`, invPreview && `ไอเทม: ${invPreview}`]
@@ -86,7 +90,7 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
         .join(' | ')
 
       const detailLines: string[] = []
-      detailLines.push(`   - [สภาพร่างกาย]: ${hpText} | ${acText}`)
+      detailLines.push(`   - [สภาพร่างกาย]: ${hpText} | ${skillCostText}`)
       if (gear) {
         detailLines.push(`   - [อุปกรณ์/ไอเทม]: ${gear}`)
       }
@@ -150,7 +154,7 @@ ${partyProfiles}
 สถานการณ์ปัจจุบัน: (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปให้ชัดเจน)
 
 [สภาพร่างกาย]
-(ระบุเฉพาะ HP และ AC ของตัวละครทุกคน เช่น - Oracle: HP 100/100 | AC 14)
+(ระบุเฉพาะ HP และ Skill Cost ของตัวละครทุกคน เช่น - Oracle: HP 100/100 | Skill Cost 10/10)
 
 [ Decision ]
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ข้ามและ "ห้ามพิมพ์หัวข้อ [ Decision ] ออกมาเด็ดขาด")*

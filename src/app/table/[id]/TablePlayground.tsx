@@ -19,6 +19,8 @@ import {
   DEFAULT_ABILITY_SCORES,
   EMPTY_EQUIPMENT,
   clampHpValues,
+  clampSkillCostValues,
+  extractCharacterSkillCost,
   extractCharacterSkills,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
@@ -93,6 +95,8 @@ export default function TablePlayground({
     current_hp: 10,
     max_hp: 10,
     armor_class: 10,
+    current_skill_cost: 10,
+    max_skill_cost: 10,
     status_condition: 'Normal',
     inventory: '',
     equipment: [...EMPTY_EQUIPMENT],
@@ -183,10 +187,13 @@ export default function TablePlayground({
 
   const handleOpenEdit = () => {
     if (activeChar) {
+      const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(activeChar)
       setCharForm({
         current_hp: activeChar.current_hp ?? 10,
         max_hp: activeChar.max_hp ?? 10,
-        armor_class: activeChar.armor_class ?? 10,
+        armor_class: currentSkillCost,
+        current_skill_cost: currentSkillCost,
+        max_skill_cost: maxSkillCost,
         status_condition: activeChar.status_condition || 'Normal',
         inventory: activeChar.inventory || '',
         equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)],
@@ -533,12 +540,21 @@ export default function TablePlayground({
       const sanitizedStats = sanitizeAbilityScores(charForm.stats, 0)
       const sanitizedSkills = sanitizeCharacterSkills(charForm.skills)
       const { currentHp, maxHp } = clampHpValues(charForm.current_hp, charForm.max_hp)
+      const { currentSkillCost, maxSkillCost } = clampSkillCostValues(
+        charForm.current_skill_cost,
+        charForm.max_skill_cost
+      )
       const formToSave = {
         ...charForm,
         current_hp: currentHp,
         max_hp: maxHp,
+        armor_class: currentSkillCost,
+        current_skill_cost: currentSkillCost,
+        max_skill_cost: maxSkillCost,
         stats: {
           ...sanitizedStats,
+          current_skill_cost: currentSkillCost,
+          max_skill_cost: maxSkillCost,
           skills: sanitizedSkills,
         },
         skills: sanitizedSkills,

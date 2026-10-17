@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Edit3, Heart, Plus, RotateCcw, Save, Shield, Trash2 } from 'lucide-react'
+import { ArrowLeft, Edit3, Heart, Plus, RotateCcw, Save, Trash2, Zap } from 'lucide-react'
 import {
   ABILITY_SCORE_KEYS,
   CHARACTER_CONDITIONS,
   EMPTY_EQUIPMENT,
   EQUIPMENT_LABELS,
+  extractCharacterSkillCost,
   extractCharacterSkills,
 } from '@/app/characters/equipment'
 import type { Character, CharacterCombatFormState } from './types'
@@ -47,6 +48,7 @@ export default function CharacterInspectorPanel({
   onCancelEdit,
 }: CharacterInspectorPanelProps) {
   const activeSkills = extractCharacterSkills(activeChar)
+  const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(activeChar)
 
   return (
     <aside className="w-80 border-r border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-between overflow-y-auto">
@@ -102,18 +104,22 @@ export default function CharacterInspectorPanel({
                 </button>
               )}
             </div>
-            {userCharacters.map((char) => (
-              <button
-                key={char.id}
-                onClick={() => onSelectCharacter(char.id)}
-                className="w-full text-left p-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-amber-500 text-xs transition cursor-pointer"
-              >
-                <p className="font-semibold text-white">{char.name}</p>
-                <p className="text-zinc-500">
-                  {char.class_archetype} | HP: {char.current_hp}/{char.max_hp}
-                </p>
-              </button>
-            ))}
+            {userCharacters.map((char) => {
+              const cost = extractCharacterSkillCost(char)
+              return (
+                <button
+                  key={char.id}
+                  onClick={() => onSelectCharacter(char.id)}
+                  className="w-full text-left p-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-amber-500 text-xs transition cursor-pointer"
+                >
+                  <p className="font-semibold text-white">{char.name}</p>
+                  <p className="text-zinc-500">
+                    {char.class_archetype} | HP: {char.current_hp}/{char.max_hp} | Skill Cost:{' '}
+                    {cost.currentSkillCost}/{cost.maxSkillCost}
+                  </p>
+                </button>
+              )
+            })}
             {userCharacters.length === 0 && (
               <p className="text-xs text-zinc-500 italic">
                 No character sheets found. Create one in the Character Codex.
@@ -162,32 +168,67 @@ export default function CharacterInspectorPanel({
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-zinc-400 uppercase font-mono">Armor Class</label>
+                <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                  Current Skill Cost
+                </label>
                 <input
                   type="number"
-                  value={charForm.armor_class}
-                  onChange={(e) =>
-                    onChangeCharForm({ ...charForm, armor_class: Number(e.target.value) })
-                  }
+                  min={0}
+                  max={charForm.max_skill_cost}
+                  value={charForm.current_skill_cost}
+                  onChange={(e) => {
+                    const val = Number(e.target.value)
+                    const clamped = Number.isNaN(val)
+                      ? 0
+                      : Math.max(0, Math.min(charForm.max_skill_cost, val))
+                    onChangeCharForm({
+                      ...charForm,
+                      current_skill_cost: clamped,
+                      armor_class: clamped,
+                    })
+                  }}
                   className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
                 />
               </div>
               <div>
-                <label className="text-[10px] text-zinc-400 uppercase font-mono">Condition</label>
-                <select
-                  value={charForm.status_condition}
-                  onChange={(e) =>
-                    onChangeCharForm({ ...charForm, status_condition: e.target.value })
-                  }
+                <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                  Max Skill Cost
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={charForm.max_skill_cost}
+                  onChange={(e) => {
+                    const newMax = Number(e.target.value)
+                    const clampedMax = Number.isNaN(newMax) ? 0 : Math.max(0, newMax)
+                    const nextCur = Math.min(clampedMax, charForm.current_skill_cost)
+                    onChangeCharForm({
+                      ...charForm,
+                      max_skill_cost: clampedMax,
+                      current_skill_cost: nextCur,
+                      armor_class: nextCur,
+                    })
+                  }}
                   className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white"
-                >
-                  {CHARACTER_CONDITIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-zinc-400 uppercase font-mono">Condition</label>
+              <select
+                value={charForm.status_condition}
+                onChange={(e) =>
+                  onChangeCharForm({ ...charForm, status_condition: e.target.value })
+                }
+                className="w-full bg-zinc-950 border border-zinc-700 rounded p-1.5 text-xs text-white mt-0.5"
+              >
+                {CHARACTER_CONDITIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Stats Editor */}
@@ -316,6 +357,27 @@ export default function CharacterInspectorPanel({
                     </div>
                     <div>
                       <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                        Skill Cost :
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        value={skill.cost ?? 0}
+                        onChange={(e) => {
+                          const val = Number(e.target.value)
+                          const nextSkills = [...(charForm.skills || [])]
+                          nextSkills[idx] = {
+                            ...nextSkills[idx],
+                            cost: Number.isNaN(val) ? 0 : Math.max(0, val),
+                          }
+                          onChangeCharForm({ ...charForm, skills: nextSkills })
+                        }}
+                        className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-zinc-400 uppercase font-mono block">
                         Description :
                       </span>
                       <input
@@ -338,7 +400,7 @@ export default function CharacterInspectorPanel({
                 onClick={() =>
                   onChangeCharForm({
                     ...charForm,
-                    skills: [...(charForm.skills || []), { name: '', description: '' }],
+                    skills: [...(charForm.skills || []), { name: '', cost: 0, description: '' }],
                   })
                 }
                 className="w-full py-1.5 px-2 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
@@ -381,12 +443,14 @@ export default function CharacterInspectorPanel({
                 </div>
               </div>
               <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center gap-2">
-                <Shield className="w-4 h-4 text-blue-500" />
+                <Zap className="w-4 h-4 text-amber-500" />
                 <div>
                   <span className="text-[10px] text-zinc-500 uppercase font-mono block">
-                    Armor Class
+                    Skill Cost
                   </span>
-                  <span className="font-bold text-sm text-white">{activeChar.armor_class}</span>
+                  <span className="font-bold text-sm text-white">
+                    {currentSkillCost} / {maxSkillCost}
+                  </span>
                 </div>
               </div>
             </div>
@@ -459,6 +523,12 @@ export default function CharacterInspectorPanel({
                           Skill Name :
                         </span>
                         {skill.name || 'Unnamed Skill'}
+                      </p>
+                      <p className="text-cyan-400 font-mono">
+                        <span className="text-[9px] text-zinc-500 uppercase font-mono mr-1">
+                          Skill Cost :
+                        </span>
+                        {skill.cost ?? 0}
                       </p>
                       {skill.description && (
                         <p className="text-zinc-300 whitespace-pre-line">

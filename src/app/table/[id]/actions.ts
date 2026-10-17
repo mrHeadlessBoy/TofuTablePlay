@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { generateDmNarrative } from '@/lib/ai/dm'
 import {
+  extractCharacterSkillCost,
   extractCharacterSkills,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
@@ -399,13 +400,16 @@ export async function resolveTurn(tableId: string) {
       const action = draftByMember.get(seat.id) ?? null
       if (!character && !action) return []
 
+      const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(character)
+
       return [
         {
           characterName: character?.name || `Unknown Adventurer ${index + 1}`,
           classType: character?.class_archetype || 'Wanderer',
           currentHp: character?.current_hp ?? 10,
           maxHp: character?.max_hp ?? 10,
-          ac: character?.armor_class ?? 10,
+          currentSkillCost,
+          maxSkillCost,
           condition: character?.status_condition || 'Normal',
           inventory: character?.inventory || '',
           equipment: Array.isArray(character?.equipment) ? character.equipment : [],
@@ -528,6 +532,8 @@ export async function updateCharacterCombatState(
     current_hp?: number
     max_hp?: number
     armor_class?: number
+    current_skill_cost?: number
+    max_skill_cost?: number
     status_condition?: string
     inventory?: string
     equipment?: string[]
@@ -537,17 +543,26 @@ export async function updateCharacterCombatState(
 ) {
   const { supabase, user } = await requireAuthenticatedUser()
 
-  const { skills, stats, ...restUpdates } = updates
+  const { skills, stats, current_skill_cost, max_skill_cost, ...restUpdates } = updates
   const payloadUpdates: Record<string, unknown> = { ...restUpdates }
 
-  if (stats !== undefined || skills !== undefined) {
+  if (
+    stats !== undefined ||
+    skills !== undefined ||
+    current_skill_cost !== undefined ||
+    max_skill_cost !== undefined
+  ) {
     const normalizedScores = sanitizeAbilityScores(stats, 0)
     const sanitizedSkills =
       skills !== undefined
         ? sanitizeCharacterSkills(skills)
         : extractCharacterSkills({ stats })
+    const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(updates)
+    payloadUpdates.armor_class = currentSkillCost
     payloadUpdates.stats = {
       ...normalizedScores,
+      current_skill_cost: currentSkillCost,
+      max_skill_cost: maxSkillCost,
       skills: sanitizedSkills,
     }
   }

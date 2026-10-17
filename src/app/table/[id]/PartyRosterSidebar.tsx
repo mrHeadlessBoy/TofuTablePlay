@@ -1,6 +1,7 @@
 'use client'
 
 import { BookOpen, Check, Users, UserX } from 'lucide-react'
+import { extractCharacterSkillCost } from '@/app/characters/equipment'
 import type { LorebookEntry, Member } from './types'
 
 type PartyRosterSidebarProps = {
@@ -40,6 +41,7 @@ export default function PartyRosterSidebar({
             {members.map((m) => {
               const char = m.characters
               const charName = char?.name || 'Spectator/Unbound'
+              const skillCost = char ? extractCharacterSkillCost(char) : null
               return (
                 <div
                   key={m.id}
@@ -55,11 +57,16 @@ export default function PartyRosterSidebar({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-500">
+                      <div className="flex items-center flex-wrap gap-2 mt-0.5 text-[10px] text-zinc-500">
                         <span>{char?.class_archetype || 'No class'}</span>
                         {char?.current_hp !== undefined && (
                           <span className="text-red-400 font-mono">
                             HP: {char.current_hp}/{char.max_hp}
+                          </span>
+                        )}
+                        {skillCost && (
+                          <span className="text-cyan-400 font-mono">
+                            Skill Cost: {skillCost.currentSkillCost}/{skillCost.maxSkillCost}
                           </span>
                         )}
                         {char?.status_condition && char.status_condition !== 'Normal' && (
