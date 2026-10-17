@@ -2,7 +2,12 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { EquipmentSlots } from './equipment'
+import {
+  extractCharacterSkills,
+  sanitizeCharacterSkills,
+  type CharacterSkill,
+  type EquipmentSlots,
+} from './equipment'
 
 export interface CharacterFormData {
   id?: string
@@ -19,6 +24,7 @@ export interface CharacterFormData {
     INT: number
     WIS: number
     CHA: number
+    skills?: CharacterSkill[]
   }
   appearance: string
   backstory: string
@@ -27,6 +33,7 @@ export interface CharacterFormData {
   inventory: string
   status_condition: string
   equipment: EquipmentSlots
+  skills?: CharacterSkill[]
 }
 
 export async function saveCharacter(data: CharacterFormData) {
@@ -40,16 +47,20 @@ export async function saveCharacter(data: CharacterFormData) {
     return Number.isFinite(num) ? num : 0
   }
 
-  const normalizedStats = data.stats
-    ? {
-        STR: normalizeStat(data.stats.STR),
-        DEX: normalizeStat(data.stats.DEX),
-        CON: normalizeStat(data.stats.CON),
-        INT: normalizeStat(data.stats.INT),
-        WIS: normalizeStat(data.stats.WIS),
-        CHA: normalizeStat(data.stats.CHA),
-      }
-    : data.stats
+  const sanitizedSkills =
+    data.skills !== undefined
+      ? sanitizeCharacterSkills(data.skills)
+      : extractCharacterSkills(data)
+
+  const normalizedStats = {
+    STR: normalizeStat(data.stats?.STR),
+    DEX: normalizeStat(data.stats?.DEX),
+    CON: normalizeStat(data.stats?.CON),
+    INT: normalizeStat(data.stats?.INT),
+    WIS: normalizeStat(data.stats?.WIS),
+    CHA: normalizeStat(data.stats?.CHA),
+    skills: sanitizedSkills,
+  }
 
   const maxHp = Number(data.max_hp) || 1
   const currentHp = Math.min(maxHp, Number(data.current_hp) || 0)

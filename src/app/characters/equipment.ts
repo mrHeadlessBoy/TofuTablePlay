@@ -33,8 +33,44 @@ export const DEFAULT_ABILITY_SCORES: Record<AbilityScoreKey, number> = {
   CHA: 10,
 }
 
+export interface CharacterSkill {
+  name: string
+  description: string
+}
+
+export function sanitizeCharacterSkills(skills: unknown): CharacterSkill[] {
+  if (!Array.isArray(skills)) return []
+  return skills
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    .map((item) => ({
+      name: typeof item.name === 'string' ? item.name.trim() : '',
+      description: typeof item.description === 'string' ? item.description.trim() : '',
+    }))
+    .filter((skill) => skill.name.length > 0 || skill.description.length > 0)
+}
+
+export function extractCharacterSkills(
+  character:
+    | {
+        skills?: unknown
+        stats?: Record<string, unknown> | null
+      }
+    | null
+    | undefined
+): CharacterSkill[] {
+  if (!character) return []
+  if (Array.isArray(character.skills)) {
+    return sanitizeCharacterSkills(character.skills)
+  }
+  const nestedSkills = character.stats && typeof character.stats === 'object' ? character.stats.skills : undefined
+  if (Array.isArray(nestedSkills)) {
+    return sanitizeCharacterSkills(nestedSkills)
+  }
+  return []
+}
+
 export function sanitizeAbilityScores(
-  stats: Record<string, number | string> | undefined,
+  stats: Record<string, unknown> | undefined | null,
   fallback = 0
 ): Record<AbilityScoreKey, number> {
   const result = { ...DEFAULT_ABILITY_SCORES }
@@ -51,3 +87,4 @@ export function clampHpValues(currentHpInput: number | string | undefined, maxHp
   const currentHp = Math.max(0, Math.min(maxHp, Number(currentHpInput) || 0))
   return { currentHp, maxHp }
 }
+

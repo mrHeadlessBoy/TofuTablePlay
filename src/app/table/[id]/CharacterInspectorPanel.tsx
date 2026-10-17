@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Edit3, Heart, RotateCcw, Save, Shield } from 'lucide-react'
+import { ArrowLeft, Edit3, Heart, Plus, RotateCcw, Save, Shield, Trash2 } from 'lucide-react'
 import {
+  ABILITY_SCORE_KEYS,
   CHARACTER_CONDITIONS,
   EMPTY_EQUIPMENT,
   EQUIPMENT_LABELS,
+  extractCharacterSkills,
 } from '@/app/characters/equipment'
 import type { Character, CharacterCombatFormState } from './types'
 
@@ -44,6 +46,8 @@ export default function CharacterInspectorPanel({
   onSaveCharEdits,
   onCancelEdit,
 }: CharacterInspectorPanelProps) {
+  const activeSkills = extractCharacterSkills(activeChar)
+
   return (
     <aside className="w-80 border-r border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-between overflow-y-auto">
       <div className="space-y-6">
@@ -195,7 +199,7 @@ export default function CharacterInspectorPanel({
                 <span className="text-[9px] text-zinc-500 font-mono">Allows negative</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
-                {Object.keys(charForm.stats || {}).map((stat) => (
+                {ABILITY_SCORE_KEYS.map((stat) => (
                   <div
                     key={stat}
                     className="bg-zinc-950 border border-zinc-800 rounded p-1 text-center"
@@ -264,6 +268,85 @@ export default function CharacterInspectorPanel({
               </div>
             </div>
 
+            {/* Skill Editor */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-zinc-400 uppercase font-mono block">Skill</label>
+                <span className="text-[9px] text-zinc-500 font-mono">
+                  {(charForm.skills || []).length} slot(s)
+                </span>
+              </div>
+              <div className="space-y-2">
+                {(charForm.skills || []).map((skill, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 bg-zinc-950 border border-zinc-800 rounded space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-amber-500 font-mono uppercase">
+                        Skill #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextSkills = (charForm.skills || []).filter((_, i) => i !== idx)
+                          onChangeCharForm({ ...charForm, skills: nextSkills })
+                        }}
+                        title="Remove skill"
+                        className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                        Skill Name :
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Skill name..."
+                        value={skill.name}
+                        onChange={(e) => {
+                          const nextSkills = [...(charForm.skills || [])]
+                          nextSkills[idx] = { ...nextSkills[idx], name: e.target.value }
+                          onChangeCharForm({ ...charForm, skills: nextSkills })
+                        }}
+                        className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                        Description :
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Description..."
+                        value={skill.description}
+                        onChange={(e) => {
+                          const nextSkills = [...(charForm.skills || [])]
+                          nextSkills[idx] = { ...nextSkills[idx], description: e.target.value }
+                          onChangeCharForm({ ...charForm, skills: nextSkills })
+                        }}
+                        className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  onChangeCharForm({
+                    ...charForm,
+                    skills: [...(charForm.skills || []), { name: '', description: '' }],
+                  })
+                }
+                className="w-full py-1.5 px-2 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" /> Add Skill
+              </button>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
@@ -324,10 +407,12 @@ export default function CharacterInspectorPanel({
 
             {/* Attributes */}
             <div className="grid grid-cols-3 gap-2">
-              {Object.entries(activeChar.stats || {}).map(([key, val]) => (
+              {ABILITY_SCORE_KEYS.map((key) => (
                 <div key={key} className="bg-zinc-950 border border-zinc-800/80 rounded p-2 text-center">
                   <span className="text-[9px] text-zinc-500 block uppercase font-mono">{key}</span>
-                  <span className="font-bold text-white text-xs">{String(val)}</span>
+                  <span className="font-bold text-white text-xs">
+                    {String(activeChar.stats?.[key] ?? 10)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -357,6 +442,40 @@ export default function CharacterInspectorPanel({
                   )
                 })}
               </div>
+            </div>
+
+            {/* Skill Slots */}
+            <div>
+              <span className="text-[10px] uppercase font-mono text-zinc-400">Skill</span>
+              {activeSkills.length > 0 ? (
+                <div className="mt-1 space-y-1.5">
+                  {activeSkills.map((skill, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[11px] space-y-0.5"
+                    >
+                      <p className="text-amber-400 font-semibold">
+                        <span className="text-[9px] text-zinc-500 uppercase font-mono mr-1">
+                          Skill Name :
+                        </span>
+                        {skill.name || 'Unnamed Skill'}
+                      </p>
+                      {skill.description && (
+                        <p className="text-zinc-300 whitespace-pre-line">
+                          <span className="text-[9px] text-zinc-500 uppercase font-mono mr-1">
+                            Description :
+                          </span>
+                          {skill.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-1 p-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-500 italic text-[11px]">
+                  No skills
+                </div>
+              )}
             </div>
           </div>
         )}

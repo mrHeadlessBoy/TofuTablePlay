@@ -21,6 +21,7 @@ export interface PartyMemberAction {
   strengths?: string
   weaknesses?: string
   backstory?: string
+  skills?: { name: string; description: string }[]
   action: string | null
 }
 
@@ -47,14 +48,24 @@ const NO_ACTION_TEXT =
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const { campaign, loreEntries, recentTurns, partyActions } = input
 
-  // 1. แยก Profile ข้อมูลคงที่ (Strengths, Weaknesses, Backstory) ออกมาเก็บเป็น Reference Sheet
+  // 1. แยก Profile ข้อมูลคงที่ (Strengths, Weaknesses, Backstory, Skill) ออกมาเก็บเป็น Reference Sheet
   // ส่งเข้าไปใน System Instruction เพื่อให้ AI รู้ภูมิหลังโดยไม่มองว่าเป็นสิ่งที่เกิดขึ้นในเทิร์นนี้
   const partyProfiles = partyActions
     .map((a) => {
+      const skillsText = (a.skills || [])
+        .filter((s) => s.name?.trim() || s.description?.trim())
+        .map((s) => {
+          const name = s.name?.trim() || 'Unnamed Skill'
+          const desc = s.description?.trim()
+          return desc ? `${name}: ${desc}` : name
+        })
+        .join(', ')
+
       const traits = [
         a.strengths?.trim() && `จุดเด่น: ${a.strengths.trim()}`,
         a.weaknesses?.trim() && `จุดอ่อน: ${a.weaknesses.trim()}`,
         a.backstory?.trim() && `ปูมหลัง: ${a.backstory.trim()}`,
+        skillsText && `สกิล (Skill): ${skillsText}`,
       ]
         .filter(Boolean)
         .join(' | ')

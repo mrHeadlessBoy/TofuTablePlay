@@ -8,11 +8,13 @@ import {
   EMPTY_EQUIPMENT,
   EQUIPMENT_LABELS,
   clampHpValues,
+  extractCharacterSkills,
   sanitizeAbilityScores,
+  sanitizeCharacterSkills,
   type AbilityScoreKey,
 } from './equipment'
 import { playSystemSound } from '@/lib/sound'
-import { Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { useAlert } from '@/components/ui/AlertModal'
 
 const defaultStats: Record<AbilityScoreKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 }
@@ -76,6 +78,7 @@ export default function CharacterEditor({
       inventory: '',
       status_condition: 'Normal',
       equipment: [...EMPTY_EQUIPMENT],
+      skills: [],
     })
   }
 
@@ -97,6 +100,39 @@ export default function CharacterEditor({
     }
   }
 
+  const handleAddSkill = () => {
+    if (!selectedChar) return
+    const currentSkills = selectedChar.skills ?? extractCharacterSkills(selectedChar)
+    setSelectedChar({
+      ...selectedChar,
+      skills: [...currentSkills, { name: '', description: '' }],
+    })
+  }
+
+  const handleSkillChange = (index: number, field: 'name' | 'description', value: string) => {
+    if (!selectedChar) return
+    const currentSkills = [...(selectedChar.skills ?? extractCharacterSkills(selectedChar))]
+    currentSkills[index] = {
+      ...currentSkills[index],
+      [field]: value,
+    }
+    setSelectedChar({
+      ...selectedChar,
+      skills: currentSkills,
+    })
+  }
+
+  const handleRemoveSkill = (index: number) => {
+    if (!selectedChar) return
+    const currentSkills = (selectedChar.skills ?? extractCharacterSkills(selectedChar)).filter(
+      (_, i) => i !== index
+    )
+    setSelectedChar({
+      ...selectedChar,
+      skills: currentSkills,
+    })
+  }
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedChar) return
@@ -104,11 +140,15 @@ export default function CharacterEditor({
     try {
       const { currentHp, maxHp } = clampHpValues(selectedChar.current_hp, selectedChar.max_hp)
       const sanitizedStats = sanitizeAbilityScores(selectedChar.stats, 0)
+      const sanitizedSkills = sanitizeCharacterSkills(
+        selectedChar.skills ?? extractCharacterSkills(selectedChar)
+      )
       await saveCharacter({
         ...selectedChar,
         current_hp: currentHp,
         max_hp: maxHp,
         stats: sanitizedStats,
+        skills: sanitizedSkills,
       })
       setSelectedChar(null)
       router.refresh()
@@ -136,7 +176,12 @@ export default function CharacterEditor({
           {characters.map((char) => (
             <div
               key={char.id}
-              onClick={() => setSelectedChar(char)}
+              onClick={() =>
+                setSelectedChar({
+                  ...char,
+                  skills: extractCharacterSkills(char),
+                })
+              }
               className={`p-4 rounded-lg border cursor-pointer transition ${
                 selectedChar?.id === char.id
                   ? 'border-amber-500 bg-zinc-900'
@@ -350,6 +395,79 @@ export default function CharacterEditor({
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Skill Slots */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-zinc-400 uppercase block">Skill</label>
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  {(selectedChar.skills ?? extractCharacterSkills(selectedChar)).length} slot(s)
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {(selectedChar.skills ?? extractCharacterSkills(selectedChar)).map((skill, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-amber-500 font-mono uppercase">
+                        Skill #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSkill(idx)}
+                        title="Remove skill"
+                        className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-zinc-900 transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-1">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Skill Name :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Fireball, Shadow Step..."
+                          value={skill.name}
+                          onChange={(e) => handleSkillChange(idx, 'name', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Description :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Describe what this skill does..."
+                          value={skill.description}
+                          onChange={(e) => handleSkillChange(idx, 'description', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {(selectedChar.skills ?? extractCharacterSkills(selectedChar)).length === 0 && (
+                  <p className="text-xs text-zinc-500 italic">
+                    No skills added yet. Click &quot;Add Skill&quot; below to add a skill slot.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddSkill}
+                className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Skill
+              </button>
             </div>
 
             <div className="flex justify-between items-center pt-4 border-t border-zinc-800">

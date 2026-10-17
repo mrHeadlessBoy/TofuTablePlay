@@ -15,9 +15,13 @@ import {
 } from './actions'
 import { COUNTDOWN_MS } from './countdown'
 import {
+  ABILITY_SCORE_KEYS,
   DEFAULT_ABILITY_SCORES,
   EMPTY_EQUIPMENT,
   clampHpValues,
+  extractCharacterSkills,
+  sanitizeAbilityScores,
+  sanitizeCharacterSkills,
 } from '@/app/characters/equipment'
 import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
@@ -93,6 +97,7 @@ export default function TablePlayground({
     inventory: '',
     equipment: [...EMPTY_EQUIPMENT],
     stats: { ...DEFAULT_ABILITY_SCORES },
+    skills: [],
   })
 
   // Ref to hold the Supabase channel for broadcasting
@@ -156,9 +161,9 @@ export default function TablePlayground({
           id: activeChar.id,
           name: activeChar.name,
           modifiers: Object.fromEntries(
-            Object.entries(activeChar.stats || {}).map(([key, value]) => [
+            ABILITY_SCORE_KEYS.map((key) => [
               key,
-              abilityModifier(value),
+              abilityModifier(activeChar.stats?.[key]),
             ])
           ),
         },
@@ -185,7 +190,8 @@ export default function TablePlayground({
         status_condition: activeChar.status_condition || 'Normal',
         inventory: activeChar.inventory || '',
         equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)],
-        stats: activeChar.stats || { ...DEFAULT_ABILITY_SCORES },
+        stats: sanitizeAbilityScores(activeChar.stats, 0),
+        skills: extractCharacterSkills(activeChar),
       })
     }
     setIsEditingChar(true)
@@ -524,17 +530,18 @@ export default function TablePlayground({
     if (!activeChar) return
     setIsSavingChar(true)
     try {
-      const sanitizedStats: Record<string, number> = {}
-      for (const [k, v] of Object.entries(charForm.stats || {})) {
-        const num = Number(v)
-        sanitizedStats[k] = Number.isFinite(num) ? num : 0
-      }
+      const sanitizedStats = sanitizeAbilityScores(charForm.stats, 0)
+      const sanitizedSkills = sanitizeCharacterSkills(charForm.skills)
       const { currentHp, maxHp } = clampHpValues(charForm.current_hp, charForm.max_hp)
       const formToSave = {
         ...charForm,
         current_hp: currentHp,
         max_hp: maxHp,
-        stats: sanitizedStats,
+        stats: {
+          ...sanitizedStats,
+          skills: sanitizedSkills,
+        },
+        skills: sanitizedSkills,
       }
 
       await updateCharacterCombatState(table.id, activeChar.id, formToSave)

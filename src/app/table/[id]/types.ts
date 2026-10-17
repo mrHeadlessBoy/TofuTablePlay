@@ -1,3 +1,5 @@
+import type { AbilityScoreKey, CharacterSkill } from '@/app/characters/equipment'
+
 export type Character = {
   id: string
   name: string
@@ -6,13 +8,17 @@ export type Character = {
   max_hp?: number
   armor_class?: number
   status_condition?: string
-  stats?: Record<string, number | string>
+  stats?: Partial<Record<AbilityScoreKey, number | string>> & {
+    skills?: CharacterSkill[]
+    [key: string]: unknown
+  }
   inventory?: string
   equipment?: string[]
   strengths?: string
   weaknesses?: string
   backstory?: string
   appearance?: string
+  skills?: CharacterSkill[]
 }
 
 export type Member = {
@@ -65,6 +71,7 @@ export type CharacterCombatFormState = {
   inventory: string
   equipment: string[]
   stats: Record<string, number | string>
+  skills: CharacterSkill[]
 }
 
 // How long another player's Ready click is trusted when their request never reports back

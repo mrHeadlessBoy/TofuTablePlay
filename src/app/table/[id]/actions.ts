@@ -3,6 +3,12 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { generateDmNarrative } from '@/lib/ai/dm'
+import {
+  extractCharacterSkills,
+  sanitizeAbilityScores,
+  sanitizeCharacterSkills,
+  type CharacterSkill,
+} from '@/app/characters/equipment'
 import { COUNTDOWN_MS, type TablePhase } from './countdown'
 
 type SessionClient = Awaited<ReturnType<typeof createClient>>
@@ -110,7 +116,7 @@ export async function getTableMembers(tableId: string) {
   if (characterIds.length > 0) {
     const { data: partyCharacters, error: charactersErr } = await admin
       .from('characters')
-      .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, strengths, weaknesses, backstory')
+      .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, stats, strengths, weaknesses, backstory')
       .in('id', characterIds)
 
     if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
@@ -406,6 +412,7 @@ export async function resolveTurn(tableId: string) {
           strengths: character?.strengths || '',
           weaknesses: character?.weaknesses || '',
           backstory: character?.backstory || '',
+          skills: extractCharacterSkills(character),
           action,
         },
       ]
@@ -524,20 +531,27 @@ export async function updateCharacterCombatState(
     status_condition?: string
     inventory?: string
     equipment?: string[]
-    stats?: Record<string, number | string>
+    stats?: Record<string, unknown>
+    skills?: CharacterSkill[]
   }
 ) {
   const { supabase, user } = await requireAuthenticatedUser()
 
-  const payloadUpdates = { ...updates }
-  if (updates.stats) {
-    const normalizedStats: Record<string, number> = {}
-    for (const [k, v] of Object.entries(updates.stats)) {
-      const num = Number(v)
-      normalizedStats[k] = Number.isFinite(num) ? num : 0
+  const { skills, stats, ...restUpdates } = updates
+  const payloadUpdates: Record<string, unknown> = { ...restUpdates }
+
+  if (stats !== undefined || skills !== undefined) {
+    const normalizedScores = sanitizeAbilityScores(stats, 0)
+    const sanitizedSkills =
+      skills !== undefined
+        ? sanitizeCharacterSkills(skills)
+        : extractCharacterSkills({ stats })
+    payloadUpdates.stats = {
+      ...normalizedScores,
+      skills: sanitizedSkills,
     }
-    payloadUpdates.stats = normalizedStats
   }
+
   if (updates.max_hp !== undefined && updates.current_hp !== undefined) {
     payloadUpdates.current_hp = Math.min(updates.max_hp, updates.current_hp)
   }

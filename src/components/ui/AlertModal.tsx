@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { AlertCircle, CheckCircle2, Loader2, AlertTriangle, Info, X } from 'lucide-react'
-import { playSystemSound } from '@/lib/sound'
 
 export type AlertStatus = 'loading' | 'success' | 'error' | 'warning' | 'info'
 
@@ -33,16 +32,7 @@ export function AlertModal({
   buttonText,
   confirmText,
   cancelText,
-  playSound = true,
 }: AlertModalProps) {
-  useEffect(() => {
-    if (isOpen && playSound) {
-      if (status === 'error' || status === 'warning') {
-        playSystemSound('error')
-      }
-    }
-  }, [isOpen, status, playSound])
-
   useEffect(() => {
     if (!isOpen || status === 'loading') return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -127,7 +117,7 @@ export function AlertModal({
           </div>
         )}
 
-        <div className="mt-3 text-xs text-zinc-400 leading-relaxed max-w-xs break-words">
+        <div className="mt-3 text-xs text-zinc-400 leading-relaxed max-w-xs wrap-break-words">
           {message}
         </div>
 
