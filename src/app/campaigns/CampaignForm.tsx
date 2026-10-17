@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createCampaign, updateCampaign, LoreEntryInput } from './actions'
 import { Trash2, Plus, BookOpen, Sparkles, Pencil } from 'lucide-react'
 import Link from 'next/link'
+import { useAlert } from '@/components/ui/AlertModal'
 
 const CATEGORIES = [
   'Fantasy', 'Sci-Fi', 'Horror', 'Comedy', 'Romance',
@@ -41,6 +42,7 @@ const EMPTY_ENTRY: LoreEntryInput = {
 
 export default function CampaignForm({ mode, campaignId, initial }: CampaignFormProps) {
   const router = useRouter()
+  const { showAlert, showConfirm } = useAlert()
   const isEdit = mode === 'edit'
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState(initial?.title ?? '')
@@ -90,9 +92,11 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
   }
 
   // Moves an attached entry back into the draft editor (keeping its id so it is updated, not duplicated)
-  const handleEditLoreEntry = (index: number) => {
-    if ((newEntry.title.trim() || newEntry.content.trim()) &&
-      !confirm('Discard the lore entry currently in the draft editor?')) return
+  const handleEditLoreEntry = async (index: number) => {
+    if (newEntry.title.trim() || newEntry.content.trim()) {
+      const confirmed = await showConfirm('Discard the lore entry currently in the draft editor?')
+      if (!confirmed) return
+    }
     setNewEntry(loreEntries[index])
     setTriggerInput('')
     setLoreEntries(loreEntries.filter((_, i) => i !== index))
@@ -136,7 +140,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
       const message = err instanceof Error
         ? err.message
         : `Something went wrong while ${isEdit ? 'saving' : 'creating'} the campaign.`
-      alert(message)
+      showAlert(message)
       setLoading(false)
     }
   }

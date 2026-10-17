@@ -81,28 +81,36 @@ export async function launchTable(campaignId: string) {
   redirect(`/table/${table.id}`)
 }
 
-export async function joinTableByCode(code: string) {
+export async function joinTableByCode(code: string): Promise<{ success: boolean; tableId?: string; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) throw new Error('Not authenticated')
+  if (!user) return { success: false, error: 'กรุณาเข้าสู่ระบบก่อนเข้าร่วมโต๊ะ' }
 
   const cleanCode = code.trim().toUpperCase()
+  if (!cleanCode) return { success: false, error: 'กรุณากรอก Table Code' }
+
   const { data: table, error } = await supabase
     .from('tables')
     .select('id')
     .eq('table_code', cleanCode)
-    .single()
+    .maybeSingle()
 
-  if (error || !table) throw new Error('Table not found')
+  if (error || !table) {
+    return { success: false, error: 'ไม่พบโต๊ะดังกล่าว กรุณาตรวจสอบ Table Code อีกครั้ง' }
+  }
 
   // Insert member if not already joined
-  await supabase.from('table_members').upsert({
+  const { error: memberError } = await supabase.from('table_members').upsert({
     table_id: table.id,
     user_id: user.id,
   }, { onConflict: 'table_id,user_id' })
 
-  redirect(`/table/${table.id}`)
+  if (memberError) {
+    return { success: false, error: `ไม่สามารถเข้าร่วมโต๊ะได้: ${memberError.message}` }
+  }
+
+  return { success: true, tableId: table.id }
 }
 
 // Allows any participant to leave a table they joined

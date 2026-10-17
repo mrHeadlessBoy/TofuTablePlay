@@ -25,6 +25,7 @@ import { playDiceRollSound, playSystemSound } from '@/lib/sound'
 import CharacterInspectorPanel from './CharacterInspectorPanel'
 import NarrativeFeedPanel from './NarrativeFeedPanel'
 import PartyRosterSidebar from './PartyRosterSidebar'
+import { useAlert } from '@/components/ui/AlertModal'
 import {
   READY_CLAIM_TTL_MS,
   withReadyClaims,
@@ -48,6 +49,7 @@ export default function TablePlayground({
   userId,
   isHeadTable,
 }: TablePlaygroundProps) {
+  const { showAlert, showConfirm } = useAlert()
   const [table, setTable] = useState(initialTable)
   const [members, setMembers] = useState(initialMembers)
   const [memberLoadError, setMemberLoadError] = useState<string | null>(null)
@@ -396,10 +398,9 @@ export default function TablePlayground({
     setIsResolving(false)
     broadcastSync()
     if (failure) {
-      playSystemSound('error')
-      alert(failure)
+      showAlert(failure)
     }
-  }, [table.id, broadcastSync])
+  }, [table.id, broadcastSync, showAlert])
 
   // Synchronized countdown timer
   useEffect(() => {
@@ -501,8 +502,7 @@ export default function TablePlayground({
     claim.settledAt = Date.now()
     broadcastSync()
     if (failure) {
-      playSystemSound('error')
-      alert(failure)
+      showAlert(failure)
     }
   }
 
@@ -516,8 +516,7 @@ export default function TablePlayground({
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to select character'
       console.error(message)
-      playSystemSound('error')
-      alert(message)
+      showAlert(message)
     }
   }
 
@@ -558,8 +557,7 @@ export default function TablePlayground({
       setIsEditingChar(false)
       broadcastSync()
     } catch (err: unknown) {
-      playSystemSound('error')
-      alert(err instanceof Error ? err.message : 'Failed to update character')
+      showAlert(err instanceof Error ? err.message : 'Failed to update character')
     } finally {
       setIsSavingChar(false)
     }
@@ -571,19 +569,18 @@ export default function TablePlayground({
       setEditingTurnId(null)
       broadcastSync()
     } catch (err: unknown) {
-      playSystemSound('error')
-      alert(err instanceof Error ? err.message : 'Failed to save narrative edit')
+      showAlert(err instanceof Error ? err.message : 'Failed to save narrative edit')
     }
   }
 
   const handleKick = async (targetUserId: string, targetName: string) => {
-    if (confirm(`Remove ${targetName} from this table?`)) {
+    const confirmed = await showConfirm(`Remove ${targetName} from this table?`)
+    if (confirmed) {
       try {
         await voteKickMember(table.id, targetUserId)
         broadcastSync()
       } catch (err: unknown) {
-        playSystemSound('error')
-        alert(err instanceof Error ? err.message : 'Failed to remove member')
+        showAlert(err instanceof Error ? err.message : 'Failed to remove member')
       }
     }
   }

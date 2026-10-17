@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, Clock, Dices, Loader2, Minus, Plus, RotateCcw, ScrollText, TriangleAlert, X } from 'lucide-react'
+import { useAlert } from '@/components/ui/AlertModal'
 import BoardScene, { type BoardSceneHandle, type SceneInsets } from './BoardScene'
 import DialogueBox from './DialogueBox'
 import StoryLog from './StoryLog'
@@ -42,6 +43,7 @@ const HUD_INSETS: SceneInsets = { top: 52, right: 170, bottom: 196, left: 130 }
 type Notice = { tone: 'error' | 'info'; text: string }
 
 export default function BoardPlayground({ userId, characters, campaigns, narrateAction }: BoardPlaygroundProps) {
+  const { showConfirm } = useAlert()
   const [session, setSession] = useState<BoardSession>(() => initialSession(userId, characters))
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placing, setPlacing] = useState<PlacingDraft | null>(null)
@@ -233,10 +235,18 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
     }))
   }
 
-  const removeToken = (tokenId: string) => {
+  const removeToken = async (tokenId: string) => {
     const token = tokens.find((entry) => entry.id === tokenId)
     if (!token || locked) return
-    if (token.kind === 'hero' && !window.confirm(`Remove ${token.name} from the party?`)) return
+    if (token.kind === 'hero') {
+      const confirmed = await showConfirm({
+        title: 'นำตัวละครออกจากปาร์ตี้',
+        message: `ต้องการนำ ${token.name} ออกจากปาร์ตี้ใช่หรือไม่?`,
+        confirmText: 'นำออก',
+        cancelText: 'ยกเลิก',
+      })
+      if (!confirmed) return
+    }
     setCountdownEnd(null)
     setSession((current) => ({
       ...current,
@@ -267,9 +277,15 @@ export default function BoardPlayground({ userId, characters, campaigns, narrate
     setSelectedId(hero.id)
   }
 
-  const startNewTable = (theme: MapTheme) => {
+  const startNewTable = async (theme: MapTheme) => {
     if (locked) return
-    if (!window.confirm('Start a new table? The current board, turns and log will be cleared.')) return
+    const confirmed = await showConfirm({
+      title: 'เริ่มโต๊ะใหม่',
+      message: 'การเริ่มโต๊ะใหม่จะล้างข้อมูลกระดาน เทิร์น และบันทึกเหตุการณ์ปัจจุบันทั้งหมด ต้องการดำเนินการต่อหรือไม่?',
+      confirmText: 'เริ่มใหม่',
+      cancelText: 'ยกเลิก',
+    })
+    if (!confirmed) return
     setCountdownEnd(null)
     setPlacing(null)
     setSelectedId(null)
