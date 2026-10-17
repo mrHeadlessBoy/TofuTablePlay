@@ -25,12 +25,12 @@ export const ABILITY_SCORE_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as 
 export type AbilityScoreKey = (typeof ABILITY_SCORE_KEYS)[number]
 
 export const DEFAULT_ABILITY_SCORES: Record<AbilityScoreKey, number> = {
-  STR: 10,
-  DEX: 10,
-  CON: 10,
-  INT: 10,
-  WIS: 10,
-  CHA: 10,
+  STR: 0,
+  DEX: 0,
+  CON: 0,
+  INT: 0,
+  WIS: 0,
+  CHA: 0,
 }
 
 export interface CharacterSkill {
