@@ -46,7 +46,11 @@ export interface DmTurnInput {
 const NO_ACTION_TEXT =
   '(ไม่ได้ส่งแอ็กชันในเทิร์นนี้ — ตัวละครยังอยู่ในฉาก แต่ห้ามตัดสินใจเคลื่อนไหวหรือโจมตีแทนผู้เล่น)'
 
-function formatPartyMemberForPrompt(member: PartyMemberAction, index: number): string {
+function formatPartyMemberForPrompt(
+  member: PartyMemberAction,
+  index: number,
+  isFirstPlayerTurn: boolean
+): string {
   const hpText = `HP: ${member.currentHp ?? '?'}/${member.maxHp ?? '?'}`
   const spText = `Skill Cost: ${member.currentSkillCost ?? '?'}/${member.maxSkillCost ?? '?'}`
   const condText = `สถานะ: ${member.condition || 'Normal'}`
@@ -66,7 +70,7 @@ function formatPartyMemberForPrompt(member: PartyMemberAction, index: number): s
     .join(' / ')
 
   const lines = [
-    `${index + 1}. ${member.characterName} (${member.classType})`,
+    `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType}]`,
     `   - [สเตตัสปัจจุบัน]: ${hpText} | ${spText} | ${condText}`,
   ]
 
@@ -79,7 +83,12 @@ function formatPartyMemberForPrompt(member: PartyMemberAction, index: number): s
     lines.push(`   - [สกิลที่มี]: ${skillsList}`)
   }
   if (traits) {
-    lines.push(`   - [ลักษณะเฉพาะ]: ${traits}`)
+    lines.push(
+      `   - [เงื่อนไขติดตัว (ห้ามนำมาบรรยายซ้ำหากแอ็กชันไม่เกี่ยวข้องโดยตรง)]: ${traits}`
+    )
+  }
+  if (isFirstPlayerTurn && member.backstory) {
+    lines.push(`   - [ปูมหลังย่อ]: ${member.backstory.replace(/\n+/g, ' ').slice(0, 120)}`)
   }
   lines.push(`   - [แอ็กชันที่ทำในเทิร์นนี้]: ${member.action || NO_ACTION_TEXT}`)
 
@@ -89,9 +98,12 @@ function formatPartyMemberForPrompt(member: PartyMemberAction, index: number): s
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const { campaign, loreEntries, recentTurns, partyActions } = input
 
+  // เช็กว่าเป็นเทิร์นแรกที่ผู้เล่นเริ่มเล่นหรือไม่ (มีเฉพาะ Opening Turn อยู่ในประวัติ)
+  const isFirstPlayerTurn = recentTurns.length <= 1
+
   // 1. จัดรูปแบบข้อมูลตัวละคร + แอ็กชัน
   const actionsSummary = partyActions
-    .map((member, idx) => formatPartyMemberForPrompt(member, idx))
+    .map((member, idx) => formatPartyMemberForPrompt(member, idx, isFirstPlayerTurn))
     .join('\n\n')
 
   // 2. สแกน Lorebook ดึงข้อมูลแบบ Dynamic เฉพาะคำที่ถูก Trigger
@@ -129,7 +141,7 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในปาร์ตี้ให้ครบตามรายชื่อ
 
 2. การเคารพข้อมูลตัวละคร (Character State, Equipment & Skills):
-   - คำนึงถึงค่า HP, สถานะผิดปกติ (Condition), จุดเด่น/จุดด้อย และอุปกรณ์ที่สวมใส่จริง
+   - คำนึงถึงค่า HP, สถานะผิดปกติ (Condition) และอุปกรณ์ที่สวมใส่จริงในการตัดสินผลลัพธ์
    - หากผู้เล่นประกาศใช้ "สกิล (Skill)" หรือ "ไอเทม": ให้ตรวจสอบว่ามีอยู่ในข้อมูลตัวละครหรือไม่ และมีค่า Skill Cost เพียงพอหรือไม่ (หากไม่มีสกิลนั้น หรือ Skill Cost ปัจจุบันไม่พอ ให้บรรยายว่าการร่ายสกิลล้มเหลวหรือเกิดผลเสียแทน)
 
 3. กฎการตัดสินผลแอ็กชันและลูกเต๋า (Action & Dice Resolution):
@@ -140,7 +152,7 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
      * หากผู้เล่นสั่งโจมตีศัตรูหรือทำเรื่องเสี่ยงตาย แต่ "ไม่ยอมทอยเต๋าแนบมา" ให้ตัดสินว่าจังหวะนั้นพลาดเป้า ถูกศัตรูปัดป้องได้ หรือล้มเหลวทันที
 
 4. กฎเหล็กด้านสมดุลการต่อสู้และหลอดเลือดมอนสเตอร์ (Enemy HP % & Damage Scaling) [สำคัญที่สุด]:
-   - ห้ามให้มอนสเตอร์ตายในแอ็กชันเดียว (NO ONE-SHOT KILLS)! การต่อสู้ต้องมีความตึงเครียดและใช้เวลาหลายเทิร์น (ยกเว้นมอนสเตอร์ตัวนั้นเหลือเลือดต่ำมากอยู่แล้ว หรือเป็นศตรูที่ไร้ทางสู้ เช่น ถูกลอบโจมตี หรือ เป็นศตรูที่อ่อนแอมากพอให้สามารถตายได้ในเทิร์นเดียวได้)
+   - ห้ามให้มอนสเตอร์ตายในแอ็กชันเดียว (NO ONE-SHOT KILLS)! การต่อสู้ต้องมีความตึงเครียดและใช้เวลาหลายเทิร์น (ยกเว้นมอนสเตอร์ตัวนั้นเหลือเลือดต่ำมากอยู่แล้ว หรือเป็นศัตรูที่ไร้ทางสู้ เช่น ถูกลอบโจมตี หรือ เป็นศัตรูที่อ่อนแอมากพอให้สามารถตายได้ในเทิร์นเดียวได้)
    - มอนสเตอร์ทุกตัวเริ่มที่ HP 100% เสมอ และต้องคำนวณลด % เลือดตามความสมเหตุสมผลของอาวุธ สกิล และผลเต๋า ดังนี้:
      * โจมตีด้วยมือเปล่า / อาวุธที่ไม่ถนัด / ท่าก่อกวน / เฉี่ยวชน: ลด 5% - 10%
      * โจมตีปกติด้วยอาวุธประจำตัว (ทอย SUCCESS): ลด 15% - 25%
@@ -156,6 +168,11 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
 5. กฎความเด็ดขาด (High Stakes & Lethality):
    - ห้ามมี Plot Armor ปกป้องผู้เล่น หากทอยเต๋าล้มเหลวในจังหวะอันตราย หรือประมาท ให้บรรยายบาดแผล ความเสียหายต่อ HP หรือสถานะผิดปกติที่ผู้เล่นได้รับอย่างสมจริง
 
+6. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
+   - เรียกตัวละครด้วย "ชื่อ" เท่านั้น (เช่น "**Shacco**", "**ไมค์**", "**Pantheon**") ห้ามเขียนสร้อยฉายา อาชีพ หรือลักษณะชุดต่อท้ายชื่อซ้ำๆ เด็ดขาด (เช่น ห้ามเขียน "Shacco นักฆ่าในชุดตัวตลก...", "ไมค์ นักบวชผู้ควบคุมเปลวไฟ...", "Pantheon ทหารรับจ้างสไตล์สปาร์ตา...")
+   - ห้ามนำนิสัยท่าทางเดิมๆ หรือจุดด้อย (เช่น ความซุ่มซ่ามเกือบสะดุดล้ม, ฝีเท้าหนักแน่นและเชื่องช้า, รังสีความน่ากลัว) ที่เคยบรรยายไปแล้วในเทิร์นก่อนหน้า มาเขียนซ้ำอีกในเทิร์นนี้ ยกเว้นผู้เล่นจะทอยเต๋าได้ FAIL หรือสั่งทำแอ็กชันที่กระตุ้นจุดด้อยนั้นโดยตรง
+   - โฟกัสเฉพาะ "แอ็กชันที่ผู้เล่นสั่งในเทิร์นนี้" และ "ผลลัพธ์ใหม่ที่เกิดขึ้น" เท่านั้น
+  
 [REQUIRED OUTPUT FORMAT]
 (เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และการสวนกลับของศัตรู)
 
@@ -196,8 +213,9 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
   const currentTurnUserParts = [
     loreContext ? `[DYNAMIC LORE INJECTION FOR THIS TURN]\n${loreContext}\n` : '',
     `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members)]\n${actionsSummary || 'The party surveys their surroundings.'}`,
-    `\n[SYSTEM REMINDER: AUTHOR'S NOTE]
+    `\n[SYSTEM REMINDER: AUTHOR'S NOTE - ต้องปฏิบัติตามอย่างเคร่งครัด]
 - กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน
+- [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ (เช่น **Shacco**, **ไมค์**, **Pantheon**) ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ (เช่น ห้ามบรรยายว่าสะดุดล้มซุ่มซ่าม หรือเดินฝีเท้าหนักแน่นซ้ำกับเทิร์นที่แล้ว) ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
 - หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจให้สมเหตุสมผลกับอาวุธ/สกิล/ผลเต๋า และต้องแสดงหลอดเลือดเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
 - สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีบรรทัด "สถานะศัตรู :") และ [ Decision ] เท่านั้น`,
   ]

@@ -115,3 +115,19 @@ export function withReadyClaims(list: Member[], claims: ReadyClaims, reloadStart
     }
   })
 }
+
+
+export type ChatMode = 'ic' | 'ooc'
+
+export type PartyChatMessage = {
+  id: string
+  userId: string
+  senderName: string
+  characterClass?: string | null
+  isHost?: boolean
+  mode: ChatMode
+  text: string
+  timestamp: number
+}
+
+export const MAX_PARTY_CHAT_MESSAGES = 80

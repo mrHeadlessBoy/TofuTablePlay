@@ -31,12 +31,16 @@ import { playDiceRollSound, playSystemSound } from '@/lib/sound'
 import CharacterInspectorPanel from './CharacterInspectorPanel'
 import NarrativeFeedPanel from './NarrativeFeedPanel'
 import PartyRosterSidebar from './PartyRosterSidebar'
+import PartyChatWidget from './PartyChatWidget'
 import { useAlert } from '@/components/ui/AlertModal'
 import {
+  MAX_PARTY_CHAT_MESSAGES,
   READY_CLAIM_TTL_MS,
   withReadyClaims,
   type CharacterCombatFormState,
+  type ChatMode,
   type Member,
+  type PartyChatMessage,
   type ReadyClaim,
   type ReadyClaims,
   type TableData,
@@ -63,6 +67,7 @@ export default function TablePlayground({
   const [draftAction, setDraftAction] = useState('')
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
   const [diceOpen, setDiceOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([])
 
   // Server clock minus this device's clock, in ms. countdown_end is stamped by the server,
   // so a device whose clock is a few seconds off would otherwise count down from another number.
@@ -333,6 +338,35 @@ export default function TablePlayground({
         void refreshMembers()
         fetchTable()
         fetchTurns()
+      })
+      .on('broadcast', { event: 'party_chat' }, ({ payload }) => {
+        if (!payload || typeof payload !== 'object') return
+        const msg = payload as Partial<PartyChatMessage>
+        if (
+          typeof msg.id !== 'string' ||
+          typeof msg.userId !== 'string' ||
+          typeof msg.text !== 'string' ||
+          msg.userId === userId
+        ) {
+          return
+        }
+        const incoming: PartyChatMessage = {
+          id: msg.id,
+          userId: msg.userId,
+          senderName: typeof msg.senderName === 'string' && msg.senderName ? msg.senderName : 'Adventurer',
+          characterClass: typeof msg.characterClass === 'string' ? msg.characterClass : null,
+          isHost: Boolean(msg.isHost),
+          mode: msg.mode === 'ic' ? 'ic' : 'ooc',
+          text: msg.text.slice(0, 400),
+          timestamp: typeof msg.timestamp === 'number' ? msg.timestamp : Date.now(),
+        }
+        setChatMessages((prev) => {
+          if (prev.some((existing) => existing.id === incoming.id)) return prev
+          const next = [...prev, incoming]
+          return next.length > MAX_PARTY_CHAT_MESSAGES
+            ? next.slice(next.length - MAX_PARTY_CHAT_MESSAGES)
+            : next
+        })
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -616,6 +650,47 @@ export default function TablePlayground({
     }
   }
 
+  const handleSendChatMessage = useCallback(
+    ({ mode, text }: { mode: ChatMode; text: string }) => {
+      const trimmed = text.trim().slice(0, 400)
+      if (!trimmed) return
+
+      const senderName = activeChar?.name || (isHeadTable ? 'Head Table' : 'Adventurer')
+      const newMsg: PartyChatMessage = {
+        id: `${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        userId,
+        senderName,
+        characterClass: activeChar?.class_archetype || null,
+        isHost: isHeadTable,
+        mode,
+        text: trimmed,
+        timestamp: Date.now(),
+      }
+
+      setChatMessages((prev) => {
+        const next = [...prev, newMsg]
+        return next.length > MAX_PARTY_CHAT_MESSAGES
+          ? next.slice(next.length - MAX_PARTY_CHAT_MESSAGES)
+          : next
+      })
+
+      try {
+        void channelRef.current?.send({
+          type: 'broadcast',
+          event: 'party_chat',
+          payload: newMsg,
+        })
+      } catch {
+        // Ignored if channel isn't ready
+      }
+    },
+    [activeChar?.name, activeChar?.class_archetype, isHeadTable, userId]
+  )
+
+  const handleClearChatMessages = useCallback(() => {
+    setChatMessages([])
+  }, [])
+
   return (
     <div className="flex h-screen w-screen bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
       {/* LEFT PANEL: Character Inspector */}
@@ -681,6 +756,18 @@ export default function TablePlayground({
         isHeadTable={isHeadTable}
         lorebook={lorebook}
         onKickMember={handleKick}
+      />
+
+      {/* FLOATING PARTY CHAT WIDGET (Ephemeral Realtime Broadcast) */}
+      <PartyChatWidget
+        messages={chatMessages}
+        userId={userId}
+        activeCharacterName={activeChar?.name}
+        activeCharacterClass={activeChar?.class_archetype}
+        isHeadTable={isHeadTable}
+        partySize={members.length}
+        onSendMessage={handleSendChatMessage}
+        onClearMessages={handleClearChatMessages}
       />
     </div>
   )
