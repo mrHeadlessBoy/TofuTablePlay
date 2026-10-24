@@ -97,7 +97,7 @@ const ChatMessageItem = memo(function ChatMessageItem({ msg, isOwn }: ChatMessag
       </div>
 
       <div
-        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed break-words shadow-sm ${
+        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed wrap-break-words shadow-sm ${
           isIC
             ? isOwn
               ? 'bg-amber-950/50 border border-amber-600/40 text-amber-100 italic'
@@ -170,8 +170,10 @@ export default function PartyChatWidget({
 
     if (!isOpen) {
       if (isFromOther) {
-        setUnreadCount((c) => c + 1)
-        setPreviewMsg(latest)
+        requestAnimationFrame(() => {
+          setUnreadCount((c) => c + 1)
+          setPreviewMsg(latest)
+        })
         if (soundEnabled) playChatPingSound()
       }
       return
@@ -213,7 +215,7 @@ export default function PartyChatWidget({
     let finalText = raw
 
     // Quick shortcut prefixes: "//text" or "((text))" forces OOC, "/ic text" forces IC
-    if (raw.startsWith('//')) {
+    if (raw.startsWith('/e')) {
       finalMode = 'ooc'
       finalText = raw.slice(2).trim()
     } else if (raw.startsWith('((') && raw.endsWith('))') && raw.length > 4) {
@@ -310,7 +312,7 @@ export default function PartyChatWidget({
   return (
     <section
       aria-label="Party Chat"
-      className="fixed bottom-4 right-4 z-40 flex w-80 sm:w-96 h-[28rem] max-h-[calc(100vh-2rem)] flex-col rounded-2xl bg-zinc-950/95 border border-zinc-800/90 shadow-2xl backdrop-blur-xl overflow-hidden"
+      className="fixed bottom-4 right-4 z-40 flex w-80 sm:w-96 h-112 max-h-[calc(100vh-2rem)] flex-col rounded-2xl bg-zinc-950/95 border border-zinc-800/90 shadow-2xl backdrop-blur-xl overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-800/90 bg-zinc-900/80 px-3.5 py-2.5">
@@ -411,7 +413,7 @@ export default function PartyChatWidget({
             <p className="text-[11px] text-zinc-600 leading-relaxed">
               เลือกโหมด <span className="text-amber-400">IC</span> เพื่อพูดคุยสวมบทบาทตัวละคร หรือ{' '}
               <span className="text-cyan-400">OOC</span> (หรือพิมพ์ขึ้นต้นด้วย{' '}
-              <code className="text-zinc-400">//</code>) เพื่อวางแผนกับปาร์ตี้แบบสดๆ
+              <code className="text-zinc-400">/e</code>) เพื่อวางแผนกับปาร์ตี้แบบสดๆ
             </p>
           </div>
         ) : (

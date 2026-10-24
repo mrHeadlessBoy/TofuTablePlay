@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
   Check,
@@ -17,7 +17,7 @@ import {
   User,
   X,
   Zap,
-} from 'lucide-react'
+} from "lucide-react";
 import {
   ABILITY_SCORE_KEYS,
   CHARACTER_CONDITIONS,
@@ -25,8 +25,8 @@ import {
   EQUIPMENT_LABELS,
   extractCharacterSkillCost,
   extractCharacterSkills,
-} from '@/app/characters/equipment'
-import { abilityModifier, formatModifier } from '@/components/dice/dice'
+} from "@/app/characters/equipment";
+import { abilityModifier, formatModifier } from "@/components/dice/dice";
 import SaoCharacterOrb, {
   DEFAULT_ORB_SCALE_PERCENT,
   MAX_ORB_SCALE_PERCENT,
@@ -36,26 +36,26 @@ import SaoCharacterOrb, {
   SaoDualSemicircleDial,
   computeEffectiveOrbPx,
   playSaoChime,
-} from './SaoCharacterOrb'
-import type { Character, CharacterCombatFormState } from './types'
+} from "./SaoCharacterOrb";
+import type { Character, CharacterCombatFormState } from "./types";
 
 type CharacterInspectorPanelProps = {
-  activeChar: Character | null | undefined
-  userCharacters: Character[]
-  isEditingChar: boolean
-  isSavingChar: boolean
-  isSwitchingChar: boolean
-  charForm: CharacterCombatFormState
-  tableCode: string
-  isHeadTable: boolean
-  onToggleEdit: () => void
-  onStartSwitch: () => void
-  onCancelSwitch: () => void
-  onSelectCharacter: (charId: string) => void
-  onChangeCharForm: (next: CharacterCombatFormState) => void
-  onSaveCharEdits: () => void
-  onCancelEdit: () => void
-}
+  activeChar: Character | null | undefined;
+  userCharacters: Character[];
+  isEditingChar: boolean;
+  isSavingChar: boolean;
+  isSwitchingChar: boolean;
+  charForm: CharacterCombatFormState;
+  tableCode: string;
+  isHeadTable: boolean;
+  onToggleEdit: () => void;
+  onStartSwitch: () => void;
+  onCancelSwitch: () => void;
+  onSelectCharacter: (charId: string) => void;
+  onChangeCharForm: (next: CharacterCombatFormState) => void;
+  onSaveCharEdits: () => void;
+  onCancelEdit: () => void;
+};
 
 export default function CharacterInspectorPanel({
   activeChar,
@@ -74,127 +74,154 @@ export default function CharacterInspectorPanel({
   onSaveCharEdits,
   onCancelEdit,
 }: CharacterInspectorPanelProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [copiedInvite, setCopiedInvite] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
   const [scalePercent, setScalePercent] = useState<number>(() => {
-    if (typeof window === 'undefined') return DEFAULT_ORB_SCALE_PERCENT
+    if (typeof window === "undefined") return DEFAULT_ORB_SCALE_PERCENT;
     try {
-      const saved = Number(window.localStorage.getItem(SAO_ORB_SCALE_STORAGE_KEY))
+      const saved = Number(
+        window.localStorage.getItem(SAO_ORB_SCALE_STORAGE_KEY),
+      );
       if (
         Number.isFinite(saved) &&
         saved >= MIN_ORB_SCALE_PERCENT &&
         saved <= MAX_ORB_SCALE_PERCENT
       ) {
-        return Math.round(saved)
+        return Math.round(saved);
       }
     } catch {
       // Ignore storage access errors
     }
-    return DEFAULT_ORB_SCALE_PERCENT
-  })
-  const [viewport, setViewport] = useState<{ width: number; height: number }>(() => ({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
-    height: typeof window !== 'undefined' ? window.innerHeight : 900,
-  }))
+    return DEFAULT_ORB_SCALE_PERCENT;
+  });
+  const [viewport, setViewport] = useState<{ width: number; height: number }>(
+    () => ({
+      width: typeof window !== "undefined" ? window.innerWidth : 1440,
+      height: typeof window !== "undefined" ? window.innerHeight : 900,
+    }),
+  );
 
-  const activeSkills = extractCharacterSkills(activeChar)
-  const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(activeChar)
+  const activeSkills = extractCharacterSkills(activeChar);
+  const { currentSkillCost, maxSkillCost } =
+    extractCharacterSkillCost(activeChar);
 
   // Track viewport changes for responsive orb & window placement
   useEffect(() => {
     const updateViewport = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight })
-    }
-    updateViewport()
-    window.addEventListener('resize', updateViewport)
-    return () => window.removeEventListener('resize', updateViewport)
-  }, [])
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   // Persist user orb scale preference to localStorage
   useEffect(() => {
     try {
-      window.localStorage.setItem(SAO_ORB_SCALE_STORAGE_KEY, String(scalePercent))
+      window.localStorage.setItem(
+        SAO_ORB_SCALE_STORAGE_KEY,
+        String(scalePercent),
+      );
     } catch {
       // Ignore storage errors
     }
-  }, [scalePercent])
+  }, [scalePercent]);
 
-  const orbSizePx = computeEffectiveOrbPx(scalePercent, viewport.width, viewport.height)
-  const isDesktop = viewport.width >= 1024
+  const orbSizePx = computeEffectiveOrbPx(
+    scalePercent,
+    viewport.width,
+    viewport.height,
+  );
+  const isDesktop = viewport.width >= 1024;
 
   // Sync dynamic left clearance CSS variable so NarrativeFeedPanel's bottom input never overlaps the orb
   useEffect(() => {
-    const root = document.documentElement
-    root.style.setProperty('--sao-orb-clearance', `${orbSizePx + 32}px`)
+    const root = document.documentElement;
+    root.style.setProperty("--sao-orb-clearance", `${orbSizePx + 32}px`);
     return () => {
-      root.style.removeProperty('--sao-orb-clearance')
-    }
-  }, [orbSizePx])
+      root.style.removeProperty("--sao-orb-clearance");
+    };
+  }, [orbSizePx]);
 
   const handleToggleWindow = () => {
-    const next = !isOpen
-    setIsOpen(next)
-    playSaoChime(next)
-  }
+    const next = !isOpen;
+    setIsOpen(next);
+    playSaoChime(next);
+  };
 
   const handleDecreaseScale = () => {
-    setScalePercent((prev) => Math.max(MIN_ORB_SCALE_PERCENT, prev - ORB_SCALE_STEP_PERCENT))
-  }
+    setScalePercent((prev) =>
+      Math.max(MIN_ORB_SCALE_PERCENT, prev - ORB_SCALE_STEP_PERCENT),
+    );
+  };
 
   const handleIncreaseScale = () => {
-    setScalePercent((prev) => Math.min(MAX_ORB_SCALE_PERCENT, prev + ORB_SCALE_STEP_PERCENT))
-  }
+    setScalePercent((prev) =>
+      Math.min(MAX_ORB_SCALE_PERCENT, prev + ORB_SCALE_STEP_PERCENT),
+    );
+  };
 
   const handleResetScale = () => {
-    setScalePercent(DEFAULT_ORB_SCALE_PERCENT)
-  }
+    setScalePercent(DEFAULT_ORB_SCALE_PERCENT);
+  };
 
   // Allow closing the SAO window with Escape when not actively editing inputs
   useEffect(() => {
-    if (!isOpen || isEditingChar) return
+    if (!isOpen || isEditingChar) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false)
-        playSaoChime(false)
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        playSaoChime(false);
       }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isOpen, isEditingChar])
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, isEditingChar]);
 
   const handleCopyInviteLink = async () => {
-    const inviteUrl = `${window.location.origin}/table/${tableCode}`
+    const inviteUrl = `${window.location.origin}/table/${tableCode}`;
     try {
-      await navigator.clipboard.writeText(inviteUrl)
-      setCopiedInvite(true)
-      setTimeout(() => setCopiedInvite(false), 2000)
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 2000);
     } catch {
       // Fallback ignored
     }
-  }
+  };
 
-  const curHp = activeChar?.current_hp ?? 0
-  const maxHp = Math.max(1, activeChar?.max_hp ?? 1)
-  const hpPercent = activeChar ? Math.max(0, Math.min(100, Math.round((curHp / maxHp) * 100))) : 0
+  const curHp = activeChar?.current_hp ?? 0;
+  const maxHp = Math.max(1, activeChar?.max_hp ?? 1);
+  const hpPercent = activeChar
+    ? Math.max(0, Math.min(100, Math.round((curHp / maxHp) * 100)))
+    : 0;
   const spPercent =
     activeChar && maxSkillCost > 0
-      ? Math.max(0, Math.min(100, Math.round((currentSkillCost / maxSkillCost) * 100)))
-      : 0
+      ? Math.max(
+          0,
+          Math.min(100, Math.round((currentSkillCost / maxSkillCost) * 100)),
+        )
+      : 0;
 
   // Dynamic placement for the expanded SAO window based on current orb size & viewport
-  const desktopLeftPx = Math.min(orbSizePx + 36, Math.max(16, viewport.width - 432))
-  const mobileBottomPx = Math.min(orbSizePx + 48, Math.max(80, Math.round(viewport.height * 0.42)))
+  const desktopLeftPx = Math.min(
+    orbSizePx + 36,
+    Math.max(16, viewport.width - 432),
+  );
+  const mobileBottomPx = Math.min(
+    orbSizePx + 48,
+    Math.max(80, Math.round(viewport.height * 0.42)),
+  );
   const windowStyle = isDesktop
     ? {
         left: `${desktopLeftPx}px`,
-        bottom: '16px',
-        maxHeight: 'calc(100vh - 3.5rem)',
+        bottom: "16px",
+        maxHeight: "calc(100vh - 3.5rem)",
       }
     : {
-        left: '12px',
+        left: "12px",
         bottom: `${mobileBottomPx}px`,
         maxHeight: `calc(100vh - ${mobileBottomPx + 56}px)`,
-      }
+      };
 
   return (
     <>
@@ -261,17 +288,18 @@ export default function CharacterInspectorPanel({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[9px] font-mono uppercase tracking-[0.22em] text-amber-400">
-                    SAO // PLAYER STATUS
+                    PLAYER STATUS
                   </span>
                   <span className="text-[9px] font-mono px-1.5 py-0.2 bg-white/10 text-zinc-300 rounded-xs">
-                    {isHeadTable ? 'HOST' : 'PARTY'}
+                    {isHeadTable ? "HOST" : "PARTY"}
                   </span>
                 </div>
                 <h2 className="text-base font-bold text-white truncate">
-                  {activeChar ? activeChar.name : 'No Character Bound'}
+                  {activeChar ? activeChar.name : "No Character Bound"}
                 </h2>
                 <p className="text-[11px] text-zinc-400 truncate">
-                  {activeChar?.class_archetype || 'Select a character sheet below'}
+                  {activeChar?.class_archetype ||
+                    "Select a character sheet below"}
                 </p>
               </div>
             </div>
@@ -282,15 +310,17 @@ export default function CharacterInspectorPanel({
                   <button
                     type="button"
                     onClick={onToggleEdit}
-                    title={isEditingChar ? 'Close Editor' : 'Edit Character Sheet'}
+                    title={
+                      isEditingChar ? "Close Editor" : "Edit Character Sheet"
+                    }
                     className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider border transition flex items-center gap-1 cursor-pointer ${
                       isEditingChar
-                        ? 'bg-amber-500/20 border-amber-400 text-amber-300'
-                        : 'bg-white/5 border-white/15 text-zinc-300 hover:border-amber-400/70 hover:text-amber-300'
+                        ? "bg-amber-500/20 border-amber-400 text-amber-300"
+                        : "bg-white/5 border-white/15 text-zinc-300 hover:border-amber-400/70 hover:text-amber-300"
                     }`}
                   >
                     <Edit3 className="w-3 h-3" />
-                    <span>{isEditingChar ? 'Close' : 'Edit'}</span>
+                    <span>{isEditingChar ? "Close" : "Edit"}</span>
                   </button>
                   <button
                     type="button"
@@ -335,7 +365,7 @@ export default function CharacterInspectorPanel({
                   )}
                 </div>
                 {userCharacters.map((char) => {
-                  const cost = extractCharacterSkillCost(char)
+                  const cost = extractCharacterSkillCost(char);
                   return (
                     <button
                       key={char.id}
@@ -345,15 +375,17 @@ export default function CharacterInspectorPanel({
                     >
                       <p className="font-bold text-white">{char.name}</p>
                       <p className="text-zinc-400 font-mono text-[11px] mt-0.5">
-                        {char.class_archetype || 'Adventurer'} · HP {char.current_hp}/{char.max_hp} ·
-                        SP {cost.currentSkillCost}/{cost.maxSkillCost}
+                        {char.class_archetype || "Adventurer"} · HP{" "}
+                        {char.current_hp}/{char.max_hp} · SP{" "}
+                        {cost.currentSkillCost}/{cost.maxSkillCost}
                       </p>
                     </button>
-                  )
+                  );
                 })}
                 {userCharacters.length === 0 && (
                   <p className="text-xs text-zinc-500 italic">
-                    No character sheets found. Create one in the Character Codex first.
+                    No character sheets found. Create one in the Character Codex
+                    first.
                   </p>
                 )}
               </div>
@@ -370,29 +402,33 @@ export default function CharacterInspectorPanel({
                       max={charForm.max_hp}
                       value={charForm.current_hp}
                       onChange={(e) => {
-                        const val = Number(e.target.value)
+                        const val = Number(e.target.value);
                         onChangeCharForm({
                           ...charForm,
-                          current_hp: Number.isNaN(val) ? 0 : Math.min(charForm.max_hp, val),
-                        })
+                          current_hp: Number.isNaN(val)
+                            ? 0
+                            : Math.min(charForm.max_hp, val),
+                        });
                       }}
                       className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono">Max HP</label>
+                    <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                      Max HP
+                    </label>
                     <input
                       type="number"
                       min={1}
                       value={charForm.max_hp}
                       onChange={(e) => {
-                        const newMax = Number(e.target.value)
-                        const clampedMax = Number.isNaN(newMax) ? 1 : newMax
+                        const newMax = Number(e.target.value);
+                        const clampedMax = Number.isNaN(newMax) ? 1 : newMax;
                         onChangeCharForm({
                           ...charForm,
                           max_hp: clampedMax,
                           current_hp: Math.min(clampedMax, charForm.current_hp),
-                        })
+                        });
                       }}
                       className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
                     />
@@ -410,15 +446,15 @@ export default function CharacterInspectorPanel({
                       max={charForm.max_skill_cost}
                       value={charForm.current_skill_cost}
                       onChange={(e) => {
-                        const val = Number(e.target.value)
+                        const val = Number(e.target.value);
                         const clamped = Number.isNaN(val)
                           ? 0
-                          : Math.max(0, Math.min(charForm.max_skill_cost, val))
+                          : Math.max(0, Math.min(charForm.max_skill_cost, val));
                         onChangeCharForm({
                           ...charForm,
                           current_skill_cost: clamped,
                           armor_class: clamped,
-                        })
+                        });
                       }}
                       className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
                     />
@@ -432,15 +468,20 @@ export default function CharacterInspectorPanel({
                       min={0}
                       value={charForm.max_skill_cost}
                       onChange={(e) => {
-                        const newMax = Number(e.target.value)
-                        const clampedMax = Number.isNaN(newMax) ? 0 : Math.max(0, newMax)
-                        const nextCur = Math.min(clampedMax, charForm.current_skill_cost)
+                        const newMax = Number(e.target.value);
+                        const clampedMax = Number.isNaN(newMax)
+                          ? 0
+                          : Math.max(0, newMax);
+                        const nextCur = Math.min(
+                          clampedMax,
+                          charForm.current_skill_cost,
+                        );
                         onChangeCharForm({
                           ...charForm,
                           max_skill_cost: clampedMax,
                           current_skill_cost: nextCur,
                           armor_class: nextCur,
-                        })
+                        });
                       }}
                       className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
                     />
@@ -448,11 +489,16 @@ export default function CharacterInspectorPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-zinc-400 uppercase font-mono">Condition</label>
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                    Condition
+                  </label>
                   <select
                     value={charForm.status_condition}
                     onChange={(e) =>
-                      onChangeCharForm({ ...charForm, status_condition: e.target.value })
+                      onChangeCharForm({
+                        ...charForm,
+                        status_condition: e.target.value,
+                      })
                     }
                     className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white mt-0.5 focus:border-amber-400 outline-none"
                   >
@@ -470,7 +516,9 @@ export default function CharacterInspectorPanel({
                     <label className="text-[10px] text-zinc-400 uppercase font-mono block">
                       Ability Scores
                     </label>
-                    <span className="text-[9px] text-zinc-500 font-mono">Allows negative</span>
+                    <span className="text-[9px] text-zinc-500 font-mono">
+                      Allows negative
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
                     {ABILITY_SCORE_KEYS.map((stat) => (
@@ -478,25 +526,27 @@ export default function CharacterInspectorPanel({
                         key={stat}
                         className="bg-zinc-900 border border-zinc-800 rounded p-1 text-center"
                       >
-                        <span className="text-[9px] text-zinc-500 uppercase block">{stat}</span>
+                        <span className="text-[9px] text-zinc-500 uppercase block">
+                          {stat}
+                        </span>
                         <input
                           type="number"
                           value={charForm.stats[stat] ?? 10}
                           onChange={(e) => {
-                            const raw = e.target.value
-                            if (raw === '' || raw === '-') {
+                            const raw = e.target.value;
+                            if (raw === "" || raw === "-") {
                               onChangeCharForm({
                                 ...charForm,
                                 stats: { ...charForm.stats, [stat]: raw },
-                              })
-                              return
+                              });
+                              return;
                             }
-                            const val = Number(raw)
+                            const val = Number(raw);
                             if (!Number.isNaN(val)) {
                               onChangeCharForm({
                                 ...charForm,
                                 stats: { ...charForm.stats, [stat]: val },
-                              })
+                              });
                             }
                           }}
                           className="w-full bg-transparent text-center font-bold text-xs text-white outline-none"
@@ -508,11 +558,18 @@ export default function CharacterInspectorPanel({
 
                 {/* Inventory Editor */}
                 <div>
-                  <label className="text-[10px] text-zinc-400 uppercase font-mono">Inventory</label>
+                  <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                    Inventory
+                  </label>
                   <textarea
                     rows={3}
                     value={charForm.inventory}
-                    onChange={(e) => onChangeCharForm({ ...charForm, inventory: e.target.value })}
+                    onChange={(e) =>
+                      onChangeCharForm({
+                        ...charForm,
+                        inventory: e.target.value,
+                      })
+                    }
                     className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-xs text-white mt-1 focus:border-amber-400 outline-none"
                   />
                 </div>
@@ -525,15 +582,21 @@ export default function CharacterInspectorPanel({
                   <div className="grid grid-cols-2 gap-1.5">
                     {EQUIPMENT_LABELS.map((label, idx) => (
                       <div key={label}>
-                        <span className="text-[9px] text-zinc-500 uppercase block">{label}</span>
+                        <span className="text-[9px] text-zinc-500 uppercase block">
+                          {label}
+                        </span>
                         <input
                           type="text"
                           placeholder={`${label}...`}
-                          value={(charForm.equipment ?? EMPTY_EQUIPMENT)[idx] || ''}
+                          value={
+                            (charForm.equipment ?? EMPTY_EQUIPMENT)[idx] || ""
+                          }
                           onChange={(e) => {
-                            const next = [...(charForm.equipment ?? EMPTY_EQUIPMENT)]
-                            next[idx] = e.target.value
-                            onChangeCharForm({ ...charForm, equipment: next })
+                            const next = [
+                              ...(charForm.equipment ?? EMPTY_EQUIPMENT),
+                            ];
+                            next[idx] = e.target.value;
+                            onChangeCharForm({ ...charForm, equipment: next });
                           }}
                           className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[11px] text-white focus:border-amber-400 outline-none"
                         />
@@ -565,8 +628,13 @@ export default function CharacterInspectorPanel({
                           <button
                             type="button"
                             onClick={() => {
-                              const nextSkills = (charForm.skills || []).filter((_, i) => i !== idx)
-                              onChangeCharForm({ ...charForm, skills: nextSkills })
+                              const nextSkills = (charForm.skills || []).filter(
+                                (_, i) => i !== idx,
+                              );
+                              onChangeCharForm({
+                                ...charForm,
+                                skills: nextSkills,
+                              });
                             }}
                             title="Remove skill"
                             className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
@@ -583,9 +651,15 @@ export default function CharacterInspectorPanel({
                             placeholder="Skill name..."
                             value={skill.name}
                             onChange={(e) => {
-                              const nextSkills = [...(charForm.skills || [])]
-                              nextSkills[idx] = { ...nextSkills[idx], name: e.target.value }
-                              onChangeCharForm({ ...charForm, skills: nextSkills })
+                              const nextSkills = [...(charForm.skills || [])];
+                              nextSkills[idx] = {
+                                ...nextSkills[idx],
+                                name: e.target.value,
+                              };
+                              onChangeCharForm({
+                                ...charForm,
+                                skills: nextSkills,
+                              });
                             }}
                             className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
                           />
@@ -600,13 +674,16 @@ export default function CharacterInspectorPanel({
                             placeholder="0"
                             value={skill.cost ?? 0}
                             onChange={(e) => {
-                              const val = Number(e.target.value)
-                              const nextSkills = [...(charForm.skills || [])]
+                              const val = Number(e.target.value);
+                              const nextSkills = [...(charForm.skills || [])];
                               nextSkills[idx] = {
                                 ...nextSkills[idx],
                                 cost: Number.isNaN(val) ? 0 : Math.max(0, val),
-                              }
-                              onChangeCharForm({ ...charForm, skills: nextSkills })
+                              };
+                              onChangeCharForm({
+                                ...charForm,
+                                skills: nextSkills,
+                              });
                             }}
                             className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
                           />
@@ -620,9 +697,15 @@ export default function CharacterInspectorPanel({
                             placeholder="Description..."
                             value={skill.description}
                             onChange={(e) => {
-                              const nextSkills = [...(charForm.skills || [])]
-                              nextSkills[idx] = { ...nextSkills[idx], description: e.target.value }
-                              onChangeCharForm({ ...charForm, skills: nextSkills })
+                              const nextSkills = [...(charForm.skills || [])];
+                              nextSkills[idx] = {
+                                ...nextSkills[idx],
+                                description: e.target.value,
+                              };
+                              onChangeCharForm({
+                                ...charForm,
+                                skills: nextSkills,
+                              });
                             }}
                             className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
                           />
@@ -637,31 +720,13 @@ export default function CharacterInspectorPanel({
                         ...charForm,
                         skills: [
                           ...(charForm.skills || []),
-                          { name: '', cost: 0, description: '' },
+                          { name: "", cost: 0, description: "" },
                         ],
                       })
                     }
                     className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Add Skill
-                  </button>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={onSaveCharEdits}
-                    disabled={isSavingChar}
-                    className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 rounded text-xs font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                  >
-                    <Save className="w-3.5 h-3.5" /> {isSavingChar ? 'Saving...' : 'Save Sheet'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onCancelEdit}
-                    className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300 cursor-pointer"
-                  >
-                    Cancel
                   </button>
                 </div>
               </div>
@@ -695,10 +760,10 @@ export default function CharacterInspectorPanel({
                         <div
                           className={`h-full transition-all duration-300 ${
                             hpPercent <= 25
-                              ? 'bg-red-500'
+                              ? "bg-red-500"
                               : hpPercent <= 55
-                                ? 'bg-yellow-400'
-                                : 'bg-emerald-400'
+                                ? "bg-yellow-400"
+                                : "bg-emerald-400"
                           }`}
                           style={{ width: `${hpPercent}%` }}
                         />
@@ -728,23 +793,25 @@ export default function CharacterInspectorPanel({
                 <div className="space-y-2.5">
                   <div className="p-2.5 bg-zinc-900/70 border border-white/10 rounded flex justify-between items-center">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-amber-400" /> Condition
+                      <Shield className="w-3.5 h-3.5 text-amber-400" />{" "}
+                      Condition
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                        activeChar.status_condition === 'Normal' || !activeChar.status_condition
-                          ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/60'
-                          : 'bg-amber-950 text-amber-300 border border-amber-700'
+                        activeChar.status_condition === "Normal" ||
+                        !activeChar.status_condition
+                          ? "bg-emerald-950/70 text-emerald-300 border border-emerald-800/60"
+                          : "bg-amber-950 text-amber-300 border border-amber-700"
                       }`}
                     >
-                      {activeChar.status_condition || 'Normal'}
+                      {activeChar.status_condition || "Normal"}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-6 gap-1.5">
                     {ABILITY_SCORE_KEYS.map((key) => {
-                      const raw = activeChar.stats?.[key] ?? 10
-                      const mod = abilityModifier(raw)
+                      const raw = activeChar.stats?.[key] ?? 10;
+                      const mod = abilityModifier(raw);
                       return (
                         <div
                           key={key}
@@ -760,7 +827,7 @@ export default function CharacterInspectorPanel({
                             {formatModifier(mod)}
                           </span>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -772,7 +839,9 @@ export default function CharacterInspectorPanel({
                   </span>
                   <div className="grid grid-cols-2 gap-1.5">
                     {EQUIPMENT_LABELS.map((label, idx) => {
-                      const item = (activeChar.equipment ?? EMPTY_EQUIPMENT)[idx]
+                      const item = (activeChar.equipment ?? EMPTY_EQUIPMENT)[
+                        idx
+                      ];
                       return (
                         <div
                           key={label}
@@ -781,9 +850,11 @@ export default function CharacterInspectorPanel({
                           <span className="text-[9px] text-zinc-500 uppercase font-mono block">
                             {label}
                           </span>
-                          <span className="text-zinc-200 wrap-break-words">{item || '—'}</span>
+                          <span className="text-zinc-200 wrap-break-words">
+                            {item || "—"}
+                          </span>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -791,7 +862,8 @@ export default function CharacterInspectorPanel({
                 {/* Skill Slots */}
                 <div>
                   <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 flex items-center gap-1 mb-1.5">
-                    <Sparkles className="w-3 h-3" /> Skills ({activeSkills.length})
+                    <Sparkles className="w-3 h-3" /> Skills (
+                    {activeSkills.length})
                   </span>
                   {activeSkills.length > 0 ? (
                     <div className="space-y-1.5">
@@ -802,7 +874,7 @@ export default function CharacterInspectorPanel({
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-amber-300 font-bold">
-                              {skill.name || 'Unnamed Skill'}
+                              {skill.name || "Unnamed Skill"}
                             </span>
                             <span className="px-1.5 py-0.5 rounded bg-sky-950/80 border border-sky-800/70 text-[10px] font-mono text-sky-300 shrink-0">
                               Cost: {skill.cost ?? 0}
@@ -829,7 +901,7 @@ export default function CharacterInspectorPanel({
                     Inventory
                   </span>
                   <div className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-zinc-200 min-h-14 whitespace-pre-line text-[11px] leading-relaxed">
-                    {activeChar.inventory || 'Empty'}
+                    {activeChar.inventory || "Empty"}
                   </div>
                 </div>
 
@@ -847,7 +919,9 @@ export default function CharacterInspectorPanel({
                         <span className="text-[9px] text-emerald-400 uppercase font-mono block">
                           Strengths
                         </span>
-                        <p className="text-zinc-300 whitespace-pre-line">{activeChar.strengths}</p>
+                        <p className="text-zinc-300 whitespace-pre-line">
+                          {activeChar.strengths}
+                        </p>
                       </div>
                     )}
                     {activeChar.weaknesses && (
@@ -855,7 +929,9 @@ export default function CharacterInspectorPanel({
                         <span className="text-[9px] text-red-400 uppercase font-mono block">
                           Weaknesses
                         </span>
-                        <p className="text-zinc-300 whitespace-pre-line">{activeChar.weaknesses}</p>
+                        <p className="text-zinc-300 whitespace-pre-line">
+                          {activeChar.weaknesses}
+                        </p>
                       </div>
                     )}
                     {activeChar.appearance && (
@@ -863,7 +939,9 @@ export default function CharacterInspectorPanel({
                         <span className="text-[9px] text-zinc-400 uppercase font-mono block">
                           Appearance
                         </span>
-                        <p className="text-zinc-300 whitespace-pre-line">{activeChar.appearance}</p>
+                        <p className="text-zinc-300 whitespace-pre-line">
+                          {activeChar.appearance}
+                        </p>
                       </div>
                     )}
                     {activeChar.backstory && (
@@ -871,7 +949,9 @@ export default function CharacterInspectorPanel({
                         <span className="text-[9px] text-zinc-400 uppercase font-mono block">
                           Backstory
                         </span>
-                        <p className="text-zinc-300 whitespace-pre-line">{activeChar.backstory}</p>
+                        <p className="text-zinc-300 whitespace-pre-line">
+                          {activeChar.backstory}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -881,34 +961,30 @@ export default function CharacterInspectorPanel({
           </div>
 
           {/* SAO Window Footer */}
-          <div className="border-t border-white/15 bg-zinc-900/90 px-4 py-2.5 flex items-center justify-between gap-2 shrink-0">
-            <Link
-              href="/hub"
-              className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-amber-400 transition"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Campaign Hub</span>
-            </Link>
-            <button
-              type="button"
-              onClick={handleCopyInviteLink}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/15 text-[10px] font-mono text-zinc-300 hover:text-amber-300 transition cursor-pointer"
-            >
-              {copiedInvite ? (
-                <>
-                  <Check className="w-3 h-3 text-emerald-400" />
-                  <span className="text-emerald-400">Invite Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Link2 className="w-3 h-3 text-amber-400" />
-                  <span>CODE: {tableCode}</span>
-                </>
-              )}
-            </button>
-          </div>
+          {isEditingChar && (
+            <div className="border-t border-white/15 bg-zinc-900/90 px-4 py-2.5">
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={onSaveCharEdits}
+                  disabled={isSavingChar}
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 rounded text-xs font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />{" "}
+                  {isSavingChar ? "Saving..." : "Save Sheet"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelEdit}
+                  className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
       )}
     </>
-  )
+  );
 }

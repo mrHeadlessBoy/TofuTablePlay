@@ -464,7 +464,7 @@ export default function NarrativeFeedPanel({
       </div>
 
       {/* Bottom Private Drafting Input & Ready Barrier */}
-      <div className="border-t border-zinc-800 bg-zinc-900/80 py-4 pr-4 pl-4 md:pl-[var(--sao-orb-clearance,18rem)] lg:pl-[var(--sao-orb-clearance,24rem)] backdrop-blur-md transition-[padding] duration-200">
+      <div className="border-t border-zinc-800 bg-zinc-900/80 py-4 pr-4 pl-4 md:pl-(--sao-orb-clearance,18rem) lg:pl-(--sao-orb-clearance,24rem) backdrop-blur-md transition-[padding] duration-200">
         <div className="max-w-3xl mx-auto space-y-3">
           {turnPhase === 'countdown' && !turnResolving && (
             <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-600/50 flex items-center justify-center gap-2 text-amber-300 font-mono text-sm animate-pulse">
