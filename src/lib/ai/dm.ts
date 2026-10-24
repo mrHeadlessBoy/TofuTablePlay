@@ -66,10 +66,108 @@ export interface DmTurnInput {
 const NO_ACTION_TEXT =
   '(ไม่ได้ส่งแอ็กชันในเทิร์นนี้ — ตัวละครยังอยู่ในฉาก แต่ห้ามตัดสินใจเคลื่อนไหวหรือโจมตีแทนผู้เล่น)'
 
+interface PartyDamageBenchmark {
+  avgPartyMaxHp: number
+  grazeMin: number
+  grazeMax: number
+  normalMin: number
+  normalMax: number
+  heavyMin: number
+  heavyMax: number
+}
+
+function computePartyDamageBenchmark(partyActions: PartyMemberAction[]): PartyDamageBenchmark {
+  const validMaxHps = partyActions
+    .map((m) => Number(m.maxHp))
+    .filter((hp) => Number.isFinite(hp) && hp > 0)
+
+  const avgPartyMaxHp =
+    validMaxHps.length > 0
+      ? Math.max(10, Math.round(validMaxHps.reduce((sum, v) => sum + v, 0) / validMaxHps.length))
+      : 100
+
+  return {
+    avgPartyMaxHp,
+    grazeMin: Math.max(1, Math.round(avgPartyMaxHp * 0.05)),
+    grazeMax: Math.max(2, Math.round(avgPartyMaxHp * 0.1)),
+    normalMin: Math.max(2, Math.round(avgPartyMaxHp * 0.15)),
+    normalMax: Math.max(4, Math.round(avgPartyMaxHp * 0.25)),
+    heavyMin: Math.max(4, Math.round(avgPartyMaxHp * 0.3)),
+    heavyMax: Math.max(6, Math.round(avgPartyMaxHp * 0.45)),
+  }
+}
+
+const SHIELD_OR_GUARD_REGEX = /โล่|เกราะ|ปัดป้อง|shield|buckler|guard|aegis|armor|armour/i
+
+function computeCharacterDefenseInfo(
+  member: PartyMemberAction,
+  avgPartyMaxHp: number
+): {
+  damageReduction: number
+  armorPiecesCount: number
+  conModifier: number
+  summaryText: string
+} {
+  const conScore = member.stats?.CON ?? 0
+  const conModifier = abilityModifier(conScore)
+  const equip = member.equipment || []
+
+  // Slots 0..3 are Head, Torso, Leg, Foot (wearable armor/clothing slots).
+  // Slots 4..5 are Left Hand, Right Hand (count as defensive gear if holding a shield/guard).
+  let armorPiecesCount = 0
+  for (let i = 0; i < Math.min(equip.length, 6); i++) {
+    const item = typeof equip[i] === 'string' ? equip[i].trim() : ''
+    if (!item) continue
+    if (i <= 3 || SHIELD_OR_GUARD_REGEX.test(item)) {
+      armorPiecesCount++
+    }
+  }
+
+  // Each +1 CON modifier grants ~3% of avgPartyMaxHp reduction; each armor piece grants ~1.5%
+  const rawConMitigation =
+    conModifier >= 0
+      ? conModifier * (avgPartyMaxHp * 0.03)
+      : conModifier * (avgPartyMaxHp * 0.02)
+  const rawArmorMitigation = armorPiecesCount * (avgPartyMaxHp * 0.015)
+
+  const maxAllowedReduction = Math.max(1, Math.round(avgPartyMaxHp * 0.15))
+  const damageReduction = Math.min(
+    maxAllowedReduction,
+    Math.round(rawConMitigation + rawArmorMitigation)
+  )
+
+  if (damageReduction > 0) {
+    return {
+      damageReduction,
+      armorPiecesCount,
+      conModifier,
+      summaryText: `ลดทอนความเสียหายที่ได้รับ -${damageReduction} HP ต่อครั้ง (จาก CON ${formatModifier(conModifier)} และอุปกรณ์ป้องกัน ${armorPiecesCount} ชิ้น | ดาเมจสุทธิขั้นต่ำต้องไม่ต่ำกว่า 1 HP)`,
+    }
+  }
+
+  if (damageReduction < 0) {
+    const extraDmg = Math.abs(damageReduction)
+    return {
+      damageReduction,
+      armorPiecesCount,
+      conModifier,
+      summaryText: `รับความเสียหายเพิ่มขึ้น +${extraDmg} HP ต่อครั้ง (เนื่องจากค่า CON ${formatModifier(conModifier)} ติดลบและไม่มีเกราะชดเชย)`,
+    }
+  }
+
+  return {
+    damageReduction: 0,
+    armorPiecesCount,
+    conModifier,
+    summaryText: `ไม่มีโบนัสลดทอนความเสียหาย (0 HP — รับดาเมจตามฐานความรุนแรงของศัตรูเต็มจำนวน)`,
+  }
+}
+
 function formatPartyMemberForPrompt(
   member: PartyMemberAction,
   index: number,
-  isFirstPlayerTurn: boolean
+  isFirstPlayerTurn: boolean,
+  benchmark: PartyDamageBenchmark
 ): string {
   const hpText = `HP: ${member.currentHp ?? '?'}/${member.maxHp ?? '?'}`
   const spText = `Skill Cost (SP): ${member.currentSkillCost ?? '?'}/${member.maxSkillCost ?? '?'}`
@@ -80,6 +178,8 @@ function formatPartyMemberForPrompt(
     const mod = formatModifier(abilityModifier(score))
     return `${key}: ${score} (${mod})`
   }).join(', ')
+
+  const defenseInfo = computeCharacterDefenseInfo(member, benchmark.avgPartyMaxHp)
 
   const equipList = (member.equipment || [])
     .map((item, idx) => {
@@ -121,6 +221,7 @@ function formatPartyMemberForPrompt(
     `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType}]`,
     `   - [สเตตัสปัจจุบัน]: ${hpText} | ${spText} | ${condText}`,
     `   - [ค่าสถานะทั้ง 6 (Stats & Dice Bonus)]: ${statsText}`,
+    `   - [ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]: ${defenseInfo.summaryText}`,
   ]
 
   if (appearancePreview) {
@@ -162,9 +263,14 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   // เช็กว่าเป็นเทิร์นแรกที่ผู้เล่นเริ่มเล่นหรือไม่ (มีเฉพาะ Opening Turn อยู่ในประวัติ)
   const isFirstPlayerTurn = recentTurns.length <= 1
 
+  // คำนวณตารางฐานดาเมจกลางของโต๊ะจากค่าเฉลี่ย Max HP ของปาร์ตี้ เพื่อให้คนที่มี HP เยอะกว่าถึกกว่าจริง
+  const damageBenchmark = computePartyDamageBenchmark(partyActions)
+
   // 1. จัดรูปแบบข้อมูลตัวละคร + แอ็กชัน
   const actionsSummary = partyActions
-    .map((member, idx) => formatPartyMemberForPrompt(member, idx, isFirstPlayerTurn))
+    .map((member, idx) =>
+      formatPartyMemberForPrompt(member, idx, isFirstPlayerTurn, damageBenchmark)
+    )
     .join('\n\n')
 
   // 2. สแกน Lorebook ดึงข้อมูลแบบ Dynamic เฉพาะคำที่ถูก Trigger
@@ -228,15 +334,20 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - ต้องดึงค่า HP% ล่าสุดของมอนสเตอร์จากหมวด [ Overview ] ของเทิร์นก่อนหน้ามาคำนวณต่อเสมอ ห้ามรีเซ็ตกลับเป็น 100%
    - มอนสเตอร์ที่ยังไม่ตาย (HP > 0%) ต้องมีการโจมตีสวนกลับ ใช้สกิล หรือคุกคามปาร์ตี้คืนในท้ายเทิร์นเสมอ!
 
-5. กฎความเด็ดขาดและการคำนวณดาเมจต่อผู้เล่น (High Stakes, Player HP Loss Calculation & NO Plot Armor) [สำคัญที่สุด]:
+5. กฎความเด็ดขาดและการคำนวณดาเมจต่อผู้เล่น (High Stakes, Shared Flat Damage Benchmark & Defense Mitigation) [สำคัญที่สุด]:
    - ห้ามมี Plot Armor ปกป้องผู้เล่นเด็ดขาด! (ไม่ว่าจะเล่นคนเดียว Solo หรือเล่นเป็นปาร์ตี้) หากทอยเต๋าล้มเหลว (FAIL หรือ NATURAL 1) ในจังหวะอันตราย, สั่งโจมตีโดยไม่ทอยเต๋า, ประมาท, หรือถูกมอนสเตอร์ที่ยังไม่ตายโจมตีสวนกลับ ให้บรรยายบาดแผล คำนวณความเสียหายเป็นจำนวนหน่วย HP ที่ผู้เล่นเสียไปจริง และระบุสถานะผิดปกติที่ผู้เล่นได้รับอย่างสมจริงเสมอ!
-   - เกณฑ์คำนวณความเสียหายต่อ HP ของผู้เล่น (คิดเป็นสัดส่วน % ของค่า Max HP ของผู้เล่นคนนั้น แล้วแปลงเป็นจำนวนเต็มหน่วย HP ขั้นต่ำอย่างน้อย 1 HP):
-     * โดนโจมตีเฉี่ยวๆ / กับดักเล็กน้อย / ปัดป้องหรือหลบได้บางส่วน: เสียเลือด 5% - 10% ของ Max HP (ขั้นต่ำ 1 HP)
-     * โดนศัตรูโจมตีปกติ / ศัตรูสวนกลับท้ายเทิร์น / ทอยเต๋าได้ FAIL ในจังหวะปะทะหรือหลบหลีก / สั่งโจมตีโดยไม่ทอยเต๋า: เสียเลือด 15% - 25% ของ Max HP
-     * โดนท่าไม้ตายศัตรู / ศัตรูระดับ Elite หรือ Boss โจมตีเต็มแรง / ทอยติด NATURAL 1 (Critical Fail) / ประมาทอย่างรุนแรง: เสียเลือด 30% - 45% ของ Max HP
-     * (ให้นำค่า CON และอุปกรณ์ป้องกันในช่อง "สวมใส่" ของผู้เล่นมาพิจารณาปรับลดหรือเพิ่มดาเมจภายในช่วง % ข้างต้นตามความสมเหตุสมผล และหากการโจมตีมีพิษ มึนงง คำสาป หรือบาดเจ็บสาหัส ให้เปลี่ยนสถานะ Condition เป็น Bloodied, Poisoned, Stunned, Blinded, Exhausted หรือ Unconscious เมื่อ HP เหลือ 0)
+   - [สำคัญมาก: ห้ามคิดดาเมจแยกตาม % เลือดของใครของมันเด็ดขาด เพราะจะทำให้คนที่มี Max HP สูง (เช่น 120 HP) กับคนที่มี Max HP น้อย (เช่น 90 HP) ตายในจำนวนครั้งเท่ากัน!]
+   - ให้ใช้ "ตารางฐานดาเมจกลางของศัตรูประจำโต๊ะนี้" (คำนวณจากค่าเฉลี่ย Max HP ของปาร์ตี้ = ${damageBenchmark.avgPartyMaxHp} HP) เป็นตัวเลขหน่วย HP คงที่เดียวกันสำหรับทุกคนในฉาก ดังนี้:
+     * โดนโจมตีเฉี่ยวๆ / กับดักเล็กน้อย / ปัดป้องหรือหลบได้บางส่วน: ฐานดาเมจ ${damageBenchmark.grazeMin} - ${damageBenchmark.grazeMax} HP
+     * โดนศัตรูโจมตีปกติ / ศัตรูสวนกลับท้ายเทิร์น / ทอยเต๋าได้ FAIL ในจังหวะปะทะหรือหลบหลีก / สั่งโจมตีโดยไม่ทอยเต๋า: ฐานดาเมจ ${damageBenchmark.normalMin} - ${damageBenchmark.normalMax} HP
+     * โดนท่าไม้ตายศัตรู / ศัตรูระดับ Elite หรือ Boss โจมตีเต็มแรง / ทอยติด NATURAL 1 (Critical Fail) / ประมาทอย่างรุนแรง: ฐานดาเมจ ${damageBenchmark.heavyMin} - ${damageBenchmark.heavyMax} HP
+   - [การหักลบด้วยค่า CON และชุดเกราะ (Defense Mitigation)]:
+     * เมื่อได้ "ฐานดาเมจของศัตรู" ข้างต้นแล้ว ให้นำไปหักลบกับค่าในบรรทัด "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้นเสมอ!
+     * สูตรคำนวณ: ดาเมจสุทธิที่ผู้เล่นได้รับ = (ฐานดาเมจของศัตรู - ค่าลดทอนดาเมจจาก CON และชุดเกราะของผู้เล่นคนนั้น) โดยต้องเสียเลือดขั้นต่ำอย่างน้อย 1 HP เสมอ
+     * ด้วยวิธีนี้ ผู้เล่นที่มี Max HP สูง (เช่น 120 HP) และมีค่า CON + ชุดเกราะดี จะโดนดาเมจเข้าเนื้อน้อยกว่าและทนรับการโจมตีได้หลายเทิร์นกว่าผู้เล่นที่ตัวบาง (เช่น 90 HP) อย่างแท้จริง!
+     * หากการโจมตีของศัตรูมีพิษ มึนงง คำสาป หรือบาดเจ็บสาหัส ให้เปลี่ยนสถานะ Condition เป็น Bloodied, Poisoned, Stunned, Blinded, Exhausted หรือ Unconscious เมื่อ HP เหลือ 0
    - [บังคับเขียนตัวเลข HP ของผู้เล่นในเนื้อเรื่องทุกครั้งที่เสียเลือดหรือฟื้นฟูเลือด]:
-     * ทุกครั้งที่ผู้เล่นได้รับความเสียหายหรือฟื้นฟู HP ต้องเขียนวงเล็บระบุค่า HP เดิม -> ค่า HP ใหม่ พร้อมจำนวนหน่วยที่ลดลง/เพิ่มขึ้นในเนื้อเรื่องทันที เช่น "(HP: 100/100 -> 80/100 [-20 HP])" หรือ "(HP: 20/20 -> 16/20 [-4 HP])"
+     * ทุกครั้งที่ผู้เล่นได้รับความเสียหายหรือฟื้นฟู HP ต้องเขียนวงเล็บระบุค่า HP เดิม -> ค่า HP ใหม่ พร้อมจำนวนหน่วยสุทธิที่ลดลง/เพิ่มขึ้นในเนื้อเรื่องทันที เช่น "(HP: 120/120 -> 108/120 [-12 HP])" หรือ "(HP: 90/90 -> 68/90 [-22 HP])"
      * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "ถูกโจมตี" โดยไม่ระบุตัวเลขหน่วย HP ที่ลดลงเด็ดขาด!
 
 6. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
@@ -284,12 +395,12 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
   // 5. CURRENT TURN PAYLOAD + AUTHOR'S NOTE REMINDER
   const currentTurnUserParts = [
     loreContext ? `[DYNAMIC LORE INJECTION FOR THIS TURN]\n${loreContext}\n` : '',
-    `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members)]\n${actionsSummary || 'The party surveys their surroundings.'}`,
+    `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members | Party Avg Max HP: ${damageBenchmark.avgPartyMaxHp})]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE - ต้องปฏิบัติตามอย่างเคร่งครัด]
 - กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน โดยอ้างอิงค่าสถานะทั้ง 6 (STR, DEX, CON, INT, WIS, CHA) อุปกรณ์สวมใส่ และสกิลที่มีจริง
 - [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ (เช่น **Shacco**, **ไมค์**, **Pantheon**) ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
 - หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจศัตรูเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
-- [ห้ามมี Plot Armor & ต้องคำนวณดาเมจผู้เล่นเป็นตัวเลขเสมอ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) ในจังหวะอันตราย หรือโจมตีโดยไม่ทอยเต๋า ต้องคำนวณหน่วย HP ที่ผู้เล่นเสียไปตามสัดส่วน Max HP (เฉี่ยว 5-10%, ปกติ/สวนกลับ/FAIL 15-25%, รุนแรง/NAT 1/Boss 30-45%) และต้องเขียนวงเล็บ (HP: เดิม/Max -> ใหม่/Max [-X HP]) ในเนื้อเรื่องเสมอ! หากใช้สกิลต้องหัก Skill Cost และเขียน (Skill Cost: เดิม/Max -> ใหม่/Max [-Y SP]) ด้วย!
+- [ห้ามมี Plot Armor & ใช้ฐานดาเมจกลางของปาร์ตี้หักลบด้วย CON/เกราะ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) หรือโจมตีโดยไม่ทอยเต๋า ให้ใช้ฐานดาเมจกลางของโต๊ะนี้ (เฉี่ยว ${damageBenchmark.grazeMin}-${damageBenchmark.grazeMax} HP, ปกติ/สวนกลับ/FAIL ${damageBenchmark.normalMin}-${damageBenchmark.normalMax} HP, รุนแรง/NAT 1/Boss ${damageBenchmark.heavyMin}-${damageBenchmark.heavyMax} HP) แล้วนำมาหักลบด้วยค่า "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" (จาก CON + ชุดเกราะ) ของผู้เล่นคนนั้น และต้องเขียนวงเล็บ (HP: เดิม/Max -> ใหม่/Max [-X HP]) ในเนื้อเรื่องเสมอ! หากใช้สกิลต้องหัก Skill Cost และเขียน (Skill Cost: เดิม/Max -> ใหม่/Max [-Y SP]) ด้วย!
 - สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :") และ [ Decision ] เท่านั้น`,
   ]
     .filter(Boolean)
