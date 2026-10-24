@@ -5,7 +5,9 @@ import type { CharacterSkill } from '@/app/characters/equipment'
 
 const ai = new GoogleGenAI()
 
+// One model for every Dungeon Master call (turn narration and the opening scene)
 const DM_MODEL = 'gemini-3.5-flash-lite'
+const OPENING_TIMEOUT_MS = 15000
 
 export interface PartyMemberAction {
   characterName: string
@@ -44,7 +46,11 @@ export interface DmTurnInput {
 const NO_ACTION_TEXT =
   '(ไม่ได้ส่งแอ็กชันในเทิร์นนี้ — ตัวละครยังอยู่ในฉาก แต่ห้ามตัดสินใจเคลื่อนไหวหรือโจมตีแทนผู้เล่น)'
 
-function formatPartyMemberForPrompt(member: PartyMemberAction, index: number, isFirstPlayerTurn: boolean): string {
+function formatPartyMemberForPrompt(
+  member: PartyMemberAction,
+  index: number,
+  isFirstPlayerTurn: boolean
+): string {
   const hpText = `HP: ${member.currentHp ?? '?'}/${member.maxHp ?? '?'}`
   const spText = `Skill Cost: ${member.currentSkillCost ?? '?'}/${member.maxSkillCost ?? '?'}`
   const condText = `สถานะ: ${member.condition || 'Normal'}`
@@ -64,7 +70,6 @@ function formatPartyMemberForPrompt(member: PartyMemberAction, index: number, is
     .join(' / ')
 
   const lines = [
-    // หากไม่ใช่เทิร์นแรก ให้ระบุชัดเจนว่าเรียกแค่ชื่อ ไม่ต้องพ่วงฉายาจาก classType
     `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType}]`,
     `   - [สเตตัสปัจจุบัน]: ${hpText} | ${spText} | ${condText}`,
   ]
@@ -77,19 +82,14 @@ function formatPartyMemberForPrompt(member: PartyMemberAction, index: number, is
   if (skillsList) {
     lines.push(`   - [สกิลที่มี]: ${skillsList}`)
   }
-  
-  // แนบคำเตือนติดไปกับบรรทัด traits โดยตรง เพื่อป้องกันโมเดลหยิบไปแต่งประโยคพร่ำเพรื่อ
   if (traits) {
     lines.push(
       `   - [เงื่อนไขติดตัว (ห้ามนำมาบรรยายซ้ำหากแอ็กชันไม่เกี่ยวข้องโดยตรง)]: ${traits}`
     )
   }
-
-  // หากเป็นเทิร์นแรกสุดและมี backstory อาจอนุญาตให้เห็นนิดหน่อย แต่เทิร์นถัดไปไม่ต้องส่งเลย
   if (isFirstPlayerTurn && member.backstory) {
     lines.push(`   - [ปูมหลังย่อ]: ${member.backstory.replace(/\n+/g, ' ').slice(0, 120)}`)
   }
-
   lines.push(`   - [แอ็กชันที่ทำในเทิร์นนี้]: ${member.action || NO_ACTION_TEXT}`)
 
   return lines.join('\n')
@@ -169,7 +169,7 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - ห้ามมี Plot Armor ปกป้องผู้เล่น หากทอยเต๋าล้มเหลวในจังหวะอันตราย หรือประมาท ให้บรรยายบาดแผล ความเสียหายต่อ HP หรือสถานะผิดปกติที่ผู้เล่นได้รับอย่างสมจริง
 
 6. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
-   - เรียกตัวละครด้วย "ชื่อ" เท่านั้น (เช่น "**Shacco**", "**ไมค์**", "**Pantheon**") ห้ามเขียนสร้อยฉายา อาชีพ หรือลักษณะชุดต่อท้ายชื่อซ้ำๆ เด็ดขาด (เช่น ห้ามเขียน "Orama นักฆ่าในชุดตัวตลก...", "ไมค์ นักบวชผู้ควบคุมเปลวไฟ...", "Dorothy ทหารรับจ้างสไตล์สปาร์ตา...")
+   - เรียกตัวละครด้วย "ชื่อ" เท่านั้น (เช่น "**Shacco**", "**ไมค์**", "**Pantheon**") ห้ามเขียนสร้อยฉายา อาชีพ หรือลักษณะชุดต่อท้ายชื่อซ้ำๆ เด็ดขาด (เช่น ห้ามเขียน "Shacco นักฆ่าในชุดตัวตลก...", "ไมค์ นักบวชผู้ควบคุมเปลวไฟ...", "Pantheon ทหารรับจ้างสไตล์สปาร์ตา...")
    - ห้ามนำนิสัยท่าทางเดิมๆ หรือจุดด้อย (เช่น ความซุ่มซ่ามเกือบสะดุดล้ม, ฝีเท้าหนักแน่นและเชื่องช้า, รังสีความน่ากลัว) ที่เคยบรรยายไปแล้วในเทิร์นก่อนหน้า มาเขียนซ้ำอีกในเทิร์นนี้ ยกเว้นผู้เล่นจะทอยเต๋าได้ FAIL หรือสั่งทำแอ็กชันที่กระตุ้นจุดด้อยนั้นโดยตรง
    - โฟกัสเฉพาะ "แอ็กชันที่ผู้เล่นสั่งในเทิร์นนี้" และ "ผลลัพธ์ใหม่ที่เกิดขึ้น" เท่านั้น
   
@@ -215,7 +215,7 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
     `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members)]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE - ต้องปฏิบัติตามอย่างเคร่งครัด]
 - กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน
-- [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ (เช่น Orama, ไมค์, Dorothy) ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ (เช่น ห้ามบรรยายว่าสะดุดล้มซุ่มซ่าม หรือเดินฝีเท้าหนักแน่นซ้ำกับเทิร์นที่แล้ว) ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
+- [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ (เช่น **Shacco**, **ไมค์**, **Pantheon**) ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ (เช่น ห้ามบรรยายว่าสะดุดล้มซุ่มซ่าม หรือเดินฝีเท้าหนักแน่นซ้ำกับเทิร์นที่แล้ว) ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
 - หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจให้สมเหตุสมผลกับอาวุธ/สกิล/ผลเต๋า และต้องแสดงหลอดเลือดเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
 - สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีบรรทัด "สถานะศัตรู :") และ [ Decision ] เท่านั้น`,
   ]
@@ -238,4 +238,68 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
   })
 
   return response.text || 'The Dungeon Master pauses as the dust settles around the party.'
+}
+
+/**
+ * The opening narration of a new table, written from the campaign sheet before any player has acted.
+ */
+export async function generateOpeningNarrative(input: {
+  campaign: DmTurnInput['campaign']
+  loreEntries: LoreEntry[]
+}): Promise<string> {
+  const { campaign, loreEntries } = input
+
+  const scanTargetText = `${campaign.world_setting}\n${campaign.core_description}`
+  const openingLore = extractTriggeredLore(loreEntries, scanTargetText, true)
+  const loreContext =
+    openingLore.length > 0
+      ? openingLore.map((l) => `[LORE: ${l.title} (${l.category})]: ${l.content}`).join('\n')
+      : null
+
+  const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
+
+[WORLD SETTING & TONE]
+${campaign.world_setting}
+
+[OVERARCHING STORY]
+${campaign.core_description}
+
+[ACTIVE MECHANICS / RULES]
+${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
+
+[OPENING SCENE DIRECTIVES]
+1. นี่คือคำบรรยายเปิดเรื่องก่อนเริ่มเทิร์นแรก ยังไม่มีผู้เล่นคนใดส่งแอ็กชัน จงเปิดฉากแรกของการผจญภัยจากข้อมูลแคมเปญข้างต้น ให้ผู้เล่นเข้าใจว่าโลกนี้เป็นอย่างไรและตอนนี้กำลังเกิดอะไรขึ้น
+2. บรรยายสถานที่ เวลา บรรยากาศ และเหตุการณ์ที่กำลังเกิดขึ้นตรงหน้าปาร์ตี้ ให้มีจุดเริ่มเรื่องที่ชัดเจนพอให้ผู้เล่นตัดสินใจได้ว่าจะทำอะไรต่อ (กระชับแต่น่าติดตาม 2-3 ย่อหน้า)
+3. ผู้เล่นยังไม่ได้เลือกตัวละคร ห้ามตั้งชื่อ กำหนดอาชีพ หรือตัดสินใจแทนตัวละครผู้เล่น ให้เรียกรวมว่า "ปาร์ตี้" หรือ "พวกคุณ"
+4. ช่วงเปิดเรื่องยังไม่มีการทอยเต๋า ห้ามขอให้ทอยเต๋า และห้ามพิมพ์หัวข้อ [ Decision ] ออกมา
+5. จบคำบรรยายด้วยคำถามสั้นๆ ที่ชวนให้ผู้เล่นประกาศแอ็กชันแรกของตัวเอง
+
+[REQUIRED OUTPUT FORMAT]
+(เนื้อหาบรรยายฉากเปิดของเรื่อง)
+
+[ Overview ]
+สถานที่และเวลา : (ชื่อสถานที่และสภาพแวดล้อมโดยย่อและบอกเวลาอย่างชัดเจนว่ากี่นาฬิกา)
+สถานการณ์ปัจจุบัน : (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปให้เข้าใจ)
+สถานะศัตรู : (หากในฉากเปิดมีศัตรูปรากฏตัว ให้ระบุชื่อและ HP: 100% / หากยังไม่มีศัตรูให้เขียนว่า "ไม่มี")`
+
+  const openingRequest = [
+    loreContext ? `[LORE FOR THE OPENING SCENE]\n${loreContext}\n` : '',
+    '[OPENING]: โต๊ะเพิ่งเปิด ปาร์ตี้มารวมตัวกันแล้ว จงบรรยายฉากเปิดของการผจญภัย',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const response = await ai.models.generateContent({
+    model: DM_MODEL,
+    contents: [{ role: 'user', parts: [{ text: openingRequest }] }],
+    config: {
+      systemInstruction: systemInstruction,
+      temperature: 0.7,
+      abortSignal: AbortSignal.timeout(OPENING_TIMEOUT_MS),
+    },
+  })
+
+  const text = response.text?.trim()
+  if (!text) throw new Error('The AI returned an empty opening scene')
+  return text
 }
