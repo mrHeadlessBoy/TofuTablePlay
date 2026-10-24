@@ -19,22 +19,37 @@ export function extractTriggeredLore(
   const normalizedText = (combinedText || '').toLowerCase()
   const matched = new Map<string, LoreEntry>()
 
-  for (const entry of (loreEntries || [])) {
+  for (const entry of loreEntries || []) {
     // 1. Always Active: Injected into every turn
     if (entry.activation_mode === 'Always Active') {
       matched.set(entry.id, entry)
       continue
     }
 
-    // 2. Secret / DM-Only: Injected if matching or pinned for the DM
-    if (entry.activation_mode === 'Secret / DM-Only' && !isDmContext) {
-      continue
+    const rawKeys = Array.isArray(entry.trigger_keys)
+      ? entry.trigger_keys.map((k) => (k || '').trim()).filter(Boolean)
+      : []
+
+    // 2. Secret / DM-Only: Never exposed outside DM context.
+    // When in DM context, inject immediately if no specific trigger keys are set.
+    if (entry.activation_mode === 'Secret / DM-Only') {
+      if (!isDmContext) {
+        continue
+      }
+      if (rawKeys.length === 0) {
+        matched.set(entry.id, entry)
+        continue
+      }
     }
 
-    // 3. Keyword Triggered: Scan trigger keys
-    const keys = Array.isArray(entry.trigger_keys) ? entry.trigger_keys : []
-    const hasMatch = keys.some((key) => {
-      const trimmed = (key || '').trim().toLowerCase()
+    // 3. Keyword Triggered (or Secret / DM-Only with specific keys):
+    // Include entry.title as a fallback trigger so mentioning the entry's title also activates it.
+    const candidateKeys = Array.from(
+      new Set([...rawKeys, (entry.title || '').trim()].filter(Boolean))
+    )
+
+    const hasMatch = candidateKeys.some((key) => {
+      const trimmed = key.toLowerCase()
       if (!trimmed) return false
 
       // If the keyword contains Thai characters, non-ASCII, symbols (e.g. C++, ( ), +1), or spaces,

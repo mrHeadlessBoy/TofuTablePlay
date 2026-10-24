@@ -345,12 +345,17 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
               </div>
 
               {/* Keyword Trigger Chips */}
-              {newEntry.activation_mode === 'Keyword Triggered' && (
+              {(newEntry.activation_mode === 'Keyword Triggered' ||
+                newEntry.activation_mode === 'Secret / DM-Only') && (
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Add comma-separated keywords (e.g. paladin, dawn, solar)"
+                      placeholder={
+                        newEntry.activation_mode === 'Secret / DM-Only'
+                          ? 'Optional keywords (leave blank to always send to AI DM)'
+                          : 'Add comma-separated keywords (e.g. paladin, dawn, solar)'
+                      }
                       value={triggerInput}
                       onChange={(e) => setTriggerInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTriggerKey(); } }}

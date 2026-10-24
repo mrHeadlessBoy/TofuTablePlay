@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateBoardNarrative, type BoardCampaign } from '@/lib/ai/boardDm'
 import type { LoreEntry } from '@/lib/ai/lorebook'
 import type { DmTokenInput, DmTurnInput, DmTurnResult, MapTheme, TokenKind } from '@/lib/board/types'
@@ -88,7 +88,8 @@ export async function narrateBoardTurn(input: DmTurnInput): Promise<DmTurnResult
 
     if (campaignRow) {
       campaign = campaignRow
-      const { data: lore, error: loreErr } = await supabase
+      const db = createAdminClient() || supabase
+      const { data: lore, error: loreErr } = await db
         .from('lorebook_entries')
         .select('*')
         .eq('campaign_id', turn.campaignId)

@@ -422,8 +422,8 @@ export async function resolveTurn(tableId: string) {
       ]
     })
 
-    // Fetch lorebook entries for dynamic scanning
-    const { data: loreEntries, error: loreErr } = await supabase
+    // Fetch lorebook entries for dynamic scanning (use service-role db so DM-only lore is always included)
+    const { data: loreEntries, error: loreErr } = await db
       .from('lorebook_entries')
       .select('*')
       .eq('campaign_id', table.campaign_id)

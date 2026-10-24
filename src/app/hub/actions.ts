@@ -25,9 +25,10 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 // A failed or slow AI call must never stop a table from opening, so any error ends in the fallback line.
 async function writeOpeningScene(supabase: SupabaseServerClient, campaignId: string): Promise<string> {
   try {
+    const db = createAdminClient() || supabase
     const [{ data: campaign }, { data: loreEntries }] = await Promise.all([
-      supabase.from('campaigns').select('*').eq('id', campaignId).single(),
-      supabase.from('lorebook_entries').select('*').eq('campaign_id', campaignId),
+      db.from('campaigns').select('*').eq('id', campaignId).single(),
+      db.from('lorebook_entries').select('*').eq('campaign_id', campaignId),
     ])
     if (!campaign) return OPENING_FALLBACK
 

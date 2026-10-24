@@ -97,14 +97,19 @@ async function TableContent({ params }: { params: Promise<{ id: string }> }) {
     .eq('table_id', id)
     .order('turn_number', { ascending: true })
 
-  // Fetch campaign lorebook entries
-  const { data: lorebook } = await supabase
+  const currentMember = members.find((m) => m.user_id === user.id)
+  const isHeadTable = table.head_table_id === user.id
+  const isCampaignOwner = table.campaigns?.creator_id === user.id
+
+  // Fetch campaign lorebook entries (hide Secret / DM-Only entries from regular players)
+  let lorebookQuery = supabase
     .from('lorebook_entries')
     .select('*')
     .eq('campaign_id', table.campaign_id)
-
-  const currentMember = members.find((m) => m.user_id === user.id)
-  const isHeadTable = table.head_table_id === user.id
+  if (!isHeadTable && !isCampaignOwner) {
+    lorebookQuery = lorebookQuery.neq('activation_mode', 'Secret / DM-Only')
+  }
+  const { data: lorebook } = await lorebookQuery
 
   return (
     <TablePlayground
