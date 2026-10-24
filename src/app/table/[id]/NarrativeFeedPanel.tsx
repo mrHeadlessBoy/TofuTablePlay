@@ -12,7 +12,7 @@ import { buildPlayerColorMap, getPlayerNameColor, type Turn } from './types'
 const DiceRoller = dynamic(() => import('@/components/dice/DiceRoller'), { ssr: false })
 
 const INLINE_TOKEN_REGEX =
-  /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|~~[^~\n]+?~~|\(HP:\s*[^)\n]+\)|\[(?:d20[^\]]*|DC\s*\d+[^\]]*)\]|\[[^\]\n]{1,40}\])/gi
+  /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|~~[^~\n]+?~~|\(HP:\s*[^)\n]+\)|\((?:Skill\s*Cost|SP):\s*[^)\n]+\)|\[(?:d20[^\]]*|DC\s*\d+[^\]]*)\]|\[[^\]\n]{1,40}\])/gi
 
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -103,6 +103,17 @@ function renderInlineFormattedText(
         <span
           key={index}
           className="inline-flex items-center px-2 py-0.5 mx-1 rounded-md bg-red-950/60 border border-red-800/60 font-mono text-[0.75em] font-semibold text-red-300 align-middle"
+        >
+          {part.slice(1, -1)}
+        </span>
+      )
+    }
+
+    if (/^\((?:Skill\s*Cost|SP):\s*[^)\n]+\)$/i.test(part)) {
+      return (
+        <span
+          key={index}
+          className="inline-flex items-center px-2 py-0.5 mx-1 rounded-md bg-cyan-950/60 border border-cyan-800/60 font-mono text-[0.75em] font-semibold text-cyan-300 align-middle"
         >
           {part.slice(1, -1)}
         </span>

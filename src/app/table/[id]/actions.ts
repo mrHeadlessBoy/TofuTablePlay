@@ -2,7 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { generateDmNarrative } from '@/lib/ai/dm'
+import { extractPartyStateUpdates, generateDmNarrative } from '@/lib/ai/dm'
 import {
   extractCharacterSkillCost,
   extractCharacterSkills,
@@ -117,7 +117,7 @@ export async function getTableMembers(tableId: string) {
   if (characterIds.length > 0) {
     const { data: partyCharacters, error: charactersErr } = await admin
       .from('characters')
-      .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, stats, strengths, weaknesses, backstory')
+      .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, stats, appearance, inventory, equipment, strengths, weaknesses, backstory')
       .in('id', characterIds)
 
     if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
@@ -393,6 +393,8 @@ export async function resolveTurn(tableId: string) {
       if (text) draftByMember.set(act.member_id, text)
     }
 
+    const characterRowById = new Map<string, Record<string, unknown>>()
+
     // One entry per seated player, in join order — the party size is whatever the table holds.
     // A seat with neither a character nor a draft is a spectator and is left out.
     const partyActions = (seats || []).flatMap((seat, index) => {
@@ -400,10 +402,15 @@ export async function resolveTurn(tableId: string) {
       const action = draftByMember.get(seat.id) ?? null
       if (!character && !action) return []
 
+      if (character?.id) {
+        characterRowById.set(character.id, character as Record<string, unknown>)
+      }
+
       const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(character)
 
       return [
         {
+          characterId: character?.id,
           characterName: character?.name || `Unknown Adventurer ${index + 1}`,
           classType: character?.class_archetype || 'Wanderer',
           currentHp: character?.current_hp ?? 10,
@@ -411,6 +418,13 @@ export async function resolveTurn(tableId: string) {
           currentSkillCost,
           maxSkillCost,
           condition: character?.status_condition || 'Normal',
+          stats: sanitizeAbilityScores(
+            character?.stats && typeof character.stats === 'object'
+              ? (character.stats as Record<string, unknown>)
+              : undefined,
+            0
+          ),
+          appearance: character?.appearance || '',
           inventory: character?.inventory || '',
           equipment: Array.isArray(character?.equipment) ? character.equipment : [],
           strengths: character?.strengths || '',
@@ -446,6 +460,41 @@ export async function resolveTurn(tableId: string) {
       recentTurns: recentTurns || [],
       partyActions,
     })
+
+    // Automatically apply any HP, Skill Cost (SP), or Condition changes reported by the AI DM
+    const partyStateUpdates = extractPartyStateUpdates(aiNarrative, partyActions)
+    if (partyStateUpdates.length > 0) {
+      await Promise.all(
+        partyStateUpdates.map(async (stateUpdate) => {
+          const existingChar = characterRowById.get(stateUpdate.characterId)
+          const existingStats =
+            existingChar?.stats && typeof existingChar.stats === 'object'
+              ? (existingChar.stats as Record<string, unknown>)
+              : {}
+
+          const { error: charUpdateErr } = await db
+            .from('characters')
+            .update({
+              current_hp: stateUpdate.currentHp,
+              armor_class: stateUpdate.currentSkillCost,
+              status_condition: stateUpdate.condition,
+              stats: {
+                ...existingStats,
+                current_skill_cost: stateUpdate.currentSkillCost,
+                max_skill_cost: stateUpdate.maxSkillCost,
+              },
+            })
+            .eq('id', stateUpdate.characterId)
+
+          if (charUpdateErr) {
+            console.error(
+              `[resolveTurn] Failed to auto-update combat state for character ${stateUpdate.characterId}:`,
+              charUpdateErr.message
+            )
+          }
+        })
+      )
+    }
 
     const nextTurnNumber = table.current_turn + 1
 

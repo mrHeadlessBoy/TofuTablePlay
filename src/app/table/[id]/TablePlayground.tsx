@@ -441,6 +441,7 @@ export default function TablePlayground({
           .eq('table_id', table.id)
           .order('turn_number', { ascending: true })
         if (data) setTurns(data)
+        void refreshMembers()
       } else {
         setTable((prev) => ({ ...prev, turn_phase: 'resolving' }))
       }
@@ -455,7 +456,7 @@ export default function TablePlayground({
     if (failure) {
       showAlert(failure)
     }
-  }, [table.id, broadcastSync, showAlert])
+  }, [table.id, broadcastSync, showAlert, refreshMembers])
 
   // Synchronized countdown timer
   useEffect(() => {
