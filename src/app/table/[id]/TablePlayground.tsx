@@ -721,6 +721,7 @@ export default function TablePlayground({
       {/* CENTER: Main Turn Narrative & Action Feed */}
       <NarrativeFeedPanel
         turns={turns}
+        playerNames={members.map((m) => m.characters?.name).filter((n): n is string => Boolean(n && n.trim()))}
         isHeadTable={isHeadTable}
         editingTurnId={editingTurnId}
         editText={editText}

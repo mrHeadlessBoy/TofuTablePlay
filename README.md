@@ -14,17 +14,21 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * `Secret / DM-Only`: Hidden from regular players in the table sidebar and reserved exclusively for AI DM context (always active for the DM when keywords are left blank, or triggered on match when keywords are specified).
 * **Multilingual & Symbol-Safe Matching:** Supports English, Thai (without requiring space boundaries), and special symbols (e.g., `+1 sword`, `C++`, `(blessing)`) with safe regex escaping.
 
-### 2. 🧙‍♂️ Character Codex & Live Inspector (`/characters`)
+### 2. 🧙‍♂️ Character Codex & SAO-Style Floating HUD Inspector (`/characters` & In-Table)
 * **Reusable Character Sheets:** Build, edit, and delete persistent characters with class archetypes, race, appearance, backstory, strengths, and weaknesses.
 * **Combat & Resource Tracking:**
   * **HP & Skill Cost Pools:** Track `Current HP / Max HP` alongside **`Current Skill Cost / Max Skill Cost`** for casting or activating abilities.
   * **Ability Scores:** Full 6-stat support (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) supporting negative, zero, and positive values with automatic D&D 5e modifier calculation.
   * **6 Equipment Slots & Inventory:** Dedicated gear slots (`Head`, `Torso`, `Leg`, `Foot`, `Left Hand`, `Right Hand`) plus freeform backpack inventory.
   * **Custom Character Skills:** Add unlimited skills per character (`Skill Name`, `Skill Cost`, `Description`), automatically formatted into the AI DM's Party Reference Sheet.
-* **Live In-Session Editing & Hot-Swapping:** Update HP, Skill Cost, status conditions (e.g., *Normal, Bloodied, Stunned, Poisoned*), stats, equipment, inventory, and skills—or switch to another character sheet—without leaving the table.
+* **SAO-Inspired Floating Circular Status Orb (`SaoCharacterOrb.tsx`):**
+  * **2-Part Semicircle SVG Dial:** Displays live quick-status before expanding—**Upper Semicircle** features dual gauges with concentric curved `<textPath>` readouts for `HP` and `SKILL PT`; **Lower Semicircle** displays all 6 Ability Scores (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) across 6 radial sectors.
+  * **Responsive & Resizable (`[ − | 100% | + ]`):** Defaults to `352px` (`100%`) on desktop and scales down automatically on tablet/mobile viewports, with fine-grained `50%–150%` resize controls saved in `localStorage` and dynamic bottom-bar clearance sync.
+  * **Expandable Full-Sheet Window:** Clicking the orb plays a crystalline Web Audio chime and unfolds a translucent SAO-style inspector window containing the 2-part semicircle crest above the full character sheet, live combat editor, and instant character sheet switcher.
 
 ### 3. 🤝 Synchronized Multiplayer Tabletop (`/table/[id]`)
 * **AI Opening Scene Generation:** Launching a table as **Head Table** prompts the AI DM to write a custom Turn 0 opening narration (`คำบรรยาย`) grounded in the campaign setting and active lorebook.
+* **Rich Narrative Formatting & Unique Player Colors:** Renders inline Markdown (`**bold**`, `*italic*`, `` `code` ``, `~~strikethrough~~`), combat HP% & DC check badges, structured `[ Overview ]` and `[ Decision ]` tactical cards, and unique collision-free player name colors synchronized with the Party Roster.
 * **Private Turn Drafting ("Gartic Phone" Loop):** Players secretly draft actions and roll dice simultaneously without seeing teammates' choices beforehand, preventing meta-gaming.
 * **Server-Synced Ready Barrier:** When every party member clicks **Ready**, a server-clock-calibrated 5-second countdown begins (`getServerTime` offset sync). If anyone un-readies, the countdown cancels immediately.
 * **Hybrid Realtime Architecture:** Powered by Supabase PostgreSQL Changes + low-latency Broadcast channels (`member_ready`, `table_sync`, `party_chat`) + optimistic ready claims and polling fallback.
@@ -151,12 +155,13 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   ├── table/[id]/                   # Synchronized Multiplayer Tabletop
     │   │   ├── page.tsx                  # Session loader (supports UUID or table_code URLs & DM lore filtering)
     │   │   ├── TablePlayground.tsx       # Realtime sync coordinator, clock offset & turn lifecycle
-    │   │   ├── NarrativeFeedPanel.tsx    # Turn chronicle, Host override editor, action input & DiceRoller
-    │   │   ├── CharacterInspectorPanel.tsx # Live in-game combat sheet editor, Skill slots & sheet switcher
-    │   │   ├── PartyRosterSidebar.tsx    # Connected party status, HP/Skill Cost bars, kick & campaign lore tabs
+    │   │   ├── NarrativeFeedPanel.tsx    # Rich-formatted turn chronicle, player colors, action input & DiceRoller
+    │   │   ├── SaoCharacterOrb.tsx       # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
+    │   │   ├── CharacterInspectorPanel.tsx # Expandable SAO character window, combat sheet editor & sheet switcher
+    │   │   ├── PartyRosterSidebar.tsx    # Connected party status, color-matched names, kick & campaign lore
     │   │   ├── PartyChatWidget.tsx       # Floating IC/OOC realtime party chat with audio ping
     │   │   ├── countdown.ts              # Synchronized ready countdown constants
-    │   │   ├── types.ts                  # Tabletop TypeScript definitions & optimistic ready claims
+    │   │   ├── types.ts                  # Tabletop types, player color palette & optimistic ready claims
     │   │   └── actions.ts                # Ready barrier, atomic AI turn resolution, combat sheet updates
     │   └── board/                        # Solo 3D Tactical Battle Board
     │       ├── page.tsx                  # Server loader for player characters & public campaigns

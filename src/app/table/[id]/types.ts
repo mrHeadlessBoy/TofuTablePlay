@@ -131,3 +131,64 @@ export type PartyChatMessage = {
 }
 
 export const MAX_PARTY_CHAT_MESSAGES = 80
+
+
+export const PLAYER_NAME_COLORS = [
+  'text-amber-300',
+  'text-sky-300',
+  'text-emerald-300',
+  'text-rose-300',
+  'text-violet-300',
+  'text-cyan-300',
+  'text-fuchsia-300',
+  'text-lime-300',
+  'text-orange-300',
+  'text-teal-300',
+  'text-pink-300',
+  'text-indigo-300',
+] as const
+
+export function hashPlayerName(name: string): number {
+  const clean = name.trim().toLowerCase()
+  let hash = 2166136261
+  for (let i = 0; i < clean.length; i++) {
+    hash ^= clean.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return Math.abs(hash >>> 0)
+}
+
+export function buildPlayerColorMap(names: string[]): Map<string, string> {
+  const map = new Map<string, string>()
+  const usedIndices = new Set<number>()
+
+  for (const rawName of names) {
+    const clean = rawName.trim()
+    if (!clean) continue
+    const key = clean.toLowerCase()
+    if (map.has(key)) continue
+
+    let idx = hashPlayerName(key) % PLAYER_NAME_COLORS.length
+    let attempts = 0
+    while (usedIndices.has(idx) && attempts < PLAYER_NAME_COLORS.length) {
+      idx = (idx + 1) % PLAYER_NAME_COLORS.length
+      attempts++
+    }
+    usedIndices.add(idx)
+    map.set(key, PLAYER_NAME_COLORS[idx])
+  }
+
+  return map
+}
+
+export function getPlayerNameColor(
+  name: string,
+  colorMap?: ReadonlyMap<string, string>
+): string {
+  const clean = name.replace(/^\*+|\*+$/g, '').replace(/^\[|\]$/g, '').trim()
+  if (!clean) return PLAYER_NAME_COLORS[0]
+  const key = clean.toLowerCase()
+  const mapped = colorMap?.get(key)
+  if (mapped) return mapped
+  return PLAYER_NAME_COLORS[hashPlayerName(key) % PLAYER_NAME_COLORS.length]
+}

@@ -1,8 +1,9 @@
 'use client'
 
+import { useMemo } from 'react'
 import { BookOpen, Check, Users, UserX } from 'lucide-react'
 import { extractCharacterSkillCost } from '@/app/characters/equipment'
-import type { LorebookEntry, Member } from './types'
+import { buildPlayerColorMap, getPlayerNameColor, type LorebookEntry, type Member } from './types'
 
 type PartyRosterSidebarProps = {
   members: Member[]
@@ -23,6 +24,16 @@ export default function PartyRosterSidebar({
   lorebook,
   onKickMember,
 }: PartyRosterSidebarProps) {
+  const playerColorMap = useMemo(
+    () =>
+      buildPlayerColorMap(
+        members
+          .map((m) => m.characters?.name)
+          .filter((name): name is string => Boolean(name && name.trim()))
+      ),
+    [members]
+  )
+
   return (
     <aside className="w-80 border-l border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-between overflow-y-auto">
       <div className="space-y-6">
@@ -41,6 +52,9 @@ export default function PartyRosterSidebar({
             {members.map((m) => {
               const char = m.characters
               const charName = char?.name || 'Spectator/Unbound'
+              const nameColorClass = char?.name
+                ? getPlayerNameColor(char.name, playerColorMap)
+                : 'text-white'
               const skillCost = char ? extractCharacterSkillCost(char) : null
               return (
                 <div
@@ -50,7 +64,7 @@ export default function PartyRosterSidebar({
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-white block">{charName}</span>
+                        <span className={`font-semibold block ${nameColorClass}`}>{charName}</span>
                         {m.user_id === headTableId && (
                           <span className="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded">
                             HOST

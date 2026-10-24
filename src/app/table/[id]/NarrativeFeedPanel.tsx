@@ -1,17 +1,308 @@
 'use client'
 
+import { useMemo, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { Check, CheckCircle2, Clock, Dices, Edit3, Loader2, X } from 'lucide-react'
+import { Check, CheckCircle2, Clock, Compass, Dices, Edit3, Loader2, ShieldAlert, X } from 'lucide-react'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
 import type { DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
-import type { Turn } from './types'
+import { buildPlayerColorMap, getPlayerNameColor, type Turn } from './types'
 
 // The dice tray draws a 3D die with three.js, so it is only downloaded when a player opens it
 const DiceRoller = dynamic(() => import('@/components/dice/DiceRoller'), { ssr: false })
 
+const INLINE_TOKEN_REGEX =
+  /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|~~[^~\n]+?~~|\(HP:\s*[^)\n]+\)|\[(?:d20[^\]]*|DC\s*\d+[^\]]*)\]|\[[^\]\n]{1,40}\])/gi
+
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function renderPlainWithPlayerNames(
+  text: string,
+  colorMap: ReadonlyMap<string, string>,
+  playerNamesRegex: RegExp | null,
+  keyPrefix: number
+): ReactNode {
+  if (!playerNamesRegex) return text
+  const subParts = text.split(playerNamesRegex)
+  if (subParts.length === 1) return text
+
+  return subParts.map((chunk, idx) => {
+    if (!chunk) return null
+    const color = colorMap.get(chunk.trim().toLowerCase())
+    if (color) {
+      return (
+        <strong key={`${keyPrefix}-${idx}`} className={`font-bold ${color}`}>
+          {chunk}
+        </strong>
+      )
+    }
+    return chunk
+  })
+}
+
+function renderInlineFormattedText(
+  text: string,
+  colorMap: ReadonlyMap<string, string>,
+  playerNamesRegex: RegExp | null
+): ReactNode[] {
+  const parts = text.split(INLINE_TOKEN_REGEX)
+  return parts.map((part, index) => {
+    if (!part) return null
+
+    if (part.startsWith('***') && part.endsWith('***') && part.length > 6) {
+      const inner = part.slice(3, -3)
+      const colorClass = getPlayerNameColor(inner, colorMap)
+      return (
+        <strong key={index} className={`font-bold italic ${colorClass}`}>
+          {inner}
+        </strong>
+      )
+    }
+
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      const inner = part.slice(2, -2)
+      const colorClass = getPlayerNameColor(inner, colorMap)
+      return (
+        <strong key={index} className={`font-bold ${colorClass}`}>
+          {inner}
+        </strong>
+      )
+    }
+
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return (
+        <em key={index} className="italic text-zinc-300">
+          {part.slice(1, -1)}
+        </em>
+      )
+    }
+
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return (
+        <code
+          key={index}
+          className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-[0.85em] text-amber-300"
+        >
+          {part.slice(1, -1)}
+        </code>
+      )
+    }
+
+    if (part.startsWith('~~') && part.endsWith('~~') && part.length > 4) {
+      return (
+        <del key={index} className="line-through text-zinc-500">
+          {part.slice(2, -2)}
+        </del>
+      )
+    }
+
+    if (/^\(HP:\s*[^)\n]+\)$/i.test(part)) {
+      return (
+        <span
+          key={index}
+          className="inline-flex items-center px-2 py-0.5 mx-1 rounded-md bg-red-950/60 border border-red-800/60 font-mono text-[0.75em] font-semibold text-red-300 align-middle"
+        >
+          {part.slice(1, -1)}
+        </span>
+      )
+    }
+
+    if (/^\[(?:d20[^\]]*|DC\s*\d+[^\]]*)\]$/i.test(part)) {
+      return (
+        <span
+          key={index}
+          className="inline-flex items-center px-2 py-0.5 mx-1 rounded-md bg-amber-950/70 border border-amber-700/60 font-mono text-[0.8em] font-semibold text-amber-300 align-middle"
+        >
+          {part.slice(1, -1)}
+        </span>
+      )
+    }
+
+    if (part.startsWith('[') && part.endsWith(']') && part.length > 2) {
+      const inner = part.slice(1, -1).trim()
+      const colorClass = getPlayerNameColor(inner, colorMap)
+      return (
+        <strong key={index} className={`font-bold ${colorClass}`}>
+          {inner}
+        </strong>
+      )
+    }
+
+    return renderPlainWithPlayerNames(part, colorMap, playerNamesRegex, index)
+  })
+}
+
+type NarrativeSection = {
+  kind: 'narrative' | 'overview' | 'decision'
+  lines: string[]
+}
+
+const SECTION_HEADER_REGEX = /^\s*(?:#+\s*)?(?:\*\*)?\[\s*(overview|decision)\s*\](?:\*\*)?\s*:?\s*$/i
+
+function parseNarrativeSections(rawText: string): NarrativeSection[] {
+  const lines = rawText.replace(/\r\n/g, '\n').split('\n')
+  const sections: NarrativeSection[] = []
+  let current: NarrativeSection = { kind: 'narrative', lines: [] }
+
+  for (const line of lines) {
+    const headerMatch = line.match(SECTION_HEADER_REGEX)
+    if (headerMatch) {
+      if (current.lines.some((l) => l.trim().length > 0)) {
+        sections.push(current)
+      }
+      const sectionKind = headerMatch[1].toLowerCase() === 'overview' ? 'overview' : 'decision'
+      current = { kind: sectionKind, lines: [] }
+    } else {
+      current.lines.push(line)
+    }
+  }
+
+  if (current.lines.some((l) => l.trim().length > 0)) {
+    sections.push(current)
+  }
+
+  return sections
+}
+
+function FormattedNarrativeOutput({
+  text,
+  colorMap,
+  playerNamesRegex,
+}: {
+  text: string
+  colorMap: ReadonlyMap<string, string>
+  playerNamesRegex: RegExp | null
+}) {
+  const sections = parseNarrativeSections(text)
+
+  return (
+    <div className="space-y-4">
+      {sections.map((section, sIdx) => {
+        if (section.kind === 'overview') {
+          const nonEmptyLines = section.lines.map((l) => l.trim()).filter(Boolean)
+          if (nonEmptyLines.length === 0) return null
+          return (
+            <div
+              key={sIdx}
+              className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2.5"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-sky-400 border-b border-zinc-800/80 pb-2">
+                <Compass className="w-3.5 h-3.5" />
+                <span>[ Overview ]</span>
+              </div>
+              <div className="space-y-1.5 text-base leading-relaxed text-zinc-200">
+                {nonEmptyLines.map((line, lIdx) => {
+                  const cleanLine = line.replace(/^[-*]\s+/, '')
+                  const kvMatch = cleanLine.match(/^([^:：]{2,40}?)\s*[:：]\s*(.+)$/)
+                  if (kvMatch) {
+                    const label = kvMatch[1].replace(/^\*\*|\*\*$/g, '').trim()
+                    const value = kvMatch[2]
+                    return (
+                      <div key={lIdx} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                        <span className="text-xs font-mono uppercase tracking-wider text-zinc-400 shrink-0">
+                          {label} :
+                        </span>
+                        <span className="text-zinc-100">
+                          {renderInlineFormattedText(value, colorMap, playerNamesRegex)}
+                        </span>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={lIdx}>
+                      {renderInlineFormattedText(cleanLine, colorMap, playerNamesRegex)}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        }
+
+        if (section.kind === 'decision') {
+          const nonEmptyLines = section.lines.map((l) => l.trim()).filter(Boolean)
+          if (nonEmptyLines.length === 0) return null
+          return (
+            <div
+              key={sIdx}
+              className="bg-amber-950/20 border border-amber-800/50 rounded-xl p-4 space-y-2.5"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-amber-400 border-b border-amber-900/50 pb-2">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>[ Decision ]</span>
+              </div>
+              <div className="space-y-2 text-base leading-relaxed text-zinc-200">
+                {nonEmptyLines.map((line, lIdx) => {
+                  const isBullet = /^[-*]\s+/.test(line)
+                  const content = isBullet ? line.replace(/^[-*]\s+/, '') : line
+                  return (
+                    <div key={lIdx} className="flex items-start gap-2">
+                      {isBullet && (
+                        <span className="text-amber-400 font-bold select-none mt-0.5">•</span>
+                      )}
+                      <div className="flex-1">
+                        {renderInlineFormattedText(content, colorMap, playerNamesRegex)}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        }
+
+        return (
+          <div key={sIdx} className="text-2xl leading-relaxed text-zinc-200 space-y-2">
+            {section.lines.map((line, lIdx) => {
+              const trimmed = line.trim()
+              if (!trimmed) {
+                return <div key={lIdx} className="h-2" />
+              }
+
+              if (/^---+$/.test(trimmed)) {
+                return <hr key={lIdx} className="border-zinc-800 my-3" />
+              }
+
+              const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/)
+              if (headingMatch) {
+                return (
+                  <h4 key={lIdx} className="text-lg font-bold text-amber-300 pt-2">
+                    {renderInlineFormattedText(headingMatch[2], colorMap, playerNamesRegex)}
+                  </h4>
+                )
+              }
+
+              if (/^[-*]\s+/.test(trimmed)) {
+                return (
+                  <div key={lIdx} className="flex items-start gap-2.5 pl-2">
+                    <span className="text-amber-500 select-none">•</span>
+                    <div className="flex-1">
+                      {renderInlineFormattedText(
+                        trimmed.replace(/^[-*]\s+/, ''),
+                        colorMap,
+                        playerNamesRegex
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <p key={lIdx}>{renderInlineFormattedText(line, colorMap, playerNamesRegex)}</p>
+              )
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 type NarrativeFeedPanelProps = {
   turns: Turn[]
+  playerNames?: string[]
   isHeadTable: boolean
   editingTurnId: string | null
   editText: string
@@ -37,6 +328,7 @@ type NarrativeFeedPanelProps = {
 
 export default function NarrativeFeedPanel({
   turns,
+  playerNames = [],
   isHeadTable,
   editingTurnId,
   editText,
@@ -59,10 +351,41 @@ export default function NarrativeFeedPanel({
   onDiceRoll,
   onReadyToggle,
 }: NarrativeFeedPanelProps) {
+  const { colorMap, playerNamesRegex } = useMemo(() => {
+    const discoveredNames: string[] = [...playerNames]
+    for (const turn of turns) {
+      const boldMatches = turn.narrative_output.matchAll(/\*\*([^*\n]{1,40}?)\*\*/g)
+      for (const m of boldMatches) {
+        const candidate = m[1].trim()
+        if (candidate && !/^\[?\s*(overview|decision)\s*\]?$/i.test(candidate)) {
+          discoveredNames.push(candidate)
+        }
+      }
+      const decisionBracketMatches = turn.narrative_output.matchAll(/^\s*[-*]\s*\[([^\]\n]{1,40})\]/gm)
+      for (const m of decisionBracketMatches) {
+        const candidate = m[1].trim()
+        if (candidate) {
+          discoveredNames.push(candidate)
+        }
+      }
+    }
+
+    const map = buildPlayerColorMap(discoveredNames)
+    const uniquePartyNames = Array.from(
+      new Set(playerNames.map((n) => n.trim()).filter((n) => n.length >= 2))
+    ).sort((a, b) => b.length - a.length)
+
+    const regex =
+      uniquePartyNames.length > 0
+        ? new RegExp(`(${uniquePartyNames.map(escapeRegExp).join('|')})`, 'gi')
+        : null
+
+    return { colorMap: map, playerNamesRegex: regex }
+  }, [playerNames, turns])
   return (
     <main className="flex-1 flex flex-col justify-between h-full bg-zinc-950">
       {/* Narrative chat area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-6 pt-14 pb-72 lg:pb-16 space-y-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {turns.map((turn) => (
             <div
@@ -121,9 +444,11 @@ export default function NarrativeFeedPanel({
                   </div>
                 </div>
               ) : (
-                <div className="text-2xl leading-relaxed text-zinc-200 whitespace-pre-line">
-                  {turn.narrative_output}
-                </div>
+                <FormattedNarrativeOutput
+                  text={turn.narrative_output}
+                  colorMap={colorMap}
+                  playerNamesRegex={playerNamesRegex}
+                />
               )}
             </div>
           ))}
@@ -139,7 +464,7 @@ export default function NarrativeFeedPanel({
       </div>
 
       {/* Bottom Private Drafting Input & Ready Barrier */}
-      <div className="border-t border-zinc-800 bg-zinc-900/80 p-4 backdrop-blur-md">
+      <div className="border-t border-zinc-800 bg-zinc-900/80 py-4 pr-4 pl-4 md:pl-[var(--sao-orb-clearance,18rem)] lg:pl-[var(--sao-orb-clearance,24rem)] backdrop-blur-md transition-[padding] duration-200">
         <div className="max-w-3xl mx-auto space-y-3">
           {turnPhase === 'countdown' && !turnResolving && (
             <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-600/50 flex items-center justify-center gap-2 text-amber-300 font-mono text-sm animate-pulse">
