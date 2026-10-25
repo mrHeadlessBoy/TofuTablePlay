@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { extractTriggeredLore, type LoreEntry } from './lorebook'
-import { ABILITY_KEYS, type AbilityKey, type DmTokenInput, type DmTurnInput, type DmTurnResult, type SceneSummary } from '@/lib/board/types'
+import { ABILITY_KEYS, type AbilityKey, type DmTokenInput, type DmTurnInput, type DmTurnResult, type SceneSummary } from '@/features/board/lib/types'
 
 const ai = new GoogleGenAI()
 

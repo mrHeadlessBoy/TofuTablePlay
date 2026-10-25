@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import CampaignForm from '../../CampaignForm'
-import type { LoreEntryInput } from '../../actions'
+import CampaignForm from '@/features/campaign/components/CampaignForm'
+import type { LoreEntryInput } from '@/features/campaign/actions'
 
 export default function EditCampaignPage({ params }: { params: Promise<{ id: string }> }) {
   return (

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BookOpen, Lock, Play} from 'lucide-react'
-import { launchTable } from '@/app/hub/actions'
+import { launchTable } from '@/features/hub/actions'
 
 type LoreEntry = {
   id: string

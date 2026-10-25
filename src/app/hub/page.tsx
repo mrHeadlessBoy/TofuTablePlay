@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import HubClient from './HubClient'
-import { signOut } from './actions'
+import HubClient from '@/features/hub/components/HubClient'
+import { signOut } from '@/features/hub/actions'
 import { LogOut } from 'lucide-react'
 
 // Reads cookies (runtime data), so it must render inside <Suspense>.

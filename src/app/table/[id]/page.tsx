@@ -1,8 +1,9 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { UUID_REGEX, type SessionClient } from '@/lib/supabase/auth'
 import { notFound, redirect } from 'next/navigation'
-import TablePlayground from './TablePlayground'
-import { getTableMembers } from './actions'
+import TablePlayground from '@/features/table/components/TablePlayground'
+import { getTableMembers } from '@/features/table/actions'
 
 export default function TablePage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -16,10 +17,8 @@ export default function TablePage({ params }: { params: Promise<{ id: string }> 
   )
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 async function ensureTableMembership(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SessionClient,
   tableId: string,
   userId: string
 ) {

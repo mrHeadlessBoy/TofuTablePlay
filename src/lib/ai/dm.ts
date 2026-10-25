@@ -7,7 +7,7 @@ import {
   EQUIPMENT_LABELS,
   type AbilityScoreKey,
   type CharacterSkill,
-} from '@/app/characters/equipment'
+} from '@/features/character/domain'
 import { abilityModifier, formatModifier } from '@/components/dice/dice'
 
 const ai = new GoogleGenAI()

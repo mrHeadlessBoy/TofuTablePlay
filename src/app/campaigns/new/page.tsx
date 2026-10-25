@@ -1,4 +1,4 @@
-import CampaignForm from '../CampaignForm'
+import CampaignForm from '@/features/campaign/components/CampaignForm'
 
 export default function NewCampaignPage() {
   return <CampaignForm mode="create" />

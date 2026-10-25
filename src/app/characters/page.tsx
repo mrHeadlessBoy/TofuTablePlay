@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import CharacterEditor from './CharacterEditor'
+import CharacterEditor from '@/features/character/components/CharacterEditor'
 import Link from 'next/link'
 
 // Reads cookies (runtime data), so it must render inside <Suspense>.

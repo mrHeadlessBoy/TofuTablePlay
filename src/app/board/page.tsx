@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import BoardLoader from './BoardLoader'
-import { narrateBoardTurn } from './actions'
+import BoardLoader from '@/features/board/components/BoardLoader'
+import { narrateBoardTurn } from '@/features/board/actions'
 
 export default function BoardPage() {
   return (

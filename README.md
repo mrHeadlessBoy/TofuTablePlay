@@ -191,47 +191,51 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 ├── public/
 │   └── assets/sound/                     # WAV sound notifications (dice roll tiers, enter, AI reply, error)
 └── src/
-    ├── app/
+    ├── app/                              # Pure Routing Layer (Pages, Layouts & Route Handlers only)
     │   ├── layout.tsx                    # Root layout with Geist fonts & global AlertProvider
     │   ├── page.tsx                      # Landing page
     │   ├── globals.css                   # Tailwind CSS 4 global styles
     │   ├── auth/callback/route.ts        # Supabase OAuth / email confirmation callback handler
     │   ├── login/page.tsx                # Sign In / Sign Up screen
-    │   ├── hub/                          # Campaign Hub
-    │   │   ├── page.tsx                  # Server loader for public campaigns & user's active tables
-    │   │   ├── HubClient.tsx             # Quick Join (Code/Invite Link), Active Tables & Campaign carousel
-    │   │   └── actions.ts                # Launch table (with AI opening scene), join, leave, delete, sign out
-    │   ├── campaigns/                    # Campaign Studio
-    │   │   ├── CampaignForm.tsx          # Shared campaign & dynamic lorebook authoring form
-    │   │   ├── actions.ts                # Create & update campaigns and lorebook entries
+    │   ├── hub/page.tsx                  # Campaign Hub server route
+    │   ├── characters/page.tsx           # Character Codex server route
+    │   ├── campaigns/                    # Campaign Studio routes
     │   │   ├── new/page.tsx              # Create new campaign route
     │   │   └── [id]/                     # Campaign details ([id]/page.tsx) & owner edit ([id]/edit/page.tsx)
-    │   ├── characters/                   # Character Codex
-    │   │   ├── page.tsx                  # Character list & sheet workspace
-    │   │   ├── CharacterEditor.tsx       # Sheet form (HP, Skill Cost, 6 Stats, 6 Equipment Slots, Skills)
-    │   │   ├── equipment.ts              # Shared stat/skill/equipment constants, sanitizers & clamping helpers
-    │   │   └── actions.ts                # Create, update & delete character sheets
-    │   ├── table/[id]/                   # Synchronized Multiplayer Tabletop
-    │   │   ├── page.tsx                  # Session loader (supports UUID or table_code URLs & DM lore filtering)
-    │   │   ├── TablePlayground.tsx       # Realtime sync coordinator, clock offset & turn lifecycle
-    │   │   ├── NarrativeFeedPanel.tsx    # Rich-formatted turn chronicle, player colors, action input & DiceRoller
-    │   │   ├── SaoCharacterOrb.tsx       # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
-    │   │   ├── CharacterInspectorPanel.tsx # Expandable SAO character window, combat sheet editor & sheet switcher
-    │   │   ├── PartyRosterSidebar.tsx    # Connected party status, color-matched names, kick & campaign lore
-    │   │   ├── PartyChatWidget.tsx       # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
+    │   ├── table/[id]/page.tsx           # Multiplayer Tabletop route (supports UUID or 6-char table_code)
+    │   └── board/page.tsx                # Solo 3D Tactical Battle Board route (NOT IN ACTIVE DEV)
+    │
+    ├── features/                         # Domain-Driven Feature Modules
+    │   ├── table/                        # Synchronized Multiplayer Tabletop
+    │   │   ├── actions.ts                # Ready barrier, atomic AI turn resolution, combat sheet updates, kick
     │   │   ├── countdown.ts              # Synchronized ready countdown constants (COUNTDOWN_MS = 5000)
-    │   │   ├── types.ts                  # Domain types, 12-color player palette, optimistic ready claims & FNV-1a color hashing
-    │   │   └── actions.ts                # Ready barrier, atomic AI turn resolution, combat sheet updates, kick
+    │   │   ├── types.ts                  # Domain types, 12-color player palette, optimistic ready claims & FNV-1a hashing
+    │   │   └── components/
+    │   │       ├── TablePlayground.tsx         # Realtime sync coordinator, clock offset & turn lifecycle
+    │   │       ├── NarrativeFeedPanel.tsx      # Rich-formatted turn chronicle, player colors, action input & DiceRoller
+    │   │       ├── SaoCharacterOrb.tsx         # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
+    │   │       ├── CharacterInspectorPanel.tsx # Expandable SAO character window, combat sheet editor & sheet switcher
+    │   │       ├── PartyRosterSidebar.tsx      # Connected party status, color-matched names, kick & campaign lore
+    │   │       └── PartyChatWidget.tsx         # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
+    │   ├── character/                    # Character Codex & Shared Character Domain
+    │   │   ├── domain.ts                 # Shared stat/skill/equipment constants, sanitizers & clamping helpers
+    │   │   ├── actions.ts                # Create, update & delete character sheets
+    │   │   └── components/
+    │   │       └── CharacterEditor.tsx   # Sheet form (HP, Skill Cost, 6 Stats, 6 Equipment Slots, Skills)
+    │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
+    │   │   ├── actions.ts                # Create & update campaigns and lorebook entries
+    │   │   └── components/
+    │   │       └── CampaignForm.tsx      # Shared campaign & dynamic lorebook authoring form
+    │   ├── hub/                          # Campaign Hub & Session Management
+    │   │   ├── actions.ts                # Launch table (with AI opening scene), join, leave, delete, sign out
+    │   │   └── components/
+    │   │       └── HubClient.tsx         # Quick Join (Code/Invite Link), Active Tables & Campaign carousel
     │   └── board/                        # Solo 3D Tactical Battle Board (NOT IN ACTIVE DEV)
-    │       ├── page.tsx                  # Server loader for player characters & public campaigns
-    │       ├── BoardLoader.tsx           # Client-only dynamic loader for Three.js board
-    │       ├── BoardPlayground.tsx       # Turn flow, grid movement, token placement & dice integration
-    │       ├── BoardScene.tsx            # Three.js 3D procedural map, props, lighting & token renderer
-    │       ├── BoardPanels.tsx           # HUD cards (Scene, Party Roster, Threat List, Token Inspector, Rolls)
-    │       ├── DialogueBox.tsx           # Grapheme-safe retro typewriter narration box (Intl.Segmenter)
-    │       ├── StoryLog.tsx              # Filterable turn-by-turn chronicle drawer
-    │       └── actions.ts                # Server Action bridging board turns & lorebooks to Gemini
-    ├── components/
+    │       ├── actions.ts                # Server Action bridging board turns & lorebooks to Gemini
+    │       ├── lib/                      # Seeded map generator (maps.ts), session.ts, turn.ts, types.ts, utils.ts
+    │       └── components/               # BoardLoader, BoardPlayground, BoardScene, BoardPanels, DialogueBox, StoryLog
+    │
+    ├── components/                       # Shared Reusable UI & Widgets
     │   ├── dice/                         # Reusable 3D Polyhedral Dice System
     │   │   ├── DiceRoller.tsx            # Dice tray UI (d4–d100, modifiers, actor stats, Adv/Disadv, DC)
     │   │   ├── Die3D.tsx                 # Three.js 3D polyhedral mesh & roll animation
@@ -239,22 +243,18 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   └── index.ts                  # Barrel exports
     │   └── ui/
     │       └── AlertModal.tsx            # Global modal & confirmation dialog context (useAlert, showConfirm)
-    └── lib/
+    │
+    └── lib/                              # Core Infrastructure & Cross-Cutting Services
         ├── sound.ts                      # Autoplay-resilient dice & system sound notification player
         ├── turns.ts                      # Opening narration turn index constant (OPENING_TURN_NUMBER = 1)
         ├── ai/
-        │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, damage benchmarks, defense mitigation, narrative parser (~700 lines)
-        │   ├── boardDm.ts                # Battle Board JSON AI DM: prompt builder & safe reply parser (~214 lines)
-        │   └── lorebook.ts               # Multilingual keyword/title scanner & DM-only lore filter (~78 lines)
-        ├── board/
-        │   ├── maps.ts                   # Seeded procedural map generator & BFS tile reachability
-        │   ├── session.ts                # Board session state & localStorage persistence
-        │   ├── turn.ts                   # Board DM input builder & state mutation applier
-        │   ├── types.ts                  # Grid, terrain, token & DM JSON types (~135 lines)
-        │   └── utils.ts                  # Board helper utilities
+        │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, damage benchmarks, defense mitigation & parser
+        │   ├── boardDm.ts                # Battle Board JSON AI DM: prompt builder & safe reply parser
+        │   └── lorebook.ts               # Multilingual keyword/title scanner & DM-only lore filter
         └── supabase/
             ├── client.ts                 # Browser Supabase client (6-hour cookie maxAge)
-            └── server.ts                 # SSR cookie client & Service Role admin client
+            ├── server.ts                 # SSR cookie client & Service Role admin client
+            └── auth.ts                   # Shared requireAuthenticatedUser() guard, UUID_REGEX & DB client types
 ```
 
 ---
