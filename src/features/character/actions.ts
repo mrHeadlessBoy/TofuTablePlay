@@ -13,6 +13,11 @@ import {
   type CharacterSkill,
   type EquipmentSlots,
 } from './domain'
+import {
+  templateStatsPayload,
+  type CharacterTemplate,
+  type SheetCustomValues,
+} from './template'
 
 export interface CharacterFormData {
   id?: string
@@ -25,15 +30,18 @@ export interface CharacterFormData {
   current_skill_cost?: number
   max_skill_cost?: number
   stats: {
-    STR: number
-    DEX: number
-    CON: number
-    INT: number
-    WIS: number
-    CHA: number
+    STR?: number
+    DEX?: number
+    CON?: number
+    INT?: number
+    WIS?: number
+    CHA?: number
     current_skill_cost?: number
     max_skill_cost?: number
     skills?: CharacterSkill[]
+    sheet_template?: CharacterTemplate
+    sheet_custom?: SheetCustomValues
+    [key: string]: unknown
   }
   appearance: string
   backstory: string
@@ -55,12 +63,18 @@ export async function saveCharacter(data: CharacterFormData) {
 
   const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(data)
   const sanitizedScores = sanitizeAbilityScores(data.stats, 0)
+  const templatePayload = templateStatsPayload(
+    data.stats?.sheet_template,
+    data.stats?.sheet_custom
+  )
 
   const normalizedStats = {
+    ...data.stats,
     ...sanitizedScores,
     current_skill_cost: currentSkillCost,
     max_skill_cost: maxSkillCost,
     skills: sanitizedSkills,
+    ...templatePayload,
   }
 
   const maxHp = Number(data.max_hp) || 1
