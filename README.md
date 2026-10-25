@@ -28,14 +28,14 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 
 ### 3. 🤝 Synchronized Multiplayer Tabletop (`/table/[id]`)
 * **AI Opening Scene Generation:** Launching a table as **Head Table** prompts the AI DM to write a custom Turn 0 opening narration (`คำบรรยาย`) grounded in the campaign setting and active lorebook.
-* **Rich Narrative Formatting & Unique Player Colors:** Renders inline Markdown (`**bold**`, `*italic*`, `` `code` ``, `~~strikethrough~~`), combat HP% & DC check badges, structured `[ Overview ]` and `[ Decision ]` tactical cards, and unique collision-free player name colors synchronized with the Party Roster.
+* **Rich Narrative Formatting & Unique Player Colors:** Renders inline Markdown (`**bold**`, `*italic*`, `` `code` ``, `~~strikethrough~~`), combat HP% & DC check badges, structured `[ Overview ]` and `[ Decision ]` tactical cards, and unique collision-free player name colors synchronized with the Party Roster (FNV-1a hash → 12-color palette with linear probing).
 * **Private Turn Drafting ("Gartic Phone" Loop):** Players secretly draft actions and roll dice simultaneously without seeing teammates' choices beforehand, preventing meta-gaming.
-* **Server-Synced Ready Barrier:** When every party member clicks **Ready**, a server-clock-calibrated 5-second countdown begins (`getServerTime` offset sync). If anyone un-readies, the countdown cancels immediately.
+* **Server-Synced Ready Barrier:** When every party member clicks **Ready**, a server-clock-calibrated 5-second countdown begins (`getServerTime` offset sync). If anyone un-readies, the countdown cancels immediately. Optimistic ready claims with 6-second TTL prevent badge flicker from stale realtime reloads.
 * **Hybrid Realtime Architecture:** Powered by Supabase PostgreSQL Changes + low-latency Broadcast channels (`member_ready`, `table_sync`, `party_chat`) + optimistic ready claims and polling fallback.
 * **Table Codes & Direct Invite Links:** Join active sessions from the Hub using a 6-character Table Code (e.g., `7K4X9B`) or a one-click copyable Invite Link (`/table/<code>`).
-* **Floating Party Chat Widget:** Real-time in-table chat supporting **In-Character (`IC`)** roleplay dialogue and **Out-of-Character (`OOC`)** coordination, unread counters, host badges, and Web Audio API ping notifications.
+* **Floating Party Chat Widget:** Real-time in-table chat supporting **In-Character (`IC`)** roleplay dialogue and **Out-of-Character (`OOC`)** coordination, unread counters, host badges, and Web Audio API ping notifications (80-message rolling buffer).
 
-### 4. 🗺️ 3D Tactical Battle Board (`/board`) (NOT IN DEVELOPMENT)
+### 4. 🗺️ 3D Tactical Battle Board (`/board`) _(NOT IN ACTIVE DEVELOPMENT)_
 * **Procedural Three.js Grid Maps:** Interactive 3D tabletop prototype featuring seeded maps across 3 themes (`Forest`, `Ruins`, `Dungeon`) with elevation, water/bridges, props, `MapControls` camera pan/zoom, and `5 ft`-per-tile movement reachability.
 * **Party & Threat Sandbox:** Deploy multiple Codex heroes onto the grid, place custom Enemy or NPC tokens, inspect stats, adjust HP, and trigger quick ability checks.
 * **Retro Visual-Novel Dialogue & Story Log:** Grapheme-accurate Thai/English typewriter `DialogueBox` (`Intl.Segmenter`) with page navigation alongside a filterable turn-by-turn `StoryLog` (`All`, `Story`, `Actions`, `Dice`).
@@ -52,9 +52,15 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **System Events:** Player entering table (`player_enter_table.wav`), new AI DM turn narration (`Ai_reply.wav`), and error alerts (`error.wav`).
 
 ### 7. 🤖 AI Dungeon Master Engine (`src/lib/ai/dm.ts`)
+* **Flat Damage Benchmark System:** Computes party-wide damage tiers from the average Max HP of all active characters:
+  * **Graze:** 5–10% of avg Max HP
+  * **Normal:** 15–25% of avg Max HP
+  * **Heavy:** 30–45% of avg Max HP
+* **Per-Character Defense Mitigation:** Calculates damage reduction from CON modifier + equipped armor piece count (max 15% of avg Max HP cap), injected into each character's stat block for the AI DM.
 * **Balanced Combat & Enemy HP% Scaling:** Enforces anti-one-shot damage scaling, tracks enemy health percentages in `[ Overview ]`, and outputs conditional `[ Decision ]` DC prompts only when meaningful obstacles or risks are present.
-* **Bounded Sliding-Window History & Anti-Repetition:** Maintains recent turn context for token efficiency while preventing repeated phrasing or overriding unsubmitted player agency.
-* **Host Narrative Override & Atomic Locking:** Head Table hosts can edit any turn's narrative output in place, while atomic database phase transitions prevent duplicate AI executions.
+* **Automatic State Extraction:** Parses AI narrative output for inline HP changes (`(HP: 100/100 -> 80/100 [-20 HP])`), Skill Cost changes (`(Skill Cost: 10/10 -> 7/10 [-3 SP])`), and Thai→English condition mapping (e.g., `มึนงง` → `Stunned`). Auto-applies Bloodied/Unconscious thresholds.
+* **Bounded Sliding-Window History & Anti-Repetition:** Maintains the last 4 turns as multi-turn conversation history for token efficiency while preventing repeated phrasing or overriding unsubmitted player agency.
+* **Host Narrative Override & Atomic Locking:** Head Table hosts can edit any turn's narrative output in place, while atomic database phase transitions (`turn_phase: 'resolving'`) prevent duplicate AI executions.
 
 ### 8. 🛡️ Authentication, Security & Room Governance
 * **Supabase Auth & 6-Hour Session Guard:** Email/password authentication with middleware-enforced 6-hour session expiration (`dnd_session_start` cookie) and post-login route restoration (`?next=...`).
@@ -64,12 +70,12 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 
 ## 🛠️ Tech Stack
 
-* **Framework:** [Next.js 16.4](https://nextjs.org/) (App Router, Turbopack, Server Actions)
+* **Framework:** [Next.js 16.4](https://nextjs.org/) (App Router, Turbopack, Server Actions, Partial Prefetching)
 * **Frontend:** [React 19.3](https://react.dev/), [TypeScript 5](https://www.typescriptlang.org/), [Tailwind CSS 4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/)
 * **3D Graphics:** [Three.js](https://threejs.org/) (`three` `^0.186.1`)
 * **Database, Auth & Realtime:** [Supabase](https://supabase.com/) (`@supabase/ssr`, `@supabase/supabase-js`, PostgreSQL Realtime & Broadcast)
-* **AI Engine:** [Google Gemini](https://ai.google.dev/) (`@google/genai` — `gemini-3.5-flash-lite`)
-* **Package Manager / Runtime:** [Bun](https://bun.sh/) (or Node.js `v20+` with `npm`)
+* **AI Engine:** [Google Gemini](https://ai.google.dev/) (`@google/genai` — `gemini-3.5-flash-lite`, temperature `0.7`)
+* **Package Manager / Runtime:** [Bun](https://bun.sh/) `1.3.1` (or Node.js `v20+` with `npm`)
 
 ---
 
@@ -94,12 +100,26 @@ GEMINI_API_KEY=your-gemini-api-key
 
 ### 3. Core Supabase Tables
 Ensure your Supabase `public` schema includes the following tables:
-* `campaigns` — Campaign metadata, world setting, core story, rule mechanics, and creator ownership
-* `lorebook_entries` — Campaign lore entries (`title`, `category`, `activation_mode`, `trigger_keys`, `content`)
-* `characters` — Player character sheets (`stats` JSONB including ability scores, skill cost, and custom skills, plus `equipment`, `inventory`, `current_hp`, `max_hp`, `armor_class`, `status_condition`)
-* `tables` — Active multiplayer sessions (`table_code`, `campaign_id`, `head_table_id`, `current_turn`, `turn_phase`, `countdown_end`)
-* `table_members` — Connected party members, linked `character_id`, `is_ready` flag, and secret `action_text` draft
-* `turns` — Turn-by-turn AI DM `narrative_output`, `party_actions_summary`, and `edited_by_host` flag
+
+| Table | Key Columns | Purpose |
+| :--- | :--- | :--- |
+| `campaigns` | `id`, `creator_id`, `title`, `category`, `world_setting`, `core_description`, `rule_mechanics` | Campaign metadata & rule definitions |
+| `lorebook_entries` | `id`, `campaign_id`, `title`, `category`, `activation_mode`, `trigger_keys[]`, `content` | Campaign lore entries with activation modes |
+| `characters` | `id`, `user_id`, `name`, `class_archetype`, `current_hp`, `max_hp`, `armor_class`, `status_condition`, `stats` (JSONB), `appearance`, `inventory`, `equipment`, `strengths`, `weaknesses`, `backstory` | Player character sheets |
+| `tables` | `id`, `table_code`, `campaign_id`, `head_table_id`, `current_turn`, `turn_phase`, `countdown_end` | Active multiplayer sessions |
+| `table_members` | `id`, `table_id`, `user_id`, `character_id`, `is_ready`, `joined_at` | Connected party members |
+| `turns` | `id`, `table_id`, `turn_number`, `narrative_output`, `edited_by_host` | Turn-by-turn AI DM narrative |
+| `turn_actions` | `turn_id`, `member_id`, `action_text` (unique on `turn_id`, `member_id`) | Player action drafts per turn |
+
+**Notable `characters.stats` JSONB structure:**
+```json
+{
+  "STR": 10, "DEX": 14, "CON": 12, "INT": 8, "WIS": 13, "CHA": 16,
+  "current_skill_cost": 7,
+  "max_skill_cost": 10,
+  "skills": [{ "name": "Fireball", "cost": 3, "description": "Area damage" }]
+}
+```
 
 ### 4. Installation & Development
 
@@ -126,6 +146,44 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## 🔄 Multiplayer Turn Lifecycle
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  1. Players select characters, enter table                   │
+│  2. AI generates Turn 0 opening narration                    │
+│     (generateOpeningNarrative — 15s timeout)                 │
+│                                                              │
+│  ┌─────────── TURN LOOP ──────────────────────────────────┐  │
+│  │  3. Players secretly draft actions + roll dice          │  │
+│  │     ("Gartic Phone" — no peeking)                       │  │
+│  │  4. All players click Ready                             │  │
+│  │     → 5-second server-synced countdown                  │  │
+│  │  5. Atomic lock (turn_phase → 'resolving')              │  │
+│  │  6. resolveTurn() gathers:                              │  │
+│  │     • All player action drafts                          │  │
+│  │     • Triggered lorebook entries                        │  │
+│  │     • Last 4 turns as conversation history              │  │
+│  │  7. generateDmNarrative() calls Gemini                  │  │
+│  │     • Full party stats + damage benchmarks              │  │
+│  │     • Per-character defense mitigation                  │  │
+│  │  8. extractPartyStateUpdates() auto-applies:            │  │
+│  │     • HP/SP changes parsed from narrative               │  │
+│  │     • Condition mapping (Thai → English)                │  │
+│  │     • Bloodied/Unconscious thresholds                   │  │
+│  │  9. New turn persisted, ready states reset → step 3     │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  Realtime Sync:                                              │
+│  • Supabase postgres_changes on tables/table_members/turns   │
+│  • Broadcast: member_ready, table_sync, party_chat           │
+│  • Server clock offset sync for countdown accuracy           │
+│  • Optimistic ready claims (6s TTL) prevent badge flicker    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 📁 Project Architecture
 
 ```text
@@ -134,8 +192,9 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 │   └── assets/sound/                     # WAV sound notifications (dice roll tiers, enter, AI reply, error)
 └── src/
     ├── app/
-    │   ├── layout.tsx                    # Root layout with fonts & global AlertProvider
+    │   ├── layout.tsx                    # Root layout with Geist fonts & global AlertProvider
     │   ├── page.tsx                      # Landing page
+    │   ├── globals.css                   # Tailwind CSS 4 global styles
     │   ├── auth/callback/route.ts        # Supabase OAuth / email confirmation callback handler
     │   ├── login/page.tsx                # Sign In / Sign Up screen
     │   ├── hub/                          # Campaign Hub
@@ -150,7 +209,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   ├── characters/                   # Character Codex
     │   │   ├── page.tsx                  # Character list & sheet workspace
     │   │   ├── CharacterEditor.tsx       # Sheet form (HP, Skill Cost, 6 Stats, 6 Equipment Slots, Skills)
-    │   │   ├── equipment.ts              # Shared stat/skill/equipment sanitizers & clamping helpers
+    │   │   ├── equipment.ts              # Shared stat/skill/equipment constants, sanitizers & clamping helpers
     │   │   └── actions.ts                # Create, update & delete character sheets
     │   ├── table/[id]/                   # Synchronized Multiplayer Tabletop
     │   │   ├── page.tsx                  # Session loader (supports UUID or table_code URLs & DM lore filtering)
@@ -159,41 +218,58 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   ├── SaoCharacterOrb.tsx       # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
     │   │   ├── CharacterInspectorPanel.tsx # Expandable SAO character window, combat sheet editor & sheet switcher
     │   │   ├── PartyRosterSidebar.tsx    # Connected party status, color-matched names, kick & campaign lore
-    │   │   ├── PartyChatWidget.tsx       # Floating IC/OOC realtime party chat with audio ping
-    │   │   ├── countdown.ts              # Synchronized ready countdown constants
-    │   │   ├── types.ts                  # Tabletop types, player color palette & optimistic ready claims
-    │   │   └── actions.ts                # Ready barrier, atomic AI turn resolution, combat sheet updates
-    │   └── board/                        # Solo 3D Tactical Battle Board
+    │   │   ├── PartyChatWidget.tsx       # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
+    │   │   ├── countdown.ts              # Synchronized ready countdown constants (COUNTDOWN_MS = 5000)
+    │   │   ├── types.ts                  # Domain types, 12-color player palette, optimistic ready claims & FNV-1a color hashing
+    │   │   └── actions.ts                # Ready barrier, atomic AI turn resolution, combat sheet updates, kick
+    │   └── board/                        # Solo 3D Tactical Battle Board (NOT IN ACTIVE DEV)
     │       ├── page.tsx                  # Server loader for player characters & public campaigns
     │       ├── BoardLoader.tsx           # Client-only dynamic loader for Three.js board
     │       ├── BoardPlayground.tsx       # Turn flow, grid movement, token placement & dice integration
     │       ├── BoardScene.tsx            # Three.js 3D procedural map, props, lighting & token renderer
     │       ├── BoardPanels.tsx           # HUD cards (Scene, Party Roster, Threat List, Token Inspector, Rolls)
-    │       ├── DialogueBox.tsx           # Grapheme-safe retro typewriter narration box
+    │       ├── DialogueBox.tsx           # Grapheme-safe retro typewriter narration box (Intl.Segmenter)
     │       ├── StoryLog.tsx              # Filterable turn-by-turn chronicle drawer
     │       └── actions.ts                # Server Action bridging board turns & lorebooks to Gemini
     ├── components/
     │   ├── dice/                         # Reusable 3D Polyhedral Dice System
     │   │   ├── DiceRoller.tsx            # Dice tray UI (d4–d100, modifiers, actor stats, Adv/Disadv, DC)
     │   │   ├── Die3D.tsx                 # Three.js 3D polyhedral mesh & roll animation
-    │   │   ├── dice.ts                   # Pure dice math, ability modifiers & roll formatters
+    │   │   ├── dice.ts                   # Pure dice math (crypto RNG), ability modifiers & roll formatters
     │   │   └── index.ts                  # Barrel exports
     │   └── ui/
-    │       └── AlertModal.tsx            # Global modal & confirmation dialog context (useAlert)
+    │       └── AlertModal.tsx            # Global modal & confirmation dialog context (useAlert, showConfirm)
     └── lib/
         ├── sound.ts                      # Autoplay-resilient dice & system sound notification player
-        ├── turns.ts                      # Opening narration turn index constant (OPENING_TURN_NUMBER)
+        ├── turns.ts                      # Opening narration turn index constant (OPENING_TURN_NUMBER = 1)
         ├── ai/
-        │   ├── dm.ts                     # Multiplayer AI DM prompt builder, opening scene & combat scaling
-        │   ├── boardDm.ts                # Battle Board JSON AI DM prompt builder & safe reply parser
-        │   └── lorebook.ts               # Multilingual keyword/title scanner & DM-only lore filter
+        │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, damage benchmarks, defense mitigation, narrative parser (~700 lines)
+        │   ├── boardDm.ts                # Battle Board JSON AI DM: prompt builder & safe reply parser (~214 lines)
+        │   └── lorebook.ts               # Multilingual keyword/title scanner & DM-only lore filter (~78 lines)
         ├── board/
         │   ├── maps.ts                   # Seeded procedural map generator & BFS tile reachability
         │   ├── session.ts                # Board session state & localStorage persistence
         │   ├── turn.ts                   # Board DM input builder & state mutation applier
-        │   ├── types.ts                  # Grid, terrain, token & DM JSON types
+        │   ├── types.ts                  # Grid, terrain, token & DM JSON types (~135 lines)
         │   └── utils.ts                  # Board helper utilities
         └── supabase/
-            ├── client.ts                 # Browser Supabase client
+            ├── client.ts                 # Browser Supabase client (6-hour cookie maxAge)
             └── server.ts                 # SSR cookie client & Service Role admin client
 ```
+
+---
+
+## 📊 Route Map
+
+| Route | Auth | Description |
+| :--- | :---: | :--- |
+| `/` | ✗ | Landing page with hero section, feature grid, CTAs |
+| `/login` | ✗ | Sign In / Sign Up (redirects to `/hub` if already authenticated) |
+| `/auth/callback` | ✗ | Supabase OAuth / email confirmation handler |
+| `/hub` | ✓ | Campaign Hub — browse campaigns, manage active tables, Quick Join |
+| `/campaigns/new` | ✓ | Create new campaign with lorebook |
+| `/campaigns/[id]` | ✓ | Campaign detail view |
+| `/campaigns/[id]/edit` | ✓ | Edit campaign (owner only) |
+| `/characters` | ✓ | Character Codex — full sheet editor workspace |
+| `/table/[id]` | ✓ | Synchronized Multiplayer Table (supports UUID or 6-char table_code) |
+| `/board` | ✓ | Solo 3D Tactical Battle Board _(not in active dev)_ |
