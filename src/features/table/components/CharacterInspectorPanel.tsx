@@ -8,6 +8,7 @@ import {
   Edit3,
   Heart,
   Link2,
+  Package,
   Plus,
   RotateCcw,
   Save,
@@ -25,6 +26,8 @@ import {
   EQUIPMENT_LABELS,
   extractCharacterSkillCost,
   extractCharacterSkills,
+  extractCharacterInventory,
+  type CharacterInventoryItem,
 } from "@/features/character/domain";
 import { abilityModifier, formatModifier } from "@/components/dice/dice";
 import SaoCharacterOrb, {
@@ -102,6 +105,12 @@ export default function CharacterInspectorPanel({
   );
 
   const activeSkills = extractCharacterSkills(activeChar);
+  const activeInventory = extractCharacterInventory(activeChar);
+  const formInventoryItems: CharacterInventoryItem[] = Array.isArray(
+    charForm.inventory,
+  )
+    ? charForm.inventory
+    : extractCharacterInventory({ inventory: charForm.inventory });
   const { currentSkillCost, maxSkillCost } =
     extractCharacterSkillCost(activeChar);
 
@@ -557,21 +566,135 @@ export default function CharacterInspectorPanel({
                 </div>
 
                 {/* Inventory Editor */}
-                <div>
-                  <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                    Inventory
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={charForm.inventory}
-                    onChange={(e) =>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">
+                      Inventory
+                    </label>
+                    <span className="text-[9px] text-zinc-500 font-mono">
+                      {formInventoryItems.length} item(s)
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {formInventoryItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2 bg-zinc-900 border border-zinc-800 rounded space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-amber-500 font-mono uppercase">
+                            Item #{idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextItems = formInventoryItems.filter(
+                                (_, i) => i !== idx,
+                              );
+                              onChangeCharForm({
+                                ...charForm,
+                                inventory: nextItems,
+                              });
+                            }}
+                            title="Remove item"
+                            className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <div className="col-span-2">
+                            <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                              Item Name :
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="Item name..."
+                              value={item.name}
+                              onChange={(e) => {
+                                const nextItems = [...formInventoryItems];
+                                nextItems[idx] = {
+                                  ...nextItems[idx],
+                                  name: e.target.value,
+                                };
+                                onChangeCharForm({
+                                  ...charForm,
+                                  inventory: nextItems,
+                                });
+                              }}
+                              className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                              Qty :
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              placeholder="1"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                const nextItems = [...formInventoryItems];
+                                nextItems[idx] = {
+                                  ...nextItems[idx],
+                                  quantity: Number.isNaN(val) ? 1 : Math.max(1, val),
+                                };
+                                onChangeCharForm({
+                                  ...charForm,
+                                  inventory: nextItems,
+                                });
+                              }}
+                              className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white text-center"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                            Description :
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="Effect / description (optional)..."
+                            value={item.description || ""}
+                            onChange={(e) => {
+                              const nextItems = [...formInventoryItems];
+                              nextItems[idx] = {
+                                ...nextItems[idx],
+                                description: e.target.value,
+                              };
+                              onChangeCharForm({
+                                ...charForm,
+                                inventory: nextItems,
+                              });
+                            }}
+                            className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {formInventoryItems.length === 0 && (
+                      <div className="p-3 bg-zinc-900/50 border border-dashed border-zinc-800 rounded text-center text-zinc-500 text-[11px]">
+                        No items in inventory
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
                       onChangeCharForm({
                         ...charForm,
-                        inventory: e.target.value,
+                        inventory: [
+                          ...formInventoryItems,
+                          { name: "", quantity: 1, description: "" },
+                        ],
                       })
                     }
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-xs text-white mt-1 focus:border-amber-400 outline-none"
-                  />
+                    className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" /> Add Item
+                  </button>
                 </div>
 
                 {/* Equipment Slots Editor */}
@@ -897,12 +1020,38 @@ export default function CharacterInspectorPanel({
 
                 {/* Inventory */}
                 <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 block mb-1.5">
-                    Inventory
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 flex items-center gap-1.5 mb-1.5">
+                    <Package className="w-3 h-3" /> Inventory (
+                    {activeInventory.length})
                   </span>
-                  <div className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-zinc-200 min-h-14 whitespace-pre-line text-[11px] leading-relaxed">
-                    {activeChar.inventory || "Empty"}
-                  </div>
+                  {activeInventory.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {activeInventory.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-[11px] space-y-1"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-amber-300 font-bold">
+                              {item.name || "Unnamed Item"}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/70 text-[10px] font-mono text-amber-300 shrink-0">
+                              x{item.quantity}
+                            </span>
+                          </div>
+                          {item.description && (
+                            <p className="text-zinc-300 whitespace-pre-line leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-2.5 bg-zinc-900/50 border border-white/10 rounded text-zinc-500 italic text-[11px]">
+                      Inventory is empty
+                    </div>
+                  )}
                 </div>
 
                 {/* Character Traits & Lore (Full Details when present) */}

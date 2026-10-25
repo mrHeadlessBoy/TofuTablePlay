@@ -19,7 +19,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 * **Combat & Resource Tracking:**
   * **HP & Skill Cost Pools:** Track `Current HP / Max HP` alongside **`Current Skill Cost / Max Skill Cost`** for casting or activating abilities.
   * **Ability Scores:** Full 6-stat support (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) supporting negative, zero, and positive values with automatic D&D 5e modifier calculation.
-  * **6 Equipment Slots & Inventory:** Dedicated gear slots (`Head`, `Torso`, `Leg`, `Foot`, `Left Hand`, `Right Hand`) plus freeform backpack inventory.
+  * **6 Equipment Slots & Structured Inventory Slots:** Dedicated gear slots (`Head`, `Torso`, `Leg`, `Foot`, `Left Hand`, `Right Hand`) plus interactive item slots (`Item Name`, `Quantity`, optional `Description`) with dynamic add/remove controls, serialized as JSON with automatic backwards-compatible plain text fallback, and seamlessly formatted into AI DM prompt context.
   * **Custom Character Skills:** Add unlimited skills per character (`Skill Name`, `Skill Cost`, `Description`), automatically formatted into the AI DM's Party Reference Sheet.
 * **SAO-Inspired Floating Circular Status Orb (`SaoCharacterOrb.tsx`):**
   * **2-Part Semicircle SVG Dial:** Displays live quick-status before expanding—**Upper Semicircle** features dual gauges with concentric curved `<textPath>` readouts for `HP` and `SKILL PT`; **Lower Semicircle** displays all 6 Ability Scores (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) across 6 radial sectors.
@@ -110,6 +110,14 @@ Ensure your Supabase `public` schema includes the following tables:
 | `table_members` | `id`, `table_id`, `user_id`, `character_id`, `is_ready`, `joined_at` | Connected party members |
 | `turns` | `id`, `table_id`, `turn_number`, `narrative_output`, `edited_by_host` | Turn-by-turn AI DM narrative |
 | `turn_actions` | `turn_id`, `member_id`, `action_text` (unique on `turn_id`, `member_id`) | Player action drafts per turn |
+
+**Notable structured inventory JSON structure (stored in `characters.inventory` with plain-text fallback):**
+```json
+[
+  { "name": "Health Potion", "quantity": 2, "description": "Restores 20 HP" },
+  { "name": "Rope", "quantity": 1, "description": "50ft hempen rope" }
+]
+```
 
 **Notable `characters.stats` JSONB structure:**
 ```json
@@ -221,7 +229,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   ├── domain.ts                 # Shared stat/skill/equipment constants, sanitizers & clamping helpers
     │   │   ├── actions.ts                # Create, update & delete character sheets
     │   │   └── components/
-    │   │       └── CharacterEditor.tsx   # Sheet form (HP, Skill Cost, 6 Stats, 6 Equipment Slots, Skills)
+    │   │       └── CharacterEditor.tsx   # Sheet form (HP, Skill Cost, 6 Stats, 6 Equipment Slots, Structured Inventory & Skills)
     │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
     │   │   ├── actions.ts                # Create & update campaigns and lorebook entries
     │   │   └── components/

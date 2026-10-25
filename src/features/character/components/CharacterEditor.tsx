@@ -9,14 +9,16 @@ import {
   EQUIPMENT_LABELS,
   clampHpValues,
   clampSkillCostValues,
+  extractCharacterInventory,
   extractCharacterSkillCost,
   extractCharacterSkills,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
+  sanitizeInventoryItems,
   type AbilityScoreKey,
 } from '../domain'
 import { playSystemSound } from '@/lib/sound'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, Package, Sparkles } from 'lucide-react'
 import { useAlert } from '@/components/ui/AlertModal'
 
 const defaultStats: Record<AbilityScoreKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 }
@@ -44,7 +46,9 @@ export default function CharacterEditor({
   const handleDelete = async (char: CharacterRecord) => {
     if (!char.id) return
     const charName = char.name?.trim() || 'this character'
-    const confirmed = await showConfirm(`Delete character "${charName}"? This sheet will be permanently removed. This cannot be undone.`)
+    const confirmed = await showConfirm(
+      `Delete character "${charName}"? This sheet will be permanently removed. This cannot be undone.`
+    )
     if (!confirmed) {
       return
     }
@@ -79,7 +83,7 @@ export default function CharacterEditor({
       backstory: '',
       strengths: '',
       weaknesses: '',
-      inventory: '',
+      inventory: [],
       status_condition: 'Normal',
       equipment: [...EMPTY_EQUIPMENT],
       skills: [],
@@ -141,6 +145,41 @@ export default function CharacterEditor({
     })
   }
 
+  const handleAddInventoryItem = () => {
+    if (!selectedChar) return
+    const currentItems = extractCharacterInventory(selectedChar)
+    setSelectedChar({
+      ...selectedChar,
+      inventory: [...currentItems, { name: '', quantity: 1, description: '' }],
+    })
+  }
+
+  const handleInventoryItemChange = (
+    index: number,
+    field: 'name' | 'quantity' | 'description',
+    value: string | number
+  ) => {
+    if (!selectedChar) return
+    const currentItems = [...extractCharacterInventory(selectedChar)]
+    currentItems[index] = {
+      ...currentItems[index],
+      [field]: value,
+    }
+    setSelectedChar({
+      ...selectedChar,
+      inventory: currentItems,
+    })
+  }
+
+  const handleRemoveInventoryItem = (index: number) => {
+    if (!selectedChar) return
+    const currentItems = extractCharacterInventory(selectedChar).filter((_, i) => i !== index)
+    setSelectedChar({
+      ...selectedChar,
+      inventory: currentItems,
+    })
+  }
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedChar) return
@@ -155,6 +194,9 @@ export default function CharacterEditor({
       const sanitizedSkills = sanitizeCharacterSkills(
         selectedChar.skills ?? extractCharacterSkills(selectedChar)
       )
+      const sanitizedInventory = sanitizeInventoryItems(
+        selectedChar.inventory ?? extractCharacterInventory(selectedChar)
+      )
       await saveCharacter({
         ...selectedChar,
         current_hp: currentHp,
@@ -164,6 +206,7 @@ export default function CharacterEditor({
         max_skill_cost: maxSkillCost,
         stats: sanitizedStats,
         skills: sanitizedSkills,
+        inventory: sanitizedInventory,
       })
       setSelectedChar(null)
       router.refresh()
@@ -199,6 +242,7 @@ export default function CharacterEditor({
                     current_skill_cost: currentSkillCost,
                     max_skill_cost: maxSkillCost,
                     skills: extractCharacterSkills(char),
+                    inventory: extractCharacterInventory(char),
                   })
                 }
                 className={`p-4 rounded-lg border cursor-pointer transition ${
@@ -248,46 +292,65 @@ export default function CharacterEditor({
       {/* Editor Form */}
       <div className="md:col-span-2">
         {selectedChar ? (
-          <form onSubmit={onSubmit} className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-6">
+          <form
+            onSubmit={onSubmit}
+            className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-6"
+          >
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h2 className="text-lg font-semibold text-white">
+                {selectedChar.id ? 'Edit Character Sheet' : 'New Character Sheet'}
+              </h2>
+              <span className="text-xs text-amber-500 bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded">
+                Draft
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-zinc-400 uppercase">Character Name</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Roland of Gilead"
                   value={selectedChar.name}
                   onChange={(e) => setSelectedChar({ ...selectedChar, name: e.target.value })}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 uppercase">Class / Archetype</label>
+                <label className="text-xs text-zinc-400 uppercase">Class Archetype</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Gunslinger, Paladin, Wizard"
                   value={selectedChar.class_archetype}
-                  onChange={(e) => setSelectedChar({ ...selectedChar, class_archetype: e.target.value })}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                  onChange={(e) =>
+                    setSelectedChar({ ...selectedChar, class_archetype: e.target.value })
+                  }
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
             </div>
 
-            {/* Combat Vitals */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-zinc-400 uppercase">Current HP</label>
                 <input
                   type="number"
+                  min={0}
                   max={selectedChar.max_hp}
                   value={selectedChar.current_hp}
                   onChange={(e) => {
-                    const val = Number(e.target.value)
+                    const nextHp = Number(e.target.value)
+                    const clampedHp = Number.isNaN(nextHp)
+                      ? 0
+                      : Math.max(0, Math.min(selectedChar.max_hp, nextHp))
                     setSelectedChar({
                       ...selectedChar,
-                      current_hp: Number.isNaN(val) ? 0 : Math.min(selectedChar.max_hp, val),
+                      current_hp: clampedHp,
                     })
                   }}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
               <div>
@@ -298,34 +361,38 @@ export default function CharacterEditor({
                   value={selectedChar.max_hp}
                   onChange={(e) => {
                     const newMax = Number(e.target.value)
-                    const clampedMax = Number.isNaN(newMax) ? 1 : newMax
+                    const clampedMax = Number.isNaN(newMax) ? 1 : Math.max(1, newMax)
+                    const nextCur = Math.min(clampedMax, selectedChar.current_hp)
                     setSelectedChar({
                       ...selectedChar,
                       max_hp: clampedMax,
-                      current_hp: Math.min(clampedMax, selectedChar.current_hp),
+                      current_hp: nextCur,
                     })
                   }}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-zinc-400 uppercase">Current Skill Cost</label>
                 <input
                   type="number"
                   min={0}
-                  max={selectedChar.max_skill_cost ?? 10}
+                  max={selectedChar.max_skill_cost ?? selectedChar.armor_class ?? 10}
                   value={selectedChar.current_skill_cost ?? selectedChar.armor_class ?? 10}
                   onChange={(e) => {
-                    const maxCost = selectedChar.max_skill_cost ?? 10
-                    const val = Number(e.target.value)
-                    const clamped = Number.isNaN(val) ? 0 : Math.max(0, Math.min(maxCost, val))
+                    const rawVal = Number(e.target.value)
+                    const maxCost = selectedChar.max_skill_cost ?? selectedChar.armor_class ?? 10
+                    const clamped = Number.isNaN(rawVal) ? 0 : Math.max(0, Math.min(maxCost, rawVal))
                     setSelectedChar({
                       ...selectedChar,
                       current_skill_cost: clamped,
                       armor_class: clamped,
                     })
                   }}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
               <div>
@@ -335,10 +402,10 @@ export default function CharacterEditor({
                   min={0}
                   value={selectedChar.max_skill_cost ?? selectedChar.armor_class ?? 10}
                   onChange={(e) => {
-                    const newMax = Number(e.target.value)
-                    const clampedMax = Number.isNaN(newMax) ? 0 : Math.max(0, newMax)
-                    const curCost = selectedChar.current_skill_cost ?? selectedChar.armor_class ?? 10
-                    const nextCur = Math.min(clampedMax, curCost)
+                    const rawVal = Number(e.target.value)
+                    const clampedMax = Number.isNaN(rawVal) ? 0 : Math.max(0, rawVal)
+                    const cur = selectedChar.current_skill_cost ?? selectedChar.armor_class ?? 10
+                    const nextCur = Math.min(clampedMax, cur)
                     setSelectedChar({
                       ...selectedChar,
                       max_skill_cost: clampedMax,
@@ -346,38 +413,58 @@ export default function CharacterEditor({
                       armor_class: nextCur,
                     })
                   }}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white"
+                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                 />
               </div>
             </div>
 
-            {/* Attributes */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-zinc-400 uppercase block">Attributes (Stats)</label>
-                <span className="text-[11px] text-zinc-500 font-mono">Allows negative</span>
-              </div>
+              <label className="text-xs text-zinc-400 uppercase">Status Condition</label>
+              <select
+                value={selectedChar.status_condition || 'Normal'}
+                onChange={(e) =>
+                  setSelectedChar({ ...selectedChar, status_condition: e.target.value })
+                }
+                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white cursor-pointer"
+              >
+                <option value="Normal">Normal</option>
+                <option value="Bloodied">Bloodied</option>
+                <option value="Poisoned">Poisoned</option>
+                <option value="Stunned">Stunned</option>
+                <option value="Blinded">Blinded</option>
+                <option value="Unconscious">Unconscious</option>
+                <option value="Blessed">Blessed</option>
+                <option value="Charmed">Charmed</option>
+                <option value="Exhausted">Exhausted</option>
+              </select>
+            </div>
+
+            {/* Ability Scores */}
+            <div>
+              <label className="text-xs text-zinc-400 uppercase block mb-2">
+                Ability Scores (Numbers)
+              </label>
               <div className="grid grid-cols-6 gap-2">
                 {ABILITY_SCORE_KEYS.map((stat) => (
-                  <div key={stat} className="bg-zinc-950 border border-zinc-800 rounded p-2 text-center">
-                    <span className="text-[10px] text-zinc-500 font-bold block">{stat}</span>
+                  <div key={stat} className="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-center">
+                    <span className="text-[10px] text-zinc-500 font-mono block">{stat}</span>
                     <input
                       type="number"
-                      value={selectedChar.stats[stat]}
+                      value={selectedChar.stats[stat] ?? 0}
                       onChange={(e) => handleStatChange(stat, e.target.value)}
-                      className="w-full text-center bg-transparent text-sm font-semibold text-amber-400 outline-none"
+                      className="w-full bg-transparent text-center font-bold text-sm text-white outline-none mt-1"
                     />
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Descriptive Profile */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-400 uppercase">Strengths & Proficiencies</label>
+                <label className="text-xs text-zinc-400 uppercase">Strengths & Perks</label>
                 <textarea
                   rows={2}
+                  placeholder="Sharp vision, high pain tolerance..."
                   value={selectedChar.strengths || ''}
                   onChange={(e) => setSelectedChar({ ...selectedChar, strengths: e.target.value })}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
@@ -387,6 +474,7 @@ export default function CharacterEditor({
                 <label className="text-xs text-zinc-400 uppercase">Weaknesses & Flaws</label>
                 <textarea
                   rows={2}
+                  placeholder="Arrogant, fear of heights..."
                   value={selectedChar.weaknesses || ''}
                   onChange={(e) => setSelectedChar({ ...selectedChar, weaknesses: e.target.value })}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
@@ -395,7 +483,7 @@ export default function CharacterEditor({
             </div>
 
             <div>
-              <label className="text-xs text-zinc-400 uppercase">Appearance & Visual Traits</label>
+              <label className="text-xs text-zinc-400 uppercase">Appearance Description</label>
               <textarea
                 rows={2}
                 placeholder="Physical build, clothing, notable scars or aura..."
@@ -405,25 +493,15 @@ export default function CharacterEditor({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-zinc-400 uppercase">Inventory (Item Log)</label>
-                <textarea
-                  rows={3}
-                  value={selectedChar.inventory || ''}
-                  onChange={(e) => setSelectedChar({ ...selectedChar, inventory: e.target.value })}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 uppercase">Backstory & Bio</label>
-                <textarea
-                  rows={3}
-                  value={selectedChar.backstory || ''}
-                  onChange={(e) => setSelectedChar({ ...selectedChar, backstory: e.target.value })}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
-                />
-              </div>
+            <div>
+              <label className="text-xs text-zinc-400 uppercase">Backstory & Bio</label>
+              <textarea
+                rows={3}
+                placeholder="Origins, motivations, past events..."
+                value={selectedChar.backstory || ''}
+                onChange={(e) => setSelectedChar({ ...selectedChar, backstory: e.target.value })}
+                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+              />
             </div>
 
             {/* Equipment Slots */}
@@ -452,7 +530,9 @@ export default function CharacterEditor({
             {/* Skill Slots */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs text-zinc-400 uppercase block">Skill</label>
+                <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Skills
+                </label>
                 <span className="text-[11px] text-zinc-500 font-mono">
                   {(selectedChar.skills ?? extractCharacterSkills(selectedChar)).length} slot(s)
                 </span>
@@ -535,6 +615,103 @@ export default function CharacterEditor({
                 className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Skill
+              </button>
+            </div>
+
+            {/* Inventory Item Slots */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-amber-400" /> Inventory (Item Log)
+                </label>
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  {extractCharacterInventory(selectedChar).length} item(s)
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {extractCharacterInventory(selectedChar).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-amber-500 font-mono uppercase">
+                        Item #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInventoryItem(idx)}
+                        title="Remove item"
+                        className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-zinc-900 transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Item Name :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Health Potion, Rope..."
+                          value={item.name}
+                          onChange={(e) => handleInventoryItemChange(idx, 'name', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Quantity :
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="1"
+                          value={item.quantity ?? 1}
+                          onChange={(e) => {
+                            const val = Number(e.target.value)
+                            handleInventoryItemChange(
+                              idx,
+                              'quantity',
+                              Number.isNaN(val) ? 1 : Math.max(1, Math.round(val))
+                            )
+                          }}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Description :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Restores 20 HP, 50ft length..."
+                          value={item.description || ''}
+                          onChange={(e) =>
+                            handleInventoryItemChange(idx, 'description', e.target.value)
+                          }
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {extractCharacterInventory(selectedChar).length === 0 && (
+                  <p className="text-xs text-zinc-500 italic">
+                    No items in inventory yet. Click &quot;Add Item&quot; below to add an item.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddInventoryItem}
+                className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Item
               </button>
             </div>
 

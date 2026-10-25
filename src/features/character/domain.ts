@@ -39,6 +39,107 @@ export interface CharacterSkill {
   description: string
 }
 
+export interface CharacterInventoryItem {
+  name: string
+  quantity: number
+  description?: string
+}
+
+export function sanitizeInventoryItems(items: unknown): CharacterInventoryItem[] {
+  if (!Array.isArray(items)) return []
+  return items
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    .map((item) => {
+      const parsedQty = Number(item.quantity ?? item.count ?? item.qty)
+      return {
+        name: typeof item.name === 'string' ? item.name.trim() : '',
+        quantity: Number.isFinite(parsedQty) && parsedQty >= 0 ? Math.round(parsedQty) : 1,
+        description: typeof item.description === 'string' ? item.description.trim() : '',
+      }
+    })
+    .filter((item) => item.name.length > 0 || (item.description && item.description.length > 0))
+}
+
+export function extractCharacterInventory(
+  character:
+    | {
+        inventory?: unknown
+        stats?: Record<string, unknown> | null
+      }
+    | null
+    | undefined
+): CharacterInventoryItem[] {
+  if (!character) return []
+  const raw = character.inventory
+  if (Array.isArray(raw)) {
+    return sanitizeInventoryItems(raw)
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return sanitizeInventoryItems(parsed)
+        }
+      } catch {
+        // Fall back to plain text line parsing
+      }
+    }
+    // Parse legacy plain text (e.g. "Health Potion x2", "Torch x5", "Rope")
+    const lines = trimmed.split(/[\n,]+/).map((l) => l.trim()).filter(Boolean)
+    const items: CharacterInventoryItem[] = []
+    for (const line of lines) {
+      const matchQtyEnd = line.match(/^(.+?)\s*(?:[xX*]\s*(\d+)|\(\s*[xX*]?\s*(\d+)\s*\))$/)
+      const matchQtyStart = line.match(/^(\d+)\s*[xX*]\s*(.+)$/)
+      if (matchQtyEnd) {
+        const name = matchQtyEnd[1].trim()
+        const qty = Number(matchQtyEnd[2] || matchQtyEnd[3])
+        items.push({ name, quantity: Number.isFinite(qty) ? Math.max(1, qty) : 1 })
+      } else if (matchQtyStart) {
+        const qty = Number(matchQtyStart[1])
+        const name = matchQtyStart[2].trim()
+        items.push({ name, quantity: Number.isFinite(qty) ? Math.max(1, qty) : 1 })
+      } else {
+        items.push({ name: line, quantity: 1 })
+      }
+    }
+    return items
+  }
+
+  const nested =
+    character.stats && typeof character.stats === 'object' ? character.stats.inventory : undefined
+  if (Array.isArray(nested)) {
+    return sanitizeInventoryItems(nested)
+  }
+
+  return []
+}
+
+export function formatInventoryForPrompt(inventory: unknown): string {
+  const items = Array.isArray(inventory)
+    ? sanitizeInventoryItems(inventory)
+    : extractCharacterInventory({ inventory })
+
+  if (items.length === 0) return ''
+
+  return items
+    .map((item) => {
+      const qtyStr = `x${item.quantity}`
+      const descStr = item.description ? ` - ${item.description}` : ''
+      return `${item.name} (${qtyStr}${descStr})`
+    })
+    .join(', ')
+}
+
+export function serializeInventory(inventory: unknown): string {
+  const items = Array.isArray(inventory)
+    ? sanitizeInventoryItems(inventory)
+    : extractCharacterInventory({ inventory })
+  return JSON.stringify(items)
+}
+
 export function sanitizeCharacterSkills(skills: unknown): CharacterSkill[] {
   if (!Array.isArray(skills)) return []
   return skills

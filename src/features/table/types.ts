@@ -1,4 +1,4 @@
-import type { AbilityScoreKey, CharacterSkill } from '@/features/character/domain'
+import type { AbilityScoreKey, CharacterInventoryItem, CharacterSkill } from '@/features/character/domain'
 
 export type Character = {
   id: string
@@ -16,7 +16,7 @@ export type Character = {
     skills?: CharacterSkill[]
     [key: string]: unknown
   }
-  inventory?: string
+  inventory?: string | CharacterInventoryItem[]
   equipment?: string[]
   strengths?: string
   weaknesses?: string
@@ -74,7 +74,7 @@ export type CharacterCombatFormState = {
   current_skill_cost: number
   max_skill_cost: number
   status_condition: string
-  inventory: string
+  inventory: CharacterInventoryItem[] | string
   equipment: string[]
   stats: Record<string, number | string>
   skills: CharacterSkill[]

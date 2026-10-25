@@ -24,6 +24,8 @@ import {
   extractCharacterSkills,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
+  extractCharacterInventory,
+  sanitizeInventoryItems,
 } from '@/features/character/domain'
 import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
@@ -103,7 +105,7 @@ export default function TablePlayground({
     current_skill_cost: 10,
     max_skill_cost: 10,
     status_condition: 'Normal',
-    inventory: '',
+    inventory: [],
     equipment: [...EMPTY_EQUIPMENT],
     stats: { ...DEFAULT_ABILITY_SCORES },
     skills: [],
@@ -200,7 +202,7 @@ export default function TablePlayground({
         current_skill_cost: currentSkillCost,
         max_skill_cost: maxSkillCost,
         status_condition: activeChar.status_condition || 'Normal',
-        inventory: activeChar.inventory || '',
+        inventory: extractCharacterInventory(activeChar),
         equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)],
         stats: sanitizeAbilityScores(activeChar.stats, 0),
         skills: extractCharacterSkills(activeChar),
@@ -582,6 +584,7 @@ export default function TablePlayground({
     try {
       const sanitizedStats = sanitizeAbilityScores(charForm.stats, 0)
       const sanitizedSkills = sanitizeCharacterSkills(charForm.skills)
+      const sanitizedInventory = sanitizeInventoryItems(charForm.inventory)
       const { currentHp, maxHp } = clampHpValues(charForm.current_hp, charForm.max_hp)
       const { currentSkillCost, maxSkillCost } = clampSkillCostValues(
         charForm.current_skill_cost,
@@ -594,6 +597,7 @@ export default function TablePlayground({
         armor_class: currentSkillCost,
         current_skill_cost: currentSkillCost,
         max_skill_cost: maxSkillCost,
+        inventory: sanitizedInventory,
         stats: {
           ...sanitizedStats,
           current_skill_cost: currentSkillCost,

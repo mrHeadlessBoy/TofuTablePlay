@@ -7,8 +7,11 @@ import { extractPartyStateUpdates, generateDmNarrative } from '@/lib/ai/dm'
 import {
   extractCharacterSkillCost,
   extractCharacterSkills,
+  formatInventoryForPrompt,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
+  serializeInventory,
+  type CharacterInventoryItem,
   type CharacterSkill,
 } from '@/features/character/domain'
 import { COUNTDOWN_MS, type TablePhase } from './countdown'
@@ -414,7 +417,7 @@ export async function resolveTurn(tableId: string) {
             0
           ),
           appearance: character?.appearance || '',
-          inventory: character?.inventory || '',
+          inventory: formatInventoryForPrompt(character?.inventory),
           equipment: Array.isArray(character?.equipment) ? character.equipment : [],
           strengths: character?.strengths || '',
           weaknesses: character?.weaknesses || '',
@@ -573,7 +576,7 @@ export async function updateCharacterCombatState(
     current_skill_cost?: number
     max_skill_cost?: number
     status_condition?: string
-    inventory?: string
+    inventory?: string | CharacterInventoryItem[]
     equipment?: string[]
     stats?: Record<string, unknown>
     skills?: CharacterSkill[]
@@ -583,6 +586,10 @@ export async function updateCharacterCombatState(
 
   const { skills, stats, current_skill_cost, max_skill_cost, ...restUpdates } = updates
   const payloadUpdates: Record<string, unknown> = { ...restUpdates }
+
+  if (updates.inventory !== undefined) {
+    payloadUpdates.inventory = serializeInventory(updates.inventory)
+  }
 
   if (
     stats !== undefined ||

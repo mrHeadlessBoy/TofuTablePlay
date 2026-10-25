@@ -5,6 +5,7 @@ import {
   ABILITY_SCORE_KEYS,
   CHARACTER_CONDITIONS,
   EQUIPMENT_LABELS,
+  formatInventoryForPrompt,
   type AbilityScoreKey,
   type CharacterSkill,
 } from '@/features/character/domain'
@@ -192,7 +193,7 @@ function formatPartyMemberForPrompt(
     .join(', ')
 
   const invPreview = member.inventory
-    ? member.inventory.replace(/\n+/g, ', ').trim().slice(0, 600)
+    ? formatInventoryForPrompt(member.inventory).slice(0, 600)
     : ''
 
   const appearancePreview = member.appearance

@@ -8,6 +8,8 @@ import {
   extractCharacterSkills,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
+  serializeInventory,
+  type CharacterInventoryItem,
   type CharacterSkill,
   type EquipmentSlots,
 } from './domain'
@@ -37,7 +39,7 @@ export interface CharacterFormData {
   backstory: string
   strengths: string
   weaknesses: string
-  inventory: string
+  inventory: string | CharacterInventoryItem[]
   status_condition: string
   equipment: EquipmentSlots
   skills?: CharacterSkill[]
@@ -76,7 +78,7 @@ export async function saveCharacter(data: CharacterFormData) {
     backstory: data.backstory,
     strengths: data.strengths,
     weaknesses: data.weaknesses,
-    inventory: data.inventory,
+    inventory: serializeInventory(data.inventory),
     status_condition: data.status_condition || 'Normal',
     equipment: data.equipment,
   }
