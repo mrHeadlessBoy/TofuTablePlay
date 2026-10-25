@@ -223,7 +223,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │       ├── NarrativeFeedPanel.tsx      # Rich-formatted turn chronicle, player colors, action input & DiceRoller
     │   │       ├── SaoCharacterOrb.tsx         # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
     │   │       ├── CharacterInspectorPanel.tsx # Expandable SAO character window, combat sheet editor & sheet switcher
-    │   │       ├── PartyRosterSidebar.tsx      # Connected party status, color-matched names, kick & campaign lore
+    │   │       ├── PartyRosterSidebar.tsx      # Floating top-right in-game HUD (transparent BG) for party status & campaign lore
     │   │       └── PartyChatWidget.tsx         # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
     │   ├── character/                    # Character Codex & Shared Character Domain
     │   │   ├── domain.ts                 # Shared stat/skill/equipment constants, sanitizers & clamping helpers
