@@ -11,11 +11,11 @@ export const MIN_ORB_SCALE_PERCENT = 50
 export const MAX_ORB_SCALE_PERCENT = 150
 export const ORB_SCALE_STEP_PERCENT = 10
 
-// Desktop default at 100% is 352px (22rem), scaling down responsively on tablet & mobile
+// Desktop default at 100% is 280px (80% calibrated baseline), scaling down responsively on tablet & mobile
 export function getResponsiveBaseOrbPx(viewportWidth: number): number {
-  if (viewportWidth < 640) return 192 // Mobile default (12rem)
-  if (viewportWidth < 1024) return 256 // Tablet default (16rem)
-  return 352 // Desktop default (22rem — 2x standard size)
+  if (viewportWidth < 640) return 154 // Mobile default (~80% of 192px)
+  if (viewportWidth < 1024) return 205 // Tablet default (~80% of 256px)
+  return 280 // Desktop default (280px = ~80% of original 352px)
 }
 
 export function computeEffectiveOrbPx(
@@ -108,10 +108,26 @@ function describeSectorWedge(
   ].join(' ')
 }
 
-function getSaoHpStroke(ratio: number): string {
-  if (ratio <= 0.25) return '#ef4444' // Red critical
-  if (ratio <= 0.55) return '#facc15' // Yellow caution
-  return '#4ade80' // SAO vibrant green
+function describeCounterClockwiseArc(
+  cx: number,
+  cy: number,
+  r: number,
+  startDeg: number,
+  endDeg: number
+): string {
+  const span = Math.max(0, Math.min(359.9, startDeg - endDeg))
+  if (span < 0.5) return ''
+  const s = polarToCartesian(cx, cy, r, startDeg)
+  const e = polarToCartesian(cx, cy, r, startDeg - span)
+  const largeArc = span > 180 ? 1 : 0
+  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 0 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
+}
+
+export function getSaoHpStroke(ratio: number): string {
+  if (ratio >= 0.75) return '#4ade80' // Green (>= 75%)
+  if (ratio >= 0.50) return '#facc15' // Yellow (50% - 74.99%)
+  if (ratio >= 0.30) return '#f97316' // Orange (30% - 49.99%)
+  return '#ef4444' // Red (< 30% Bloodied / Critical)
 }
 
 export type SaoDualSemicircleDialProps = {
@@ -154,13 +170,11 @@ export function SaoDualSemicircleDial({
   const spColor = activeChar ? '#38bdf8' : '#52525b'
 
   // Upper Semicircle gauge arcs (r = 84):
-  // Left upper quadrant (HP): 184° -> 266° (82° sweep rising from left horizon to top)
+  // Left upper quadrant (HP): 184° -> 266° (82° sweep rising from left horizon to top clockwise)
   const hpTrackPath = describeClockwiseArc(cx, cy, 84, 184, 266)
-  const hpFillPath = describeClockwiseArc(cx, cy, 84, 184, 184 + 82 * hpRatio)
 
-  // Right upper quadrant (Skill Point): 274° -> 356° (82° sweep rising from right horizon to top)
-  const spTrackPath = describeClockwiseArc(cx, cy, 84, 274, 356)
-  const spFillPath = describeClockwiseArc(cx, cy, 84, 356 - 82 * spRatio, 356)
+  // Right upper quadrant (Skill Point): 356° -> 274° (82° sweep rising from right horizon to top counter-clockwise)
+  const spTrackPath = describeCounterClockwiseArc(cx, cy, 84, 356, 274)
 
   // Concentric curved text paths inside Upper-Left (184° -> 266°) and Upper-Right (274° -> 356°):
   // Outer arc (r = 65): curved label ("HP" / "SKILL PT")
@@ -266,7 +280,7 @@ export function SaoDualSemicircleDial({
         strokeWidth="1.5"
       />
 
-      {/* HP Track & Active Gauge (Upper-Left) */}
+      {/* HP Track & Active Gauge (Upper-Left) — Exact Stroke Length via pathLength & strokeDashoffset */}
       <path
         d={hpTrackPath}
         fill="none"
@@ -274,18 +288,21 @@ export function SaoDualSemicircleDial({
         strokeWidth="8.5"
         strokeLinecap="round"
       />
-      {hpFillPath && (
+      {hpRatio > 0 && (
         <path
-          d={hpFillPath}
+          d={hpTrackPath}
           fill="none"
           stroke={hpColor}
           strokeWidth="8.5"
           strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray="100"
+          strokeDashoffset={(1 - hpRatio) * 100}
           filter={`url(#${glowFilterId})`}
         />
       )}
 
-      {/* Skill Point Track & Active Gauge (Upper-Right) */}
+      {/* Skill Point Track & Active Gauge (Upper-Right) — Symmetrical Counter-Clockwise Stroke */}
       <path
         d={spTrackPath}
         fill="none"
@@ -293,13 +310,16 @@ export function SaoDualSemicircleDial({
         strokeWidth="8.5"
         strokeLinecap="round"
       />
-      {spFillPath && (
+      {spRatio > 0 && (
         <path
-          d={spFillPath}
+          d={spTrackPath}
           fill="none"
           stroke={spColor}
           strokeWidth="8.5"
           strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray="100"
+          strokeDashoffset={(1 - spRatio) * 100}
           filter={`url(#${glowFilterId})`}
         />
       )}

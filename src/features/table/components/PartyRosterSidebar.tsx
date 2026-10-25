@@ -112,7 +112,15 @@ export default function PartyRosterSidebar({
                       <div className="flex items-center flex-wrap gap-2 mt-0.5 text-[10px] text-zinc-400 drop-shadow-sm">
                         <span className="text-zinc-300">{char?.class_archetype || 'No class'}</span>
                         {char?.current_hp !== undefined && (
-                          <span className="text-red-400 font-mono font-semibold">
+                          <span className={`font-mono font-semibold ${
+                            char.max_hp && char.current_hp / char.max_hp < 0.3
+                              ? 'text-red-400'
+                              : char.max_hp && char.current_hp / char.max_hp < 0.5
+                                ? 'text-orange-400'
+                                : char.max_hp && char.current_hp / char.max_hp < 0.75
+                                  ? 'text-yellow-400'
+                                  : 'text-emerald-400'
+                          }`}>
                             HP: {char.current_hp}/{char.max_hp}
                           </span>
                         )}

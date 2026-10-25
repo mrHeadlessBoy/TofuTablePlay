@@ -233,4 +233,29 @@ export function extractCharacterSkillCost(
   return clampSkillCostValues(rawCurrent, rawMax)
 }
 
+/**
+ * Standard 4-Tier HP Color Thresholds:
+ * - >= 75%: Green (#4ade80 / text-emerald-400 / bg-emerald-400)
+ * - 50% - 74.99%: Yellow (#facc15 / text-yellow-400 / bg-yellow-400)
+ * - 30% - 49.99%: Orange (#f97316 / text-orange-400 / bg-orange-500)
+ * - < 30%: Red (#ef4444 / text-red-400 / bg-red-500) — Bloodied / Critical
+ */
+export function getHpColorHex(ratio: number): string {
+  if (ratio >= 0.75) return '#4ade80' // Green
+  if (ratio >= 0.50) return '#facc15' // Yellow
+  if (ratio >= 0.30) return '#f97316' // Orange
+  return '#ef4444' // Red (< 30% Bloodied)
+}
 
+export function getHpTailwindClass(currentHp: number, maxHp: number): {
+  text: string
+  bg: string
+  border: string
+} {
+  const safeMax = Math.max(1, maxHp)
+  const ratio = Math.max(0, currentHp / safeMax)
+  if (ratio >= 0.75) return { text: 'text-emerald-400', bg: 'bg-emerald-400', border: 'border-emerald-500/60' }
+  if (ratio >= 0.50) return { text: 'text-yellow-400', bg: 'bg-yellow-400', border: 'border-yellow-500/60' }
+  if (ratio >= 0.30) return { text: 'text-orange-400', bg: 'bg-orange-500', border: 'border-orange-500/60' }
+  return { text: 'text-red-400', bg: 'bg-red-500', border: 'border-red-500/60' }
+}

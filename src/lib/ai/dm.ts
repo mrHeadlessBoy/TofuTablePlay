@@ -346,7 +346,7 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
      * เมื่อได้ "ฐานดาเมจของศัตรู" ข้างต้นแล้ว ให้นำไปหักลบกับค่าในบรรทัด "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้นเสมอ!
      * สูตรคำนวณ: ดาเมจสุทธิที่ผู้เล่นได้รับ = (ฐานดาเมจของศัตรู - ค่าลดทอนดาเมจจาก CON และชุดเกราะของผู้เล่นคนนั้น) โดยต้องเสียเลือดขั้นต่ำอย่างน้อย 1 HP เสมอ
      * ด้วยวิธีนี้ ผู้เล่นที่มี Max HP สูง (เช่น 120 HP) และมีค่า CON + ชุดเกราะดี จะโดนดาเมจเข้าเนื้อน้อยกว่าและทนรับการโจมตีได้หลายเทิร์นกว่าผู้เล่นที่ตัวบาง (เช่น 90 HP) อย่างแท้จริง!
-     * หากการโจมตีของศัตรูมีพิษ มึนงง คำสาป หรือบาดเจ็บสาหัส ให้เปลี่ยนสถานะ Condition เป็น Bloodied, Poisoned, Stunned, Blinded, Exhausted หรือ Unconscious เมื่อ HP เหลือ 0
+     * หากการโจมตีของศัตรูมีพิษ มึนงง คำสาป หรือบาดเจ็บสาหัส (HP เหลือน้อยกว่า 30%) ให้เปลี่ยนสถานะ Condition เป็น Bloodied, Poisoned, Stunned, Blinded, Exhausted หรือ Unconscious เมื่อ HP เหลือ 0
    - [บังคับเขียนตัวเลข HP ของผู้เล่นในเนื้อเรื่องทุกครั้งที่เสียเลือดหรือฟื้นฟูเลือด]:
      * ทุกครั้งที่ผู้เล่นได้รับความเสียหายหรือฟื้นฟู HP ต้องเขียนวงเล็บระบุค่า HP เดิม -> ค่า HP ใหม่ พร้อมจำนวนหน่วยสุทธิที่ลดลง/เพิ่มขึ้นในเนื้อเรื่องทันที เช่น "(HP: 120/120 -> 108/120 [-12 HP])" หรือ "(HP: 90/90 -> 68/90 [-22 HP])"
      * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "ถูกโจมตี" โดยไม่ระบุตัวเลขหน่วย HP ที่ลดลงเด็ดขาด!
@@ -604,12 +604,12 @@ export function extractPartyStateUpdates(
     if (target.currentHp === 0) {
       target.condition = 'Unconscious'
     } else if (
-      target.currentHp <= Math.floor(target.maxHp * 0.5) &&
+      target.currentHp <= Math.floor(target.maxHp * 0.3) &&
       target.condition === 'Normal'
     ) {
       target.condition = 'Bloodied'
     } else if (
-      target.currentHp > Math.floor(target.maxHp * 0.5) &&
+      target.currentHp > Math.floor(target.maxHp * 0.3) &&
       target.condition === 'Bloodied'
     ) {
       target.condition = 'Normal'

@@ -873,7 +873,15 @@ export default function CharacterInspectorPanel({
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-mono mb-1">
                         <span className="flex items-center gap-1 text-zinc-300">
-                          <Heart className="w-3 h-3 text-emerald-400" /> HP
+                          <Heart className={`w-3 h-3 ${
+                            hpPercent < 30
+                              ? "text-red-400"
+                              : hpPercent < 50
+                                ? "text-orange-400"
+                                : hpPercent < 75
+                                  ? "text-yellow-400"
+                                  : "text-emerald-400"
+                          }`} /> HP
                         </span>
                         <span className="text-white font-bold">
                           {activeChar.current_hp} / {activeChar.max_hp}
@@ -882,11 +890,13 @@ export default function CharacterInspectorPanel({
                       <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
                         <div
                           className={`h-full transition-all duration-300 ${
-                            hpPercent <= 25
+                            hpPercent < 30
                               ? "bg-red-500"
-                              : hpPercent <= 55
-                                ? "bg-yellow-400"
-                                : "bg-emerald-400"
+                              : hpPercent < 50
+                                ? "bg-orange-500"
+                                : hpPercent < 75
+                                  ? "bg-yellow-400"
+                                  : "bg-emerald-400"
                           }`}
                           style={{ width: `${hpPercent}%` }}
                         />

@@ -23,7 +23,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **Custom Character Skills:** Add unlimited skills per character (`Skill Name`, `Skill Cost`, `Description`), automatically formatted into the AI DM's Party Reference Sheet.
 * **SAO-Inspired Floating Circular Status Orb (`SaoCharacterOrb.tsx`):**
   * **2-Part Semicircle SVG Dial:** Displays live quick-status before expanding—**Upper Semicircle** features dual gauges with concentric curved `<textPath>` readouts for `HP` and `SKILL PT`; **Lower Semicircle** displays all 6 Ability Scores (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) across 6 radial sectors.
-  * **Responsive & Resizable (`[ − | 100% | + ]`):** Defaults to `352px` (`100%`) on desktop and scales down automatically on tablet/mobile viewports, with fine-grained `50%–150%` resize controls saved in `localStorage` and dynamic bottom-bar clearance sync.
+  * **Responsive & Resizable (`[ − | 100% | + ]`):** Defaults to `280px` (`100%`, calibrated 80% baseline) on desktop and scales down automatically on tablet/mobile viewports, with fine-grained `50%–150%` resize controls saved in `localStorage` and dynamic bottom-bar clearance sync.
   * **Expandable Full-Sheet Window:** Clicking the orb plays a crystalline Web Audio chime and unfolds a translucent SAO-style inspector window containing the 2-part semicircle crest above the full character sheet, live combat editor, and instant character sheet switcher.
 
 ### 3. 🤝 Synchronized Multiplayer Tabletop (`/table/[id]`)
@@ -58,7 +58,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **Heavy:** 30–45% of avg Max HP
 * **Per-Character Defense Mitigation:** Calculates damage reduction from CON modifier + equipped armor piece count (max 15% of avg Max HP cap), injected into each character's stat block for the AI DM.
 * **Balanced Combat & Enemy HP% Scaling:** Enforces anti-one-shot damage scaling, tracks enemy health percentages in `[ Overview ]`, and outputs conditional `[ Decision ]` DC prompts only when meaningful obstacles or risks are present.
-* **Automatic State Extraction:** Parses AI narrative output for inline HP changes (`(HP: 100/100 -> 80/100 [-20 HP])`), Skill Cost changes (`(Skill Cost: 10/10 -> 7/10 [-3 SP])`), and Thai→English condition mapping (e.g., `มึนงง` → `Stunned`). Auto-applies Bloodied/Unconscious thresholds.
+* **Automatic State Extraction:** Parses AI narrative output for inline HP changes (`(HP: 100/100 -> 80/100 [-20 HP])`), Skill Cost changes (`(Skill Cost: 10/10 -> 7/10 [-3 SP])`), and Thai→English condition mapping (e.g., `มึนงง` → `Stunned`). Auto-applies Bloodied (HP <= 30%) and Unconscious (HP = 0) thresholds with 4-tier HP status colors (>=75% Green, 50–74% Yellow, 30–49% Orange, <30% Red).
 * **Bounded Sliding-Window History & Anti-Repetition:** Maintains the last 4 turns as multi-turn conversation history for token efficiency while preventing repeated phrasing or overriding unsubmitted player agency.
 * **Host Narrative Override & Atomic Locking:** Head Table hosts can edit any turn's narrative output in place, while atomic database phase transitions (`turn_phase: 'resolving'`) prevent duplicate AI executions.
 
