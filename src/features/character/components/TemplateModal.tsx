@@ -760,7 +760,7 @@ export default function TemplateModal({
           {tab === 'export' && (
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-800/40 text-xs text-amber-200/90 leading-relaxed">
-                คัดลอกรหัส Share Key นี้เพื่อส่งให้เพื่อนหรือบันทึกเก็บไว้ รหัสจะบรรจุข้อมูลโครงสร้างชีตทั้งหมด สามารถนำไป Import ได้ทันทีโดยไม่ต้องต่อ Database
+                คัดลอกรหัส Share Key นี้เพื่อส่งให้เพื่อนหรือบันทึกเก็บไว้และใช้ Import
               </div>
 
               <div className="relative">

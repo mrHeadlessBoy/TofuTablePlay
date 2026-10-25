@@ -1,4 +1,4 @@
-# 🐉 D&D Playground — Synchronized AI Tabletop RPG
+# 🐉 TofuTablePlay — Synchronized AI Tabletop RPG
 
 An intelligent, real-time tabletop roleplaying platform combining **synchronized multiplayer text campaigns**, a **solo 3D tactical grid battle board**, **3D polyhedral dice rolling**, **dynamic multilingual lorebooks**, and an automated **AI Dungeon Master** powered by Google Gemini.
 

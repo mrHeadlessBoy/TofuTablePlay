@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "dnd-playground",
+      "name": "TofuTablePlay",
       "dependencies": {
         "@google/genai": "^2.28.0",
         "@supabase/ssr": "^0.12.7",
