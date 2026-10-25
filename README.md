@@ -34,6 +34,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 * **Hybrid Realtime Architecture:** Powered by Supabase PostgreSQL Changes + low-latency Broadcast channels (`member_ready`, `table_sync`, `party_chat`) + optimistic ready claims and polling fallback.
 * **Table Codes & Direct Invite Links:** Join active sessions from the Hub using a 6-character Table Code (e.g., `7K4X9B`) or a one-click copyable Invite Link (`/table/<code>`).
 * **Floating Party Chat Widget:** Real-time in-table chat supporting **In-Character (`IC`)** roleplay dialogue and **Out-of-Character (`OOC`)** coordination, unread counters, host badges, and Web Audio API ping notifications (80-message rolling buffer).
+* **Auto-Scroll to Latest Turn & Minimal Quick-Return Symbol:** Automatically scrolls to the newest turn narration upon entering the table and when turns resolve. When scrolling up to read historical chronicle turns, a sleek floating symbol button (`CircleDot`, non-textual, without arrows) appears to quickly jump back to the bottom.
 
 ### 4. 🗺️ 3D Tactical Battle Board (`/board`) _(NOT IN ACTIVE DEVELOPMENT)_
 * **Procedural Three.js Grid Maps:** Interactive 3D tabletop prototype featuring seeded maps across 3 themes (`Forest`, `Ruins`, `Dungeon`) with elevation, water/bridges, props, `MapControls` camera pan/zoom, and `5 ft`-per-tile movement reachability.

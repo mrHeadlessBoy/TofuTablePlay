@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { Check, CheckCircle2, Clock, Compass, Dices, Edit3, Loader2, ShieldAlert, X } from 'lucide-react'
+import { Check, CheckCircle2, CircleDot, Clock, Compass, Dices, Edit3, Loader2, ShieldAlert, X } from 'lucide-react'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
 import type { DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
@@ -393,10 +393,54 @@ export default function NarrativeFeedPanel({
 
     return { colorMap: map, playerNamesRegex: regex }
   }, [playerNames, turns])
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const isInitialScrollDoneRef = useRef(false)
+  const prevTurnsCountRef = useRef(turns.length)
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior })
+    setIsAtBottom(true)
+  }, [])
+
+  // Auto-scroll to latest turn on table entry
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el || turns.length === 0) return
+
+    if (!isInitialScrollDoneRef.current) {
+      isInitialScrollDoneRef.current = true
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
+        })
+      })
+      return
+    }
+
+    if (turns.length > prevTurnsCountRef.current) {
+      prevTurnsCountRef.current = turns.length
+      if (isAtBottom) {
+        requestAnimationFrame(() => {
+          scrollToBottom('smooth')
+        })
+      }
+    }
+  }, [turns, isAtBottom, scrollToBottom])
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    setIsAtBottom(distanceFromBottom < 100)
+  }, [])
+
   return (
-    <main className="flex-1 flex flex-col justify-between h-full bg-zinc-950">
+    <main className="flex-1 flex flex-col justify-between h-full bg-zinc-950 relative">
       {/* Narrative chat area */}
-      <div className="flex-1 overflow-y-auto px-6 pt-14 pb-72 lg:pb-16 space-y-6">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-6 pt-14 pb-72 lg:pb-16 space-y-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {turns.map((turn) => (
             <div
@@ -473,6 +517,19 @@ export default function NarrativeFeedPanel({
           )}
         </div>
       </div>
+
+      {/* Floating Scroll to Bottom Symbol (Minimalist CircleDot, no text, no arrows) */}
+      {!isAtBottom && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom('smooth')}
+          aria-label="Scroll to latest turn"
+          title="ไปยังข้อความล่าสุด"
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-zinc-950/90 hover:bg-zinc-900 border border-amber-500/60 hover:border-amber-400 text-amber-400 hover:text-amber-300 shadow-[0_4px_20px_rgba(245,158,11,0.35)] backdrop-blur-md transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer group"
+        >
+          <CircleDot className="w-4 h-4 animate-pulse group-hover:scale-110 transition-transform" />
+        </button>
+      )}
 
       {/* Bottom Private Drafting Input & Ready Barrier */}
       <div className="border-t border-zinc-800 bg-zinc-900/80 py-4 px-4 sm:px-6 backdrop-blur-md">
