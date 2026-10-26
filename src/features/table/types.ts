@@ -1,4 +1,5 @@
 import type { AbilityScoreKey, CharacterInventoryItem, CharacterSkill } from '@/features/character/domain'
+import type { CharacterTemplate, SheetCustomValues } from '@/features/character/template'
 
 export type Character = {
   id: string
@@ -14,6 +15,8 @@ export type Character = {
     current_skill_cost?: number
     max_skill_cost?: number
     skills?: CharacterSkill[]
+    sheet_template?: CharacterTemplate
+    sheet_custom?: SheetCustomValues
     [key: string]: unknown
   }
   inventory?: string | CharacterInventoryItem[]
@@ -78,6 +81,8 @@ export type CharacterCombatFormState = {
   equipment: string[]
   stats: Record<string, number | string>
   skills: CharacterSkill[]
+  sheet_template?: CharacterTemplate
+  sheet_custom?: SheetCustomValues
 }
 
 // How long another player's Ready click is trusted when their request never reports back

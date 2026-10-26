@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { BookOpen, Check, ChevronDown, Users, UserX } from 'lucide-react'
-import { extractCharacterSkillCost } from '@/features/character/domain'
+import { extractCharacterSkillCost, getHpTailwindClass } from '@/features/character/domain'
 import { buildPlayerColorMap, getPlayerNameColor, type LorebookEntry, type Member } from '../types'
 
 type PartyRosterSidebarProps = {
@@ -112,15 +112,11 @@ export default function PartyRosterSidebar({
                       <div className="flex items-center flex-wrap gap-2 mt-0.5 text-[10px] text-zinc-400 drop-shadow-sm">
                         <span className="text-zinc-300">{char?.class_archetype || 'No class'}</span>
                         {char?.current_hp !== undefined && (
-                          <span className={`font-mono font-semibold ${
-                            char.max_hp && char.current_hp / char.max_hp < 0.3
-                              ? 'text-red-400'
-                              : char.max_hp && char.current_hp / char.max_hp < 0.5
-                                ? 'text-orange-400'
-                                : char.max_hp && char.current_hp / char.max_hp < 0.75
-                                  ? 'text-yellow-400'
-                                  : 'text-emerald-400'
-                          }`}>
+                          <span
+                            className={`font-mono font-semibold ${
+                              getHpTailwindClass(char.current_hp, char.max_hp ?? 1).text
+                            }`}
+                          >
                             HP: {char.current_hp}/{char.max_hp}
                           </span>
                         )}

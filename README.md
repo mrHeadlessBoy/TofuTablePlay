@@ -1,6 +1,6 @@
 # 🐉 TofuTablePlay — Synchronized AI Tabletop RPG
 
-An intelligent, real-time tabletop roleplaying platform combining **synchronized multiplayer text campaigns**, a **solo 3D tactical grid battle board**, **3D polyhedral dice rolling**, **dynamic multilingual lorebooks**, and an automated **AI Dungeon Master** powered by Google Gemini.
+An intelligent, real-time tabletop roleplaying platform combining **synchronized multiplayer text campaigns**, **customizable character sheet templates with shareable keys**, a **solo 3D tactical grid battle board**, **3D polyhedral dice rolling**, **dynamic multilingual lorebooks**, and an automated **AI Dungeon Master** powered by Google Gemini.
 
 ---
 
@@ -14,17 +14,21 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * `Secret / DM-Only`: Hidden from regular players in the table sidebar and reserved exclusively for AI DM context (always active for the DM when keywords are left blank, or triggered on match when keywords are specified).
 * **Multilingual & Symbol-Safe Matching:** Supports English, Thai (without requiring space boundaries), and special symbols (e.g., `+1 sword`, `C++`, `(blessing)`) with safe regex escaping.
 
-### 2. 🧙‍♂️ Character Codex & SAO-Style Floating HUD Inspector (`/characters` & In-Table)
-* **Reusable Character Sheets:** Build, edit, and delete persistent characters with class archetypes, race, appearance, backstory, strengths, and weaknesses.
+### 2. 🧙‍♂️ Character Codex, Sheet Templates & SAO-Style Floating HUD Inspector (`/characters` & In-Table)
+* **Reusable Character Sheets:** Build, edit, and delete persistent characters with class archetypes, appearance, backstory, strengths, weaknesses, and custom genre-specific fields.
+* **Customizable Character Sheet Templates & Shareable Keys (`template.ts` & `TemplateModal.tsx`):**
+  * **Built-In Genre Presets:** Switch between **Classic Fantasy RPG** (`STR/DEX/CON/INT/WIS/CHA`, `HP`, `Skill Cost`, 6 armor slots), **Romance / Slice of Life** (`Charm/Empathy/Wit/Style/Luck/Courage`, `Composure`, `Social Energy`, `Stress`, `Crush`, `Relationships`, outfit/accessory/keepsake slots), and **Horror Investigation** (`Physique/Nerves/Observation/Occult/Willpower/Luck`, `Health`, `Sanity`, `Luck`, `Phobia / Trauma`).
+  * **Visual Template Builder:** Customize template metadata, add/remove Resource Bars (with 8 color themes and default max values), Stats/Attributes (with optional min/max clamping and default scores), Text & Bio Fields, Equipment Slots, Status Conditions, and toggle Skills/Inventory sections.
+  * **Shareable Template Keys (`CST1.` / `CST0.`):** Export any template into a compact `deflate-raw` compressed base64url share key (`CST1....`) or plain key (`CST0....`) and import keys or raw JSON with live structure preview.
 * **Combat & Resource Tracking:**
-  * **HP & Skill Cost Pools:** Track `Current HP / Max HP` alongside **`Current Skill Cost / Max Skill Cost`** for casting or activating abilities.
-  * **Ability Scores:** Full 6-stat support (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) supporting negative, zero, and positive values with automatic D&D 5e modifier calculation.
-  * **6 Equipment Slots & Structured Inventory Slots:** Dedicated gear slots (`Head`, `Torso`, `Leg`, `Foot`, `Left Hand`, `Right Hand`) plus interactive item slots (`Item Name`, `Quantity`, optional `Description`) with dynamic add/remove controls, serialized as JSON with automatic backwards-compatible plain text fallback, and seamlessly formatted into AI DM prompt context.
+  * **HP, Skill Cost & Custom Resource Pools:** Track `Current HP / Max HP`, `Current Skill Cost / Max Skill Cost`, and any template-defined custom resource bars (`Stress`, `Luck`, etc.).
+  * **Dynamic Attributes & Modifiers:** Supports classic 6 ability scores (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) and custom template stats (supporting negative, zero, and positive values with automatic modifier calculation and `DiceRoller` integration).
+  * **Equipment Slots & Structured Inventory Slots:** Dedicated gear slots (mapped across standard 6 slots and custom template slots) plus interactive item slots (`Item Name`, `Quantity`, optional `Description`) with dynamic add/remove controls, serialized as JSON with automatic backwards-compatible plain text fallback, and seamlessly formatted into AI DM prompt context.
   * **Custom Character Skills:** Add unlimited skills per character (`Skill Name`, `Skill Cost`, `Description`), automatically formatted into the AI DM's Party Reference Sheet.
 * **SAO-Inspired Floating Circular Status Orb (`SaoCharacterOrb.tsx`):**
-  * **2-Part Semicircle SVG Dial:** Displays live quick-status before expanding—**Upper Semicircle** features dual gauges with concentric curved `<textPath>` readouts for `HP` and `SKILL PT`; **Lower Semicircle** displays all 6 Ability Scores (`STR`, `DEX`, `CON`, `INT`, `WIS`, `CHA`) across 6 radial sectors.
+  * **2-Part Semicircle SVG Dial:** Displays live quick-status before expanding—**Upper Semicircle** features dual gauges with concentric curved `<textPath>` readouts for the template's primary resources (`HP` and `SKILL PT`) with 4-tier HP color coding (`>=75%` Green, `50–74%` Yellow, `30–49%` Orange, `<30%` Red); **Lower Semicircle** displays the character's template stats across radial sectors.
   * **Responsive & Resizable (`[ − | 100% | + ]`):** Defaults to `280px` (`100%`, calibrated 80% baseline) on desktop and scales down automatically on tablet/mobile viewports, with fine-grained `50%–150%` resize controls saved in `localStorage` and dynamic bottom-bar clearance sync.
-  * **Expandable Full-Sheet Window:** Clicking the orb plays a crystalline Web Audio chime and unfolds a translucent SAO-style inspector window containing the 2-part semicircle crest above the full character sheet, live combat editor, and instant character sheet switcher.
+  * **Expandable Full-Sheet Window:** Clicking the orb plays a crystalline Web Audio chime and unfolds a translucent SAO-style inspector window containing the 2-part semicircle crest above the full template-aware character sheet, live combat editor, and instant character sheet switcher.
 
 ### 3. 🤝 Synchronized Multiplayer Tabletop (`/table/[id]`)
 * **AI Opening Scene Generation:** Launching a table as **Head Table** prompts the AI DM to write a custom Turn 0 opening narration (`คำบรรยาย`) grounded in the campaign setting and active lorebook.
@@ -44,7 +48,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 
 ### 5. 🎲 3D Polyhedral Dice Roller (`src/components/dice/`)
 * **Interactive 3D Dice Tray:** Three.js-rendered polyhedral dice (`d4`, `d6`, `d8`, `d10`, `d12`, `d20`, `d100`) with tumbling animation and critical hit / critical fail visual highlights.
-* **Full Tabletop Modifiers:** Supports multi-dice pools, flat modifiers, character ability score bonuses, `Normal` / `Advantage` / `Disadvantage` modes, and optional `DC` target checks.
+* **Full Tabletop Modifiers:** Supports multi-dice pools, flat modifiers, character ability score & custom template stat bonuses, `Normal` / `Advantage` / `Disadvantage` modes, and optional `DC` target checks.
 * **Seamless Action Integration:** Automatically appends formatted roll results into the player's action draft in Multiplayer Table mode or logs pending roll outcomes for the DM in Battle Board mode.
 
 ### 6. 🔊 Event & Dice Notification Audio (`src/lib/sound.ts`)
@@ -58,8 +62,9 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **Normal:** 15–25% of avg Max HP
   * **Heavy:** 30–45% of avg Max HP
 * **Per-Character Defense Mitigation:** Calculates damage reduction from CON modifier + equipped armor piece count (max 15% of avg Max HP cap), injected into each character's stat block for the AI DM.
+* **Template-Aware Character Context:** Formats both classic and custom template stats, custom resource bars (`Stress`, `Luck`, etc.), custom equipment slots, and custom text/bio fields into the AI DM prompt.
 * **Balanced Combat & Enemy HP% Scaling:** Enforces anti-one-shot damage scaling, tracks enemy health percentages in `[ Overview ]`, and outputs conditional `[ Decision ]` DC prompts only when meaningful obstacles or risks are present.
-* **Automatic State Extraction:** Parses AI narrative output for inline HP changes (`(HP: 100/100 -> 80/100 [-20 HP])`), Skill Cost changes (`(Skill Cost: 10/10 -> 7/10 [-3 SP])`), and Thai→English condition mapping (e.g., `มึนงง` → `Stunned`). Auto-applies Bloodied (HP <= 30%) and Unconscious (HP = 0) thresholds with 4-tier HP status colors (>=75% Green, 50–74% Yellow, 30–49% Orange, <30% Red).
+* **Automatic State Extraction:** Parses AI narrative output for inline HP changes (`(HP: 100/100 -> 80/100 [-20 HP])`), Skill Cost changes (`(Skill Cost: 10/10 -> 7/10 [-3 SP])`), custom template conditions, and Thai→English condition mapping (e.g., `มึนงง` → `Stunned`). Auto-applies Bloodied (HP <= 30%) and Unconscious (HP = 0) thresholds with 4-tier HP status colors (>=75% Green, 50–74% Yellow, 30–49% Orange, <30% Red).
 * **Bounded Sliding-Window History & Anti-Repetition:** Maintains the last 4 turns as multi-turn conversation history for token efficiency while preventing repeated phrasing or overriding unsubmitted player agency.
 * **Host Narrative Override & Atomic Locking:** Head Table hosts can edit any turn's narrative output in place, while atomic database phase transitions (`turn_phase: 'resolving'`) prevent duplicate AI executions.
 
@@ -120,13 +125,20 @@ Ensure your Supabase `public` schema includes the following tables:
 ]
 ```
 
-**Notable `characters.stats` JSONB structure:**
+**Notable `characters.stats` JSONB structure (supports custom sheet templates & custom values):**
 ```json
 {
   "STR": 10, "DEX": 14, "CON": 12, "INT": 8, "WIS": 13, "CHA": 16,
   "current_skill_cost": 7,
   "max_skill_cost": 10,
-  "skills": [{ "name": "Fireball", "cost": 3, "description": "Area damage" }]
+  "skills": [{ "name": "Fireball", "cost": 3, "description": "Area damage" }],
+  "sheet_template": { "v": 1, "id": "builtin-romance", "name": "Romance / Slice of Life", "..." : "..." },
+  "sheet_custom": {
+    "stats": { "charm": 14, "wit": 12 },
+    "resources": { "stress": { "current": 2, "max": 10 } },
+    "fields": { "crush": "Childhood friend" },
+    "equipment": { "outfit": "School Uniform" }
+  }
 }
 ```
 
@@ -174,11 +186,11 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 │  │     • Triggered lorebook entries                        │  │
 │  │     • Last 4 turns as conversation history              │  │
 │  │  7. generateDmNarrative() calls Gemini                  │  │
-│  │     • Full party stats + damage benchmarks              │  │
+│  │     • Full party stats + template fields + benchmarks   │  │
 │  │     • Per-character defense mitigation                  │  │
 │  │  8. extractPartyStateUpdates() auto-applies:            │  │
 │  │     • HP/SP changes parsed from narrative               │  │
-│  │     • Condition mapping (Thai → English)                │  │
+│  │     • Condition mapping (Template & Thai → English)     │  │
 │  │     • Bloodied/Unconscious thresholds                   │  │
 │  │  9. New turn persisted, ready states reset → step 3     │  │
 │  └─────────────────────────────────────────────────────────┘  │
@@ -223,14 +235,16 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │       ├── TablePlayground.tsx         # Realtime sync coordinator, clock offset & turn lifecycle
     │   │       ├── NarrativeFeedPanel.tsx      # Rich-formatted turn chronicle, player colors, action input & DiceRoller
     │   │       ├── SaoCharacterOrb.tsx         # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
-    │   │       ├── CharacterInspectorPanel.tsx # Expandable SAO character window, combat sheet editor & sheet switcher
+    │   │       ├── CharacterInspectorPanel.tsx # Expandable SAO character window, template-aware combat editor & switcher
     │   │       ├── PartyRosterSidebar.tsx      # Floating top-right in-game HUD (transparent BG) for party status & campaign lore
     │   │       └── PartyChatWidget.tsx         # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
     │   ├── character/                    # Character Codex & Shared Character Domain
-    │   │   ├── domain.ts                 # Shared stat/skill/equipment constants, sanitizers & clamping helpers
+    │   │   ├── domain.ts                 # Shared stat/skill/equipment/inventory constants, sanitizers & HP color helpers
+    │   │   ├── template.ts               # Built-in presets (Classic, Romance, Horror), template sanitizers & CST1./CST0. key codec
     │   │   ├── actions.ts                # Create, update & delete character sheets
     │   │   └── components/
-    │   │       └── CharacterEditor.tsx   # Sheet form (HP, Skill Cost, 6 Stats, 6 Equipment Slots, Structured Inventory & Skills)
+    │   │       ├── CharacterEditor.tsx   # Template-driven sheet editor (resources, stats, bio fields, equipment, inventory & skills)
+    │   │       └── TemplateModal.tsx     # Visual template customizer, CST1. share key exporter & key/JSON importer
     │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
     │   │   ├── actions.ts                # Create & update campaigns and lorebook entries
     │   │   └── components/
@@ -279,6 +293,6 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 | `/campaigns/new` | ✓ | Create new campaign with lorebook |
 | `/campaigns/[id]` | ✓ | Campaign detail view |
 | `/campaigns/[id]/edit` | ✓ | Edit campaign (owner only) |
-| `/characters` | ✓ | Character Codex — full sheet editor workspace |
+| `/characters` | ✓ | Character Codex — full template-driven sheet editor workspace |
 | `/table/[id]` | ✓ | Synchronized Multiplayer Table (supports UUID or 6-char table_code) |
 | `/board` | ✓ | Solo 3D Tactical Battle Board _(not in active dev)_ |

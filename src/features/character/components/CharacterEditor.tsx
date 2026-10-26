@@ -4,13 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveCharacter, deleteCharacter, CharacterFormData } from '../actions'
 import {
-  ABILITY_SCORE_KEYS,
   EMPTY_EQUIPMENT,
   clampHpValues,
   clampSkillCostValues,
   extractCharacterInventory,
   extractCharacterSkillCost,
   extractCharacterSkills,
+  getHpTailwindClass,
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
   sanitizeInventoryItems,
@@ -19,12 +19,15 @@ import {
 import {
   BUILTIN_TEMPLATES,
   CLASSIC_TEMPLATE,
+  COLUMN_EQUIPMENT_SLOT_INDEX,
+  COLUMN_RESOURCE_IDS,
+  clampStatValue,
   isBuiltinTemplateId,
-  readCharacterTemplate,
-  readCustomValues,
   isColumnStatId,
   isColumnTextFieldId,
-  COLUMN_EQUIPMENT_SLOT_INDEX,
+  readCharacterTemplate,
+  readCustomValues,
+  templateStatsPayload,
   type CharacterTemplate,
   type SheetCustomValues,
   type ResourceColor,
@@ -180,20 +183,34 @@ export default function CharacterEditor({
 
     // Initialize missing custom resources with defaultMax
     for (const res of nextTemplate.resources) {
-      if (res.id !== 'hp' && res.id !== 'skill_cost') {
+      if (!COLUMN_RESOURCE_IDS.some((columnId) => columnId === res.id)) {
         if (!nextCustom.resources[res.id]) {
           nextCustom.resources[res.id] = { current: res.defaultMax, max: res.defaultMax }
         }
       }
     }
 
-    // Initialize missing custom stats with default
+    // Initialize missing stats with default
+    const nextCharStats = { ...selectedChar.stats }
     for (const st of nextTemplate.stats) {
-      if (!isColumnStatId(st.id) && nextCustom.stats[st.id] === undefined) {
+      if (isColumnStatId(st.id)) {
+        if (nextCharStats[st.id] === undefined) {
+          nextCharStats[st.id] = st.default
+        }
+      } else if (nextCustom.stats[st.id] === undefined) {
         nextCustom.stats[st.id] = st.default
       }
     }
 
+    const nextCondition = nextTemplate.conditions.includes(selectedChar.status_condition)
+      ? selectedChar.status_condition
+      : nextTemplate.conditions[0] || 'Normal'
+
+    setSelectedChar({
+      ...selectedChar,
+      stats: nextCharStats,
+      status_condition: nextCondition,
+    })
     setCustomValues(nextCustom)
   }
 
@@ -219,9 +236,7 @@ export default function CharacterEditor({
 
     const num = Number(rawValue)
     if (!Number.isNaN(num)) {
-      let finalVal = num
-      if (statDef?.min !== null && statDef?.min !== undefined) finalVal = Math.max(statDef.min, finalVal)
-      if (statDef?.max !== null && statDef?.max !== undefined) finalVal = Math.min(statDef.max, finalVal)
+      const finalVal = statDef ? clampStatValue(statDef, num) : num
 
       if (isColumnStatId(statId)) {
         setSelectedChar({
@@ -253,12 +268,13 @@ export default function CharacterEditor({
     }
   }
 
-  // Handle equipment slot change
-  const handleEquipmentChange = (slotId: string, idx: number, val: string) => {
+  // Handle equipment slot change (maps standard 6 slots via COLUMN_EQUIPMENT_SLOT_INDEX, custom slots via customValues.equipment)
+  const handleEquipmentChange = (slotId: string, val: string) => {
     if (!selectedChar) return
-    if (idx < 6) {
+    const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slotId]
+    if (colIdx !== undefined) {
       const nextEq = [...(selectedChar.equipment ?? EMPTY_EQUIPMENT)] as CharacterFormData['equipment']
-      nextEq[idx] = val
+      nextEq[colIdx] = val
       setSelectedChar({ ...selectedChar, equipment: nextEq })
     } else {
       setCustomValues({
@@ -274,8 +290,10 @@ export default function CharacterEditor({
     key: 'current' | 'max',
     val: number
   ) => {
-    const existing = customValues.resources[resId] || { current: 10, max: 10 }
-    let nextMax = key === 'max' ? Math.max(0, val) : existing.max
+    const resDef = activeTemplate.resources.find((r) => r.id === resId)
+    const defaultMax = resDef?.defaultMax ?? 10
+    const existing = customValues.resources[resId] || { current: defaultMax, max: defaultMax }
+    const nextMax = key === 'max' ? Math.max(0, val) : existing.max
     let nextCurrent = key === 'current' ? Math.max(0, val) : existing.current
     if (nextCurrent > nextMax) nextCurrent = nextMax
 
@@ -390,8 +408,7 @@ export default function CharacterEditor({
         stats: {
           ...sanitizedStats,
           ...customValues.stats,
-          sheet_template: activeTemplate,
-          sheet_custom: customValues,
+          ...templateStatsPayload(activeTemplate, customValues),
         },
         skills: sanitizedSkills,
         inventory: sanitizedInventory,
@@ -431,7 +448,10 @@ export default function CharacterEditor({
             const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(char)
             const tpl = readCharacterTemplate(char)
             const hpResource = tpl.resources.find((r) => r.id === 'hp')
+            const spResource = tpl.resources.find((r) => r.id === 'skill_cost')
             const hpLabel = hpResource?.label || 'HP'
+            const spLabel = spResource?.label || 'Skill Cost'
+            const hpColors = getHpTailwindClass(char.current_hp, char.max_hp)
 
             return (
               <div
@@ -477,7 +497,10 @@ export default function CharacterEditor({
                   )}
                 </div>
                 <p className="text-xs text-zinc-400 mt-2 truncate">
-                  {hpLabel}: {char.current_hp}/{char.max_hp} | Skill Cost: {currentSkillCost}/{maxSkillCost} | Status: {char.status_condition}
+                  <span className={hpColors.text}>
+                    {hpLabel}: {char.current_hp}/{char.max_hp}
+                  </span>{' '}
+                  | {spLabel}: {currentSkillCost}/{maxSkillCost} | Status: {char.status_condition}
                 </p>
               </div>
             )
@@ -832,11 +855,12 @@ export default function CharacterEditor({
                   Equipment Slots ({activeTemplate.equipmentSlots.length})
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {activeTemplate.equipmentSlots.map((slot, idx) => {
-                    const isCol = idx < 6
-                    const val = isCol
-                      ? (selectedChar.equipment ?? EMPTY_EQUIPMENT)[idx] || ''
-                      : customValues.equipment[slot.id] || ''
+                  {activeTemplate.equipmentSlots.map((slot) => {
+                    const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slot.id]
+                    const val =
+                      colIdx !== undefined
+                        ? (selectedChar.equipment ?? EMPTY_EQUIPMENT)[colIdx] || ''
+                        : customValues.equipment[slot.id] || ''
 
                     return (
                       <div key={slot.id}>
@@ -847,7 +871,7 @@ export default function CharacterEditor({
                           type="text"
                           placeholder={`${slot.label} slot...`}
                           value={val}
-                          onChange={(e) => handleEquipmentChange(slot.id, idx, e.target.value)}
+                          onChange={(e) => handleEquipmentChange(slot.id, e.target.value)}
                           className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
                         />
                       </div>

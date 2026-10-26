@@ -12,7 +12,6 @@ import {
   Trash2,
   Sparkles,
   Heart,
-  Package,
   Shield,
   FileText,
   AlertCircle,
@@ -79,19 +78,27 @@ export default function TemplateModal({
 
   // Sync workingTemplate when modal opens
   React.useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return
+
+    let cancelled = false
+    Promise.resolve().then(() => {
+      if (cancelled) return
       setWorkingTemplate(JSON.parse(JSON.stringify(currentTemplate)))
       setImportInput('')
       setImportError(null)
       setPreviewTemplate(null)
       setCopied(false)
+    })
+
+    return () => {
+      cancelled = true
     }
   }, [isOpen, currentTemplate])
 
   // Generate export key on tab switch
   React.useEffect(() => {
     if (tab === 'export') {
-      setIsExporting(true)
+      Promise.resolve().then(() => setIsExporting(true))
       encodeTemplateKey(workingTemplate)
         .then((key) => {
           setExportKey(key)

@@ -2,7 +2,13 @@
 
 import { useId } from 'react'
 import { Minus, Plus } from 'lucide-react'
-import { ABILITY_SCORE_KEYS } from '@/features/character/domain'
+import { getHpColorHex } from '@/features/character/domain'
+import {
+  CLASSIC_TEMPLATE,
+  isColumnStatId,
+  readCharacterTemplate,
+  readCustomValues,
+} from '@/features/character/template'
 import type { Character } from '../types'
 
 export const SAO_ORB_SCALE_STORAGE_KEY = 'dnd_sao_orb_scale'
@@ -124,10 +130,7 @@ function describeCounterClockwiseArc(
 }
 
 export function getSaoHpStroke(ratio: number): string {
-  if (ratio >= 0.75) return '#4ade80' // Green (>= 75%)
-  if (ratio >= 0.50) return '#facc15' // Yellow (50% - 74.99%)
-  if (ratio >= 0.30) return '#f97316' // Orange (30% - 49.99%)
-  return '#ef4444' // Red (< 30% Bloodied / Critical)
+  return getHpColorHex(ratio)
 }
 
 export type SaoDualSemicircleDialProps = {
@@ -169,6 +172,22 @@ export function SaoDualSemicircleDial({
   const hpColor = activeChar ? getSaoHpStroke(hpRatio) : '#52525b'
   const spColor = activeChar ? '#38bdf8' : '#52525b'
 
+  const activeTemplate = activeChar ? readCharacterTemplate(activeChar) : CLASSIC_TEMPLATE
+  const customValues = activeChar ? readCustomValues(activeChar) : { stats: {}, resources: {}, fields: {}, equipment: {} }
+  const hpRes = activeTemplate.resources.find((r) => r.id === 'hp')
+  const spRes = activeTemplate.resources.find((r) => r.id === 'skill_cost')
+  const hpArcLabel = (hpRes?.label || 'HP').toUpperCase().slice(0, 10)
+  const spArcLabel = (
+    spRes?.id === 'skill_cost' && spRes.label === 'Skill Cost' ? 'SKILL PT' : spRes?.label || 'SKILL PT'
+  )
+    .toUpperCase()
+    .slice(0, 10)
+
+  const dialStats =
+    activeTemplate.stats.length > 0 ? activeTemplate.stats.slice(0, 6) : CLASSIC_TEMPLATE.stats.slice(0, 6)
+  const sectorCount = Math.max(1, dialStats.length)
+  const sectorSpanDeg = 174 / sectorCount
+
   // Upper Semicircle gauge arcs (r = 84):
   // Left upper quadrant (HP): 184° -> 266° (82° sweep rising from left horizon to top clockwise)
   const hpTrackPath = describeClockwiseArc(cx, cy, 84, 184, 266)
@@ -184,12 +203,14 @@ export function SaoDualSemicircleDial({
   const spLabelArcPath = describeClockwiseArc(cx, cy, 65, 274, 356)
   const spValueArcPath = describeClockwiseArc(cx, cy, 48, 274, 356)
 
-  // Lower Semicircle outer frame: 3° -> 177° (174° sweep along bottom for the 6 Stats)
+  // Lower Semicircle outer frame: 3° -> 177° (174° sweep along bottom for the Stats)
   const lowerOuterArc = describeClockwiseArc(cx, cy, 89, 3, 177)
   const lowerInnerArc = describeClockwiseArc(cx, cy, 40, 4, 176)
 
-  // 5 internal divider angles splitting 177°..3° into 6 equal 29° sectors
-  const statDividerAngles = [148, 119, 90, 61, 32]
+  // Internal divider angles splitting 177°..3° into equal sectors
+  const statDividerAngles = Array.from({ length: Math.max(0, sectorCount - 1) }, (_, idx) =>
+    177 - (idx + 1) * sectorSpanDeg
+  )
 
   const shortName = activeChar?.name
     ? activeChar.name.length > 10
@@ -334,7 +355,7 @@ export function SaoDualSemicircleDial({
         textAnchor="middle"
       >
         <textPath href={`#${hpLabelPathId}`} startOffset="50%">
-          HP
+          {hpArcLabel}
         </textPath>
       </text>
       <text
@@ -360,7 +381,7 @@ export function SaoDualSemicircleDial({
         textAnchor="middle"
       >
         <textPath href={`#${spLabelPathId}`} startOffset="50%">
-          SKILL PT
+          {spArcLabel}
         </textPath>
       </text>
       <text
@@ -394,14 +415,14 @@ export function SaoDualSemicircleDial({
         strokeWidth="2"
       />
 
-      {/* ================= LOWER SEMICIRCLE: { Stat ทั้ง 6 } ================= */}
+      {/* ================= LOWER SEMICIRCLE: { Stats } ================= */}
       {/* Alternating subtle sector backgrounds for crisp visual separation */}
-      {ABILITY_SCORE_KEYS.map((statKey, idx) => {
-        const endDeg = 177 - idx * 29
-        const startDeg = endDeg - 29
+      {dialStats.map((stat, idx) => {
+        const endDeg = 177 - idx * sectorSpanDeg
+        const startDeg = endDeg - sectorSpanDeg
         return (
           <path
-            key={`wedge-${statKey}`}
+            key={`wedge-${stat.id}`}
             d={describeSectorWedge(cx, cy, 40, 89, startDeg, endDeg)}
             fill={idx % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(245,158,11,0.045)'}
           />
@@ -421,7 +442,7 @@ export function SaoDualSemicircleDial({
         strokeWidth="1.2"
       />
 
-      {/* Radial dividers for the 6 stats */}
+      {/* Radial dividers for the stats */}
       {statDividerAngles.map((deg) => {
         const innerPt = polarToCartesian(cx, cy, 40, deg)
         const outerPt = polarToCartesian(cx, cy, 89, deg)
@@ -438,15 +459,22 @@ export function SaoDualSemicircleDial({
         )
       })}
 
-      {/* 6 Ability Scores arranged left-to-right across the Lower Semicircle */}
-      {ABILITY_SCORE_KEYS.map((statKey, idx) => {
-        const centerDeg = 177 - (idx * 29 + 14.5)
+      {/* Stats arranged left-to-right across the Lower Semicircle */}
+      {dialStats.map((stat, idx) => {
+        const centerDeg = 177 - (idx * sectorSpanDeg + sectorSpanDeg / 2)
         const labelPos = polarToCartesian(cx, cy, 55, centerDeg)
         const valPos = polarToCartesian(cx, cy, 74.5, centerDeg)
-        const rawScore = activeChar ? (activeChar.stats?.[statKey] ?? 10) : '--'
+        const rawScore = activeChar
+          ? isColumnStatId(stat.id)
+            ? (activeChar.stats?.[stat.id] ?? stat.default)
+            : (customValues.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
+          : '--'
+        const shortStatLabel = isColumnStatId(stat.id)
+          ? stat.id
+          : (stat.label || stat.id).toUpperCase().slice(0, 4)
 
         return (
-          <g key={statKey}>
+          <g key={stat.id}>
             <text
               x={labelPos.x}
               y={labelPos.y + 3}
@@ -456,7 +484,7 @@ export function SaoDualSemicircleDial({
               fontFamily="monospace"
               fontWeight="800"
             >
-              {statKey}
+              {shortStatLabel}
             </text>
             <text
               x={valPos.x}

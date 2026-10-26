@@ -27,6 +27,12 @@ import {
   extractCharacterInventory,
   sanitizeInventoryItems,
 } from '@/features/character/domain'
+import {
+  isColumnStatId,
+  readCharacterTemplate,
+  readCustomValues,
+  templateStatsPayload,
+} from '@/features/character/template'
 import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
 import { playDiceRollSound, playSystemSound } from '@/lib/sound'
@@ -165,20 +171,36 @@ export default function TablePlayground({
   const draftLocked =
     Boolean(activeMember?.is_ready) || table.turn_phase === 'countdown' || turnResolving
 
-  // Let the player roll as their own character, with that sheet's ability bonuses
+  // Let the player roll as their own character, with that sheet's ability bonuses (supporting custom templates)
   const diceActors: DiceActor[] = activeChar
-    ? [
-        {
-          id: activeChar.id,
-          name: activeChar.name,
-          modifiers: Object.fromEntries(
-            ABILITY_SCORE_KEYS.map((key) => [
-              key,
-              abilityModifier(activeChar.stats?.[key]),
-            ])
-          ),
-        },
-      ]
+    ? (() => {
+        const tpl = readCharacterTemplate(activeChar)
+        const custom = readCustomValues(activeChar)
+        const modifiers =
+          tpl.stats.length > 0
+            ? Object.fromEntries(
+                tpl.stats.map((stat) => {
+                  const raw = isColumnStatId(stat.id)
+                    ? (activeChar.stats?.[stat.id] ?? stat.default)
+                    : (custom.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
+                  const bonusKey = isColumnStatId(stat.id) ? stat.id : stat.label || stat.id
+                  return [bonusKey, abilityModifier(raw)]
+                })
+              )
+            : Object.fromEntries(
+                ABILITY_SCORE_KEYS.map((key) => [
+                  key,
+                  abilityModifier(activeChar.stats?.[key]),
+                ])
+              )
+        return [
+          {
+            id: activeChar.id,
+            name: activeChar.name,
+            modifiers,
+          },
+        ]
+      })()
     : []
 
   // Write the roll into the draft so the Dungeon Master reads the number when the turn resolves
@@ -195,6 +217,8 @@ export default function TablePlayground({
   const handleOpenEdit = () => {
     if (activeChar) {
       const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(activeChar)
+      const tpl = readCharacterTemplate(activeChar)
+      const custom = readCustomValues(activeChar)
       setCharForm({
         current_hp: activeChar.current_hp ?? 10,
         max_hp: activeChar.max_hp ?? 10,
@@ -204,8 +228,13 @@ export default function TablePlayground({
         status_condition: activeChar.status_condition || 'Normal',
         inventory: extractCharacterInventory(activeChar),
         equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)],
-        stats: sanitizeAbilityScores(activeChar.stats, 0),
+        stats: {
+          ...sanitizeAbilityScores(activeChar.stats, 0),
+          ...custom.stats,
+        },
         skills: extractCharacterSkills(activeChar),
+        sheet_template: tpl,
+        sheet_custom: custom,
       })
     }
     setIsEditingChar(true)
@@ -582,6 +611,22 @@ export default function TablePlayground({
     if (!activeChar) return
     setIsSavingChar(true)
     try {
+      const tpl = charForm.sheet_template ?? readCharacterTemplate(activeChar)
+      const baseCustom = charForm.sheet_custom ?? readCustomValues(activeChar)
+      const nextCustomStats = { ...baseCustom.stats }
+      for (const stat of tpl.stats) {
+        if (!isColumnStatId(stat.id)) {
+          const raw = charForm.stats[stat.id] ?? baseCustom.stats[stat.id] ?? stat.default
+          const num = Number(raw)
+          nextCustomStats[stat.id] = Number.isFinite(num) ? num : stat.default
+        }
+      }
+      const nextCustom = {
+        ...baseCustom,
+        stats: nextCustomStats,
+      }
+      const tplPayload = templateStatsPayload(tpl, nextCustom)
+
       const sanitizedStats = sanitizeAbilityScores(charForm.stats, 0)
       const sanitizedSkills = sanitizeCharacterSkills(charForm.skills)
       const sanitizedInventory = sanitizeInventoryItems(charForm.inventory)
@@ -600,11 +645,15 @@ export default function TablePlayground({
         inventory: sanitizedInventory,
         stats: {
           ...sanitizedStats,
+          ...nextCustomStats,
           current_skill_cost: currentSkillCost,
           max_skill_cost: maxSkillCost,
           skills: sanitizedSkills,
+          ...tplPayload,
         },
         skills: sanitizedSkills,
+        sheet_template: tpl,
+        sheet_custom: nextCustom,
       }
 
       await updateCharacterCombatState(table.id, activeChar.id, formToSave)

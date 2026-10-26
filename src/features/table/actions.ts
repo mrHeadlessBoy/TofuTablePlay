@@ -14,6 +14,13 @@ import {
   type CharacterInventoryItem,
   type CharacterSkill,
 } from '@/features/character/domain'
+import {
+  readCharacterTemplate,
+  readCustomValues,
+  templateStatsPayload,
+  type CharacterTemplate,
+  type SheetCustomValues,
+} from '@/features/character/template'
 import { COUNTDOWN_MS, type TablePhase } from './countdown'
 
 async function assertHeadTable(supabase: SessionClient, tableId: string, userId: string, errorMessage: string) {
@@ -423,6 +430,8 @@ export async function resolveTurn(tableId: string) {
           weaknesses: character?.weaknesses || '',
           backstory: character?.backstory || '',
           skills: extractCharacterSkills(character),
+          sheetTemplate: readCharacterTemplate(character),
+          sheetCustom: readCustomValues(character),
           action,
         },
       ]
@@ -580,11 +589,21 @@ export async function updateCharacterCombatState(
     equipment?: string[]
     stats?: Record<string, unknown>
     skills?: CharacterSkill[]
+    sheet_template?: CharacterTemplate
+    sheet_custom?: SheetCustomValues
   }
 ) {
   const { supabase, user } = await requireAuthenticatedUser()
 
-  const { skills, stats, current_skill_cost, max_skill_cost, ...restUpdates } = updates
+  const {
+    skills,
+    stats,
+    current_skill_cost,
+    max_skill_cost,
+    sheet_template,
+    sheet_custom,
+    ...restUpdates
+  } = updates
   const payloadUpdates: Record<string, unknown> = { ...restUpdates }
 
   if (updates.inventory !== undefined) {
@@ -595,7 +614,9 @@ export async function updateCharacterCombatState(
     stats !== undefined ||
     skills !== undefined ||
     current_skill_cost !== undefined ||
-    max_skill_cost !== undefined
+    max_skill_cost !== undefined ||
+    sheet_template !== undefined ||
+    sheet_custom !== undefined
   ) {
     const normalizedScores = sanitizeAbilityScores(stats, 0)
     const sanitizedSkills =
@@ -603,12 +624,21 @@ export async function updateCharacterCombatState(
         ? sanitizeCharacterSkills(skills)
         : extractCharacterSkills({ stats })
     const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(updates)
+    const resolvedTemplate =
+      sheet_template ?? (stats?.sheet_template as CharacterTemplate | undefined)
+    const resolvedCustom =
+      sheet_custom ?? (stats?.sheet_custom as SheetCustomValues | undefined)
+    const tplPayload = templateStatsPayload(resolvedTemplate, resolvedCustom)
+
     payloadUpdates.armor_class = currentSkillCost
     payloadUpdates.stats = {
+      ...(stats || {}),
       ...normalizedScores,
+      ...(tplPayload.sheet_custom?.stats || {}),
       current_skill_cost: currentSkillCost,
       max_skill_cost: maxSkillCost,
       skills: sanitizedSkills,
+      ...tplPayload,
     }
   }
 

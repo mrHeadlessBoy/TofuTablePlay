@@ -20,15 +20,23 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  ABILITY_SCORE_KEYS,
-  CHARACTER_CONDITIONS,
   EMPTY_EQUIPMENT,
-  EQUIPMENT_LABELS,
   extractCharacterSkillCost,
   extractCharacterSkills,
   extractCharacterInventory,
+  getHpTailwindClass,
   type CharacterInventoryItem,
 } from "@/features/character/domain";
+import {
+  COLUMN_EQUIPMENT_SLOT_INDEX,
+  COLUMN_RESOURCE_IDS,
+  clampStatValue,
+  isColumnStatId,
+  isColumnTextFieldId,
+  readCharacterTemplate,
+  readCustomValues,
+  type ResourceColor,
+} from "@/features/character/template";
 import { abilityModifier, formatModifier } from "@/components/dice/dice";
 import SaoCharacterOrb, {
   DEFAULT_ORB_SCALE_PERCENT,
@@ -41,6 +49,20 @@ import SaoCharacterOrb, {
   playSaoChime,
 } from "./SaoCharacterOrb";
 import type { Character, CharacterCombatFormState } from "../types";
+
+const CUSTOM_RESOURCE_BAR_COLOR: Record<
+  ResourceColor,
+  { text: string; bg: string }
+> = {
+  red: { text: "text-red-400", bg: "bg-red-500" },
+  amber: { text: "text-amber-400", bg: "bg-amber-400" },
+  cyan: { text: "text-cyan-400", bg: "bg-cyan-400" },
+  emerald: { text: "text-emerald-400", bg: "bg-emerald-400" },
+  violet: { text: "text-violet-400", bg: "bg-violet-500" },
+  rose: { text: "text-rose-400", bg: "bg-rose-500" },
+  sky: { text: "text-sky-400", bg: "bg-sky-400" },
+  zinc: { text: "text-zinc-400", bg: "bg-zinc-400" },
+};
 
 type CharacterInspectorPanelProps = {
   activeChar: Character | null | undefined;
@@ -103,6 +125,23 @@ export default function CharacterInspectorPanel({
       height: typeof window !== "undefined" ? window.innerHeight : 900,
     }),
   );
+
+  const activeTemplate = readCharacterTemplate(activeChar);
+  const activeCustom = readCustomValues(activeChar);
+  const formCustom = charForm.sheet_custom ?? activeCustom;
+
+  const hpResourceDef = activeTemplate.resources.find((r) => r.id === "hp");
+  const spResourceDef = activeTemplate.resources.find(
+    (r) => r.id === "skill_cost",
+  );
+  const customResourceDefs = activeTemplate.resources.filter(
+    (r) => !(COLUMN_RESOURCE_IDS as readonly string[]).includes(r.id),
+  );
+  const hpLabel = hpResourceDef?.label || "HP";
+  const spLabel =
+    spResourceDef?.id === "skill_cost" && spResourceDef.label === "Skill Cost"
+      ? "SKILL PT"
+      : spResourceDef?.label || "SKILL PT";
 
   const activeSkills = extractCharacterSkills(activeChar);
   const activeInventory = extractCharacterInventory(activeChar);
@@ -203,6 +242,7 @@ export default function CharacterInspectorPanel({
   const hpPercent = activeChar
     ? Math.max(0, Math.min(100, Math.round((curHp / maxHp) * 100)))
     : 0;
+  const hpColors = getHpTailwindClass(curHp, maxHp);
   const spPercent =
     activeChar && maxSkillCost > 0
       ? Math.max(
@@ -231,6 +271,19 @@ export default function CharacterInspectorPanel({
         bottom: `${mobileBottomPx}px`,
         maxHeight: `calc(100vh - ${mobileBottomPx + 56}px)`,
       };
+
+  // Helper to read text fields (both column fields and custom fields) on activeChar
+  const populatedTextFields = activeChar
+    ? activeTemplate.textFields
+        .map((field) => {
+          const charMap = activeChar as unknown as Record<string, unknown>;
+          const value = isColumnTextFieldId(field.id)
+            ? String(charMap[field.id] || "").trim()
+            : String(activeCustom.fields[field.id] || "").trim();
+          return { field, value };
+        })
+        .filter((entry) => entry.value.length > 0)
+    : [];
 
   return (
     <>
@@ -404,7 +457,7 @@ export default function CharacterInspectorPanel({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Current HP
+                      Current {hpLabel}
                     </label>
                     <input
                       type="number"
@@ -424,7 +477,7 @@ export default function CharacterInspectorPanel({
                   </div>
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Max HP
+                      Max {hpLabel}
                     </label>
                     <input
                       type="number"
@@ -447,7 +500,7 @@ export default function CharacterInspectorPanel({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Current Skill Cost
+                      Current {spResourceDef?.label || "Skill Cost"}
                     </label>
                     <input
                       type="number"
@@ -470,7 +523,7 @@ export default function CharacterInspectorPanel({
                   </div>
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Max Skill Cost
+                      Max {spResourceDef?.label || "Skill Cost"}
                     </label>
                     <input
                       type="number"
@@ -497,6 +550,83 @@ export default function CharacterInspectorPanel({
                   </div>
                 </div>
 
+                {/* Custom Template Resource Bars Editor (Stress, Luck, etc.) */}
+                {customResourceDefs.map((res) => {
+                  const existing = formCustom.resources[res.id] || {
+                    current: res.defaultMax,
+                    max: res.defaultMax,
+                  };
+                  return (
+                    <div key={res.id} className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                          Current {res.label}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={existing.max}
+                          value={existing.current}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const nextCurrent = Number.isNaN(val)
+                              ? 0
+                              : Math.max(0, Math.min(existing.max, val));
+                            onChangeCharForm({
+                              ...charForm,
+                              sheet_custom: {
+                                ...formCustom,
+                                resources: {
+                                  ...formCustom.resources,
+                                  [res.id]: {
+                                    current: nextCurrent,
+                                    max: existing.max,
+                                  },
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                          Max {res.label}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={existing.max}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const nextMax = Number.isNaN(val)
+                              ? 0
+                              : Math.max(0, val);
+                            const nextCurrent = Math.min(
+                              nextMax,
+                              existing.current,
+                            );
+                            onChangeCharForm({
+                              ...charForm,
+                              sheet_custom: {
+                                ...formCustom,
+                                resources: {
+                                  ...formCustom.resources,
+                                  [res.id]: {
+                                    current: nextCurrent,
+                                    max: nextMax,
+                                  },
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
                 <div>
                   <label className="text-[10px] text-zinc-400 uppercase font-mono">
                     Condition
@@ -511,111 +641,200 @@ export default function CharacterInspectorPanel({
                     }
                     className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white mt-0.5 focus:border-amber-400 outline-none"
                   >
-                    {CHARACTER_CONDITIONS.map((c) => (
+                    {activeTemplate.conditions.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
                     ))}
+                    {charForm.status_condition &&
+                      !activeTemplate.conditions.includes(
+                        charForm.status_condition,
+                      ) && (
+                        <option value={charForm.status_condition}>
+                          {charForm.status_condition}
+                        </option>
+                      )}
                   </select>
                 </div>
 
-                {/* Stats Editor */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">
-                      Ability Scores
-                    </label>
-                    <span className="text-[9px] text-zinc-500 font-mono">
-                      Allows negative
-                    </span>
+                {/* Stats Editor (Dynamic Template Stats) */}
+                {activeTemplate.stats.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">
+                        Attributes & Stats
+                      </label>
+                      <span className="text-[9px] text-zinc-500 font-mono">
+                        Allows negative
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {activeTemplate.stats.map((stat) => {
+                        const isCol = isColumnStatId(stat.id);
+                        const currentVal = isCol
+                          ? (charForm.stats[stat.id] ?? stat.default)
+                          : (formCustom.stats[stat.id] ??
+                            charForm.stats[stat.id] ??
+                            stat.default);
+                        return (
+                          <div
+                            key={stat.id}
+                            className="bg-zinc-900 border border-zinc-800 rounded p-1 text-center"
+                          >
+                            <span
+                              className="text-[9px] text-zinc-500 uppercase block truncate"
+                              title={stat.label}
+                            >
+                              {stat.label}
+                            </span>
+                            <input
+                              type="number"
+                              min={stat.min ?? undefined}
+                              max={stat.max ?? undefined}
+                              value={currentVal}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === "" || raw === "-") {
+                                  onChangeCharForm({
+                                    ...charForm,
+                                    stats: {
+                                      ...charForm.stats,
+                                      [stat.id]: raw,
+                                    },
+                                  });
+                                  return;
+                                }
+                                const val = Number(raw);
+                                if (!Number.isNaN(val)) {
+                                  const clamped = clampStatValue(stat, val);
+                                  onChangeCharForm({
+                                    ...charForm,
+                                    stats: {
+                                      ...charForm.stats,
+                                      [stat.id]: clamped,
+                                    },
+                                    sheet_custom: isCol
+                                      ? formCustom
+                                      : {
+                                          ...formCustom,
+                                          stats: {
+                                            ...formCustom.stats,
+                                            [stat.id]: clamped,
+                                          },
+                                        },
+                                  });
+                                }
+                              }}
+                              className="w-full bg-transparent text-center font-bold text-xs text-white outline-none"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {ABILITY_SCORE_KEYS.map((stat) => (
-                      <div
-                        key={stat}
-                        className="bg-zinc-900 border border-zinc-800 rounded p-1 text-center"
-                      >
-                        <span className="text-[9px] text-zinc-500 uppercase block">
-                          {stat}
-                        </span>
-                        <input
-                          type="number"
-                          value={charForm.stats[stat] ?? 10}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (raw === "" || raw === "-") {
-                              onChangeCharForm({
-                                ...charForm,
-                                stats: { ...charForm.stats, [stat]: raw },
-                              });
-                              return;
-                            }
-                            const val = Number(raw);
-                            if (!Number.isNaN(val)) {
-                              onChangeCharForm({
-                                ...charForm,
-                                stats: { ...charForm.stats, [stat]: val },
-                              });
-                            }
-                          }}
-                          className="w-full bg-transparent text-center font-bold text-xs text-white outline-none"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
 
                 {/* Inventory Editor */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">
-                      Inventory
-                    </label>
-                    <span className="text-[9px] text-zinc-500 font-mono">
-                      {formInventoryItems.length} item(s)
-                    </span>
-                  </div>
+                {activeTemplate.sections.inventory && (
                   <div className="space-y-2">
-                    {formInventoryItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2 bg-zinc-900 border border-zinc-800 rounded space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-amber-500 font-mono uppercase">
-                            Item #{idx + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextItems = formInventoryItems.filter(
-                                (_, i) => i !== idx,
-                              );
-                              onChangeCharForm({
-                                ...charForm,
-                                inventory: nextItems,
-                              });
-                            }}
-                            title="Remove item"
-                            className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          <div className="col-span-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">
+                        Inventory
+                      </label>
+                      <span className="text-[9px] text-zinc-500 font-mono">
+                        {formInventoryItems.length} item(s)
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {formInventoryItems.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 bg-zinc-900 border border-zinc-800 rounded space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-amber-500 font-mono uppercase">
+                              Item #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextItems = formInventoryItems.filter(
+                                  (_, i) => i !== idx,
+                                );
+                                onChangeCharForm({
+                                  ...charForm,
+                                  inventory: nextItems,
+                                });
+                              }}
+                              title="Remove item"
+                              className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <div className="col-span-2">
+                              <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                                Item Name :
+                              </span>
+                              <input
+                                type="text"
+                                placeholder="Item name..."
+                                value={item.name}
+                                onChange={(e) => {
+                                  const nextItems = [...formInventoryItems];
+                                  nextItems[idx] = {
+                                    ...nextItems[idx],
+                                    name: e.target.value,
+                                  };
+                                  onChangeCharForm({
+                                    ...charForm,
+                                    inventory: nextItems,
+                                  });
+                                }}
+                                className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                                Qty :
+                              </span>
+                              <input
+                                type="number"
+                                min={1}
+                                placeholder="1"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  const nextItems = [...formInventoryItems];
+                                  nextItems[idx] = {
+                                    ...nextItems[idx],
+                                    quantity: Number.isNaN(val)
+                                      ? 1
+                                      : Math.max(1, val),
+                                  };
+                                  onChangeCharForm({
+                                    ...charForm,
+                                    inventory: nextItems,
+                                  });
+                                }}
+                                className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white text-center"
+                              />
+                            </div>
+                          </div>
+                          <div>
                             <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                              Item Name :
+                              Description :
                             </span>
                             <input
                               type="text"
-                              placeholder="Item name..."
-                              value={item.name}
+                              placeholder="Effect / description (optional)..."
+                              value={item.description || ""}
                               onChange={(e) => {
                                 const nextItems = [...formInventoryItems];
                                 nextItems[idx] = {
                                   ...nextItems[idx],
-                                  name: e.target.value,
+                                  description: e.target.value,
                                 };
                                 onChangeCharForm({
                                   ...charForm,
@@ -625,233 +844,215 @@ export default function CharacterInspectorPanel({
                               className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
                             />
                           </div>
-                          <div>
-                            <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                              Qty :
+                        </div>
+                      ))}
+                      {formInventoryItems.length === 0 && (
+                        <div className="p-3 bg-zinc-900/50 border border-dashed border-zinc-800 rounded text-center text-zinc-500 text-[11px]">
+                          No items in inventory
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeCharForm({
+                          ...charForm,
+                          inventory: [
+                            ...formInventoryItems,
+                            { name: "", quantity: 1, description: "" },
+                          ],
+                        })
+                      }
+                      className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" /> Add Item
+                    </button>
+                  </div>
+                )}
+
+                {/* Equipment Slots Editor */}
+                {activeTemplate.equipmentSlots.length > 0 && (
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-1">
+                      Equipment Slots
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {activeTemplate.equipmentSlots.map((slot) => {
+                        const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slot.id];
+                        const val =
+                          colIdx !== undefined
+                            ? (charForm.equipment ?? EMPTY_EQUIPMENT)[colIdx] ||
+                              ""
+                            : formCustom.equipment[slot.id] || "";
+                        return (
+                          <div key={slot.id}>
+                            <span className="text-[9px] text-zinc-500 uppercase block truncate">
+                              {slot.label}
                             </span>
                             <input
-                              type="number"
-                              min={1}
-                              placeholder="1"
-                              value={item.quantity}
+                              type="text"
+                              placeholder={`${slot.label}...`}
+                              value={val}
                               onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                const nextItems = [...formInventoryItems];
-                                nextItems[idx] = {
-                                  ...nextItems[idx],
-                                  quantity: Number.isNaN(val) ? 1 : Math.max(1, val),
+                                if (colIdx !== undefined) {
+                                  const next = [
+                                    ...(charForm.equipment ?? EMPTY_EQUIPMENT),
+                                  ];
+                                  next[colIdx] = e.target.value;
+                                  onChangeCharForm({
+                                    ...charForm,
+                                    equipment: next,
+                                  });
+                                } else {
+                                  onChangeCharForm({
+                                    ...charForm,
+                                    sheet_custom: {
+                                      ...formCustom,
+                                      equipment: {
+                                        ...formCustom.equipment,
+                                        [slot.id]: e.target.value,
+                                      },
+                                    },
+                                  });
+                                }
+                              }}
+                              className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[11px] text-white focus:border-amber-400 outline-none"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Skill Editor */}
+                {activeTemplate.sections.skills && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">
+                        Skill
+                      </label>
+                      <span className="text-[9px] text-zinc-500 font-mono">
+                        {(charForm.skills || []).length} slot(s)
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {(charForm.skills || []).map((skill, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 bg-zinc-900 border border-zinc-800 rounded space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-amber-500 font-mono uppercase">
+                              Skill #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextSkills = (
+                                  charForm.skills || []
+                                ).filter((_, i) => i !== idx);
+                                onChangeCharForm({
+                                  ...charForm,
+                                  skills: nextSkills,
+                                });
+                              }}
+                              title="Remove skill"
+                              className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                              Skill Name :
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="Skill name..."
+                              value={skill.name}
+                              onChange={(e) => {
+                                const nextSkills = [...(charForm.skills || [])];
+                                nextSkills[idx] = {
+                                  ...nextSkills[idx],
+                                  name: e.target.value,
                                 };
                                 onChangeCharForm({
                                   ...charForm,
-                                  inventory: nextItems,
+                                  skills: nextSkills,
                                 });
                               }}
-                              className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white text-center"
+                              className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                              Skill Cost :
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              placeholder="0"
+                              value={skill.cost ?? 0}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                const nextSkills = [...(charForm.skills || [])];
+                                nextSkills[idx] = {
+                                  ...nextSkills[idx],
+                                  cost: Number.isNaN(val)
+                                    ? 0
+                                    : Math.max(0, val),
+                                };
+                                onChangeCharForm({
+                                  ...charForm,
+                                  skills: nextSkills,
+                                });
+                              }}
+                              className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-400 uppercase font-mono block">
+                              Description :
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="Description..."
+                              value={skill.description}
+                              onChange={(e) => {
+                                const nextSkills = [...(charForm.skills || [])];
+                                nextSkills[idx] = {
+                                  ...nextSkills[idx],
+                                  description: e.target.value,
+                                };
+                                onChangeCharForm({
+                                  ...charForm,
+                                  skills: nextSkills,
+                                });
+                              }}
+                              className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
                             />
                           </div>
                         </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                            Description :
-                          </span>
-                          <input
-                            type="text"
-                            placeholder="Effect / description (optional)..."
-                            value={item.description || ""}
-                            onChange={(e) => {
-                              const nextItems = [...formInventoryItems];
-                              nextItems[idx] = {
-                                ...nextItems[idx],
-                                description: e.target.value,
-                              };
-                              onChangeCharForm({
-                                ...charForm,
-                                inventory: nextItems,
-                              });
-                            }}
-                            className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    {formInventoryItems.length === 0 && (
-                      <div className="p-3 bg-zinc-900/50 border border-dashed border-zinc-800 rounded text-center text-zinc-500 text-[11px]">
-                        No items in inventory
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeCharForm({
+                          ...charForm,
+                          skills: [
+                            ...(charForm.skills || []),
+                            { name: "", cost: 0, description: "" },
+                          ],
+                        })
+                      }
+                      className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" /> Add Skill
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChangeCharForm({
-                        ...charForm,
-                        inventory: [
-                          ...formInventoryItems,
-                          { name: "", quantity: 1, description: "" },
-                        ],
-                      })
-                    }
-                    className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" /> Add Item
-                  </button>
-                </div>
-
-                {/* Equipment Slots Editor */}
-                <div>
-                  <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-1">
-                    Equipment Slots
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {EQUIPMENT_LABELS.map((label, idx) => (
-                      <div key={label}>
-                        <span className="text-[9px] text-zinc-500 uppercase block">
-                          {label}
-                        </span>
-                        <input
-                          type="text"
-                          placeholder={`${label}...`}
-                          value={
-                            (charForm.equipment ?? EMPTY_EQUIPMENT)[idx] || ""
-                          }
-                          onChange={(e) => {
-                            const next = [
-                              ...(charForm.equipment ?? EMPTY_EQUIPMENT),
-                            ];
-                            next[idx] = e.target.value;
-                            onChangeCharForm({ ...charForm, equipment: next });
-                          }}
-                          className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[11px] text-white focus:border-amber-400 outline-none"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Skill Editor */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">
-                      Skill
-                    </label>
-                    <span className="text-[9px] text-zinc-500 font-mono">
-                      {(charForm.skills || []).length} slot(s)
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {(charForm.skills || []).map((skill, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2 bg-zinc-900 border border-zinc-800 rounded space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-amber-500 font-mono uppercase">
-                            Skill #{idx + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextSkills = (charForm.skills || []).filter(
-                                (_, i) => i !== idx,
-                              );
-                              onChangeCharForm({
-                                ...charForm,
-                                skills: nextSkills,
-                              });
-                            }}
-                            title="Remove skill"
-                            className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                            Skill Name :
-                          </span>
-                          <input
-                            type="text"
-                            placeholder="Skill name..."
-                            value={skill.name}
-                            onChange={(e) => {
-                              const nextSkills = [...(charForm.skills || [])];
-                              nextSkills[idx] = {
-                                ...nextSkills[idx],
-                                name: e.target.value,
-                              };
-                              onChangeCharForm({
-                                ...charForm,
-                                skills: nextSkills,
-                              });
-                            }}
-                            className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
-                          />
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                            Skill Cost :
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            placeholder="0"
-                            value={skill.cost ?? 0}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              const nextSkills = [...(charForm.skills || [])];
-                              nextSkills[idx] = {
-                                ...nextSkills[idx],
-                                cost: Number.isNaN(val) ? 0 : Math.max(0, val),
-                              };
-                              onChangeCharForm({
-                                ...charForm,
-                                skills: nextSkills,
-                              });
-                            }}
-                            className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
-                          />
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                            Description :
-                          </span>
-                          <input
-                            type="text"
-                            placeholder="Description..."
-                            value={skill.description}
-                            onChange={(e) => {
-                              const nextSkills = [...(charForm.skills || [])];
-                              nextSkills[idx] = {
-                                ...nextSkills[idx],
-                                description: e.target.value,
-                              };
-                              onChangeCharForm({
-                                ...charForm,
-                                skills: nextSkills,
-                              });
-                            }}
-                            className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded p-1 text-[11px] text-white"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChangeCharForm({
-                        ...charForm,
-                        skills: [
-                          ...(charForm.skills || []),
-                          { name: "", cost: 0, description: "" },
-                        ],
-                      })
-                    }
-                    className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" /> Add Skill
-                  </button>
-                </div>
+                )}
               </div>
             ) : (
               /* ================= SAO FULL CHARACTER SHEET VIEW ================= */
@@ -872,32 +1073,17 @@ export default function CharacterInspectorPanel({
                   <div className="w-full grid grid-cols-2 gap-3 mt-2 pt-2.5 border-t border-white/10">
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                        <span className="flex items-center gap-1 text-zinc-300">
-                          <Heart className={`w-3 h-3 ${
-                            hpPercent < 30
-                              ? "text-red-400"
-                              : hpPercent < 50
-                                ? "text-orange-400"
-                                : hpPercent < 75
-                                  ? "text-yellow-400"
-                                  : "text-emerald-400"
-                          }`} /> HP
+                        <span className="flex items-center gap-1 text-zinc-300 truncate">
+                          <Heart className={`w-3 h-3 shrink-0 ${hpColors.text}`} />{" "}
+                          {hpLabel}
                         </span>
-                        <span className="text-white font-bold">
+                        <span className="text-white font-bold shrink-0">
                           {activeChar.current_hp} / {activeChar.max_hp}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
                         <div
-                          className={`h-full transition-all duration-300 ${
-                            hpPercent < 30
-                              ? "bg-red-500"
-                              : hpPercent < 50
-                                ? "bg-orange-500"
-                                : hpPercent < 75
-                                  ? "bg-yellow-400"
-                                  : "bg-emerald-400"
-                          }`}
+                          className={`h-full transition-all duration-300 ${hpColors.bg}`}
                           style={{ width: `${hpPercent}%` }}
                         />
                       </div>
@@ -905,10 +1091,11 @@ export default function CharacterInspectorPanel({
 
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                        <span className="flex items-center gap-1 text-zinc-300">
-                          <Zap className="w-3 h-3 text-sky-400" /> SKILL PT
+                        <span className="flex items-center gap-1 text-zinc-300 truncate">
+                          <Zap className="w-3 h-3 text-sky-400 shrink-0" />{" "}
+                          {spLabel}
                         </span>
-                        <span className="text-sky-300 font-bold">
+                        <span className="text-sky-300 font-bold shrink-0">
                           {currentSkillCost} / {maxSkillCost}
                         </span>
                       </div>
@@ -920,6 +1107,51 @@ export default function CharacterInspectorPanel({
                       </div>
                     </div>
                   </div>
+
+                  {/* Custom Resource Bars (Stress, Luck, etc.) */}
+                  {customResourceDefs.length > 0 && (
+                    <div className="w-full grid grid-cols-2 gap-3 mt-2.5 pt-2 border-t border-white/10">
+                      {customResourceDefs.map((res) => {
+                        const val = activeCustom.resources[res.id] || {
+                          current: res.defaultMax,
+                          max: res.defaultMax,
+                        };
+                        const pct =
+                          val.max > 0
+                            ? Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  Math.round((val.current / val.max) * 100),
+                                ),
+                              )
+                            : 0;
+                        const colorTheme =
+                          CUSTOM_RESOURCE_BAR_COLOR[res.color] ||
+                          CUSTOM_RESOURCE_BAR_COLOR.zinc;
+                        return (
+                          <div key={res.id}>
+                            <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                              <span
+                                className={`truncate font-semibold ${colorTheme.text}`}
+                              >
+                                {res.label}
+                              </span>
+                              <span className="text-white font-bold shrink-0">
+                                {val.current} / {val.max}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${colorTheme.bg}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Full Details Section (ภายใต้ครึ่งวงกลม = ข้อมูลเต็ม) */}
@@ -941,178 +1173,180 @@ export default function CharacterInspectorPanel({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-6 gap-1.5">
-                    {ABILITY_SCORE_KEYS.map((key) => {
-                      const raw = activeChar.stats?.[key] ?? 10;
-                      const mod = abilityModifier(raw);
-                      return (
-                        <div
-                          key={key}
-                          className="bg-zinc-900/70 border border-white/10 rounded p-1.5 text-center"
-                        >
-                          <span className="text-[9px] text-zinc-400 block uppercase font-mono">
-                            {key}
-                          </span>
-                          <span className="font-bold text-white text-xs font-mono block">
-                            {String(raw)}
-                          </span>
-                          <span className="text-[9px] font-mono text-amber-400 block">
-                            {formatModifier(mod)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {activeTemplate.stats.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                      {activeTemplate.stats.map((stat) => {
+                        const isCol = isColumnStatId(stat.id);
+                        const raw = isCol
+                          ? (activeChar.stats?.[stat.id] ?? stat.default)
+                          : (activeCustom.stats[stat.id] ??
+                            activeChar.stats?.[stat.id] ??
+                            stat.default);
+                        const numericRaw =
+                          typeof raw === "number" || typeof raw === "string"
+                            ? raw
+                            : stat.default;
+                        const mod = abilityModifier(numericRaw);
+                        return (
+                          <div
+                            key={stat.id}
+                            className="bg-zinc-900/70 border border-white/10 rounded p-1.5 text-center"
+                          >
+                            <span
+                              className="text-[9px] text-zinc-400 block uppercase font-mono truncate"
+                              title={stat.label}
+                            >
+                              {stat.label}
+                            </span>
+                            <span className="font-bold text-white text-xs font-mono block">
+                              {String(raw)}
+                            </span>
+                            <span className="text-[9px] font-mono text-amber-400 block">
+                              {formatModifier(mod)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Equipment Slots */}
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 block mb-1.5">
-                    Equipment Slots
-                  </span>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {EQUIPMENT_LABELS.map((label, idx) => {
-                      const item = (activeChar.equipment ?? EMPTY_EQUIPMENT)[
-                        idx
-                      ];
-                      return (
-                        <div
-                          key={label}
-                          className="p-2 bg-zinc-900/70 border border-white/10 rounded text-[11px]"
-                        >
-                          <span className="text-[9px] text-zinc-500 uppercase font-mono block">
-                            {label}
-                          </span>
-                          <span className="text-zinc-200 wrap-break-words">
-                            {item || "—"}
-                          </span>
-                        </div>
-                      );
-                    })}
+                {activeTemplate.equipmentSlots.length > 0 && (
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 block mb-1.5">
+                      Equipment Slots
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {activeTemplate.equipmentSlots.map((slot) => {
+                        const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slot.id];
+                        const item =
+                          colIdx !== undefined
+                            ? (activeChar.equipment ?? EMPTY_EQUIPMENT)[colIdx]
+                            : activeCustom.equipment[slot.id];
+                        return (
+                          <div
+                            key={slot.id}
+                            className="p-2 bg-zinc-900/70 border border-white/10 rounded text-[11px]"
+                          >
+                            <span className="text-[9px] text-zinc-500 uppercase font-mono block">
+                              {slot.label}
+                            </span>
+                            <span className="text-zinc-200 wrap-break-words">
+                              {item || "—"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Skill Slots */}
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 flex items-center gap-1 mb-1.5">
-                    <Sparkles className="w-3 h-3" /> Skills (
-                    {activeSkills.length})
-                  </span>
-                  {activeSkills.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {activeSkills.map((skill, idx) => (
-                        <div
-                          key={idx}
-                          className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-[11px] space-y-1"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-amber-300 font-bold">
-                              {skill.name || "Unnamed Skill"}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded bg-sky-950/80 border border-sky-800/70 text-[10px] font-mono text-sky-300 shrink-0">
-                              Cost: {skill.cost ?? 0}
-                            </span>
+                {activeTemplate.sections.skills && (
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 flex items-center gap-1 mb-1.5">
+                      <Sparkles className="w-3 h-3" /> Skills (
+                      {activeSkills.length})
+                    </span>
+                    {activeSkills.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {activeSkills.map((skill, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-[11px] space-y-1"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-amber-300 font-bold">
+                                {skill.name || "Unnamed Skill"}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-sky-950/80 border border-sky-800/70 text-[10px] font-mono text-sky-300 shrink-0">
+                                Cost: {skill.cost ?? 0}
+                              </span>
+                            </div>
+                            {skill.description && (
+                              <p className="text-zinc-300 whitespace-pre-line leading-relaxed">
+                                {skill.description}
+                              </p>
+                            )}
                           </div>
-                          {skill.description && (
-                            <p className="text-zinc-300 whitespace-pre-line leading-relaxed">
-                              {skill.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-zinc-900/50 border border-white/10 rounded text-zinc-500 italic text-[11px]">
-                      No skills registered
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-zinc-900/50 border border-white/10 rounded text-zinc-500 italic text-[11px]">
+                        No skills registered
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Inventory */}
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 flex items-center gap-1.5 mb-1.5">
-                    <Package className="w-3 h-3" /> Inventory (
-                    {activeInventory.length})
-                  </span>
-                  {activeInventory.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {activeInventory.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-[11px] space-y-1"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-amber-300 font-bold">
-                              {item.name || "Unnamed Item"}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/70 text-[10px] font-mono text-amber-300 shrink-0">
-                              x{item.quantity}
-                            </span>
+                {activeTemplate.sections.inventory && (
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 flex items-center gap-1.5 mb-1.5">
+                      <Package className="w-3 h-3" /> Inventory (
+                      {activeInventory.length})
+                    </span>
+                    {activeInventory.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {activeInventory.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 bg-zinc-900/70 border border-white/10 rounded text-[11px] space-y-1"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-amber-300 font-bold">
+                                {item.name || "Unnamed Item"}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/70 text-[10px] font-mono text-amber-300 shrink-0">
+                                x{item.quantity}
+                              </span>
+                            </div>
+                            {item.description && (
+                              <p className="text-zinc-300 whitespace-pre-line leading-relaxed">
+                                {item.description}
+                              </p>
+                            )}
                           </div>
-                          {item.description && (
-                            <p className="text-zinc-300 whitespace-pre-line leading-relaxed">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-zinc-900/50 border border-white/10 rounded text-zinc-500 italic text-[11px]">
-                      Inventory is empty
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-zinc-900/50 border border-white/10 rounded text-zinc-500 italic text-[11px]">
+                        Inventory is empty
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Character Traits & Lore (Full Details when present) */}
-                {(activeChar.strengths ||
-                  activeChar.weaknesses ||
-                  activeChar.appearance ||
-                  activeChar.backstory) && (
+                {/* Character Traits & Lore (Dynamic Template Text Fields) */}
+                {populatedTextFields.length > 0 && (
                   <div className="space-y-2 pt-1 border-t border-white/10">
                     <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 block">
                       Character Profile
                     </span>
-                    {activeChar.strengths && (
-                      <div className="p-2 bg-zinc-900/60 border border-white/10 rounded text-[11px]">
-                        <span className="text-[9px] text-emerald-400 uppercase font-mono block">
-                          Strengths
-                        </span>
-                        <p className="text-zinc-300 whitespace-pre-line">
-                          {activeChar.strengths}
-                        </p>
-                      </div>
-                    )}
-                    {activeChar.weaknesses && (
-                      <div className="p-2 bg-zinc-900/60 border border-white/10 rounded text-[11px]">
-                        <span className="text-[9px] text-red-400 uppercase font-mono block">
-                          Weaknesses
-                        </span>
-                        <p className="text-zinc-300 whitespace-pre-line">
-                          {activeChar.weaknesses}
-                        </p>
-                      </div>
-                    )}
-                    {activeChar.appearance && (
-                      <div className="p-2 bg-zinc-900/60 border border-white/10 rounded text-[11px]">
-                        <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                          Appearance
-                        </span>
-                        <p className="text-zinc-300 whitespace-pre-line">
-                          {activeChar.appearance}
-                        </p>
-                      </div>
-                    )}
-                    {activeChar.backstory && (
-                      <div className="p-2 bg-zinc-900/60 border border-white/10 rounded text-[11px]">
-                        <span className="text-[9px] text-zinc-400 uppercase font-mono block">
-                          Backstory
-                        </span>
-                        <p className="text-zinc-300 whitespace-pre-line">
-                          {activeChar.backstory}
-                        </p>
-                      </div>
-                    )}
+                    {populatedTextFields.map(({ field, value }) => {
+                      const labelColor =
+                        field.id === "strengths"
+                          ? "text-emerald-400"
+                          : field.id === "weaknesses"
+                            ? "text-red-400"
+                            : "text-zinc-400";
+                      return (
+                        <div
+                          key={field.id}
+                          className="p-2 bg-zinc-900/60 border border-white/10 rounded text-[11px]"
+                        >
+                          <span
+                            className={`text-[9px] uppercase font-mono block ${labelColor}`}
+                          >
+                            {field.label}
+                          </span>
+                          <p className="text-zinc-300 whitespace-pre-line">
+                            {value}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

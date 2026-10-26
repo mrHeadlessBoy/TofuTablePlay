@@ -9,6 +9,14 @@ import {
   type AbilityScoreKey,
   type CharacterSkill,
 } from '@/features/character/domain'
+import {
+  COLUMN_EQUIPMENT_SLOT_INDEX,
+  COLUMN_RESOURCE_IDS,
+  isColumnStatId,
+  isColumnTextFieldId,
+  type CharacterTemplate,
+  type SheetCustomValues,
+} from '@/features/character/template'
 import { abilityModifier, formatModifier } from '@/components/dice/dice'
 
 const ai = new GoogleGenAI()
@@ -34,6 +42,8 @@ export interface PartyMemberAction {
   weaknesses?: string
   backstory?: string
   skills?: CharacterSkill[]
+  sheetTemplate?: CharacterTemplate
+  sheetCustom?: SheetCustomValues
   action: string | null
 }
 
@@ -170,27 +180,64 @@ function formatPartyMemberForPrompt(
   isFirstPlayerTurn: boolean,
   benchmark: PartyDamageBenchmark
 ): string {
+  const tpl = member.sheetTemplate
+  const custom = member.sheetCustom
   const hpText = `HP: ${member.currentHp ?? '?'}/${member.maxHp ?? '?'}`
   const spText = `Skill Cost (SP): ${member.currentSkillCost ?? '?'}/${member.maxSkillCost ?? '?'}`
   const condText = `สถานะ: ${member.condition || 'Normal'}`
 
-  const statsText = ABILITY_SCORE_KEYS.map((key) => {
-    const score = member.stats?.[key] ?? 0
-    const mod = formatModifier(abilityModifier(score))
-    return `${key}: ${score} (${mod})`
-  }).join(', ')
+  const customResourcesText = tpl
+    ? tpl.resources
+        .filter((r) => !(COLUMN_RESOURCE_IDS as readonly string[]).includes(r.id))
+        .map((r) => {
+          const val = custom?.resources[r.id] || { current: r.defaultMax, max: r.defaultMax }
+          return `${r.label}: ${val.current}/${val.max}`
+        })
+        .join(' | ')
+    : ''
+
+  const statsText =
+    tpl && tpl.stats.length > 0
+      ? tpl.stats
+          .map((stat) => {
+            const score = isColumnStatId(stat.id)
+              ? (member.stats?.[stat.id] ?? stat.default)
+              : (custom?.stats[stat.id] ?? stat.default)
+            const mod = formatModifier(abilityModifier(score))
+            return `${stat.label}: ${score} (${mod})`
+          })
+          .join(', ')
+      : ABILITY_SCORE_KEYS.map((key) => {
+          const score = member.stats?.[key] ?? 0
+          const mod = formatModifier(abilityModifier(score))
+          return `${key}: ${score} (${mod})`
+        }).join(', ')
 
   const defenseInfo = computeCharacterDefenseInfo(member, benchmark.avgPartyMaxHp)
 
-  const equipList = (member.equipment || [])
-    .map((item, idx) => {
-      const trimmed = typeof item === 'string' ? item.trim() : ''
-      if (!trimmed) return ''
-      const slotLabel = EQUIPMENT_LABELS[idx] ?? `Slot ${idx + 1}`
-      return `${slotLabel}: ${trimmed}`
-    })
-    .filter(Boolean)
-    .join(', ')
+  const equipList =
+    tpl && tpl.equipmentSlots.length > 0
+      ? tpl.equipmentSlots
+          .map((slot) => {
+            const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slot.id]
+            const rawItem =
+              colIdx !== undefined
+                ? (member.equipment || [])[colIdx]
+                : custom?.equipment[slot.id]
+            const trimmed = typeof rawItem === 'string' ? rawItem.trim() : ''
+            return trimmed ? `${slot.label}: ${trimmed}` : ''
+          })
+          .filter(Boolean)
+          .join(', ')
+      : (member.equipment || [])
+          .map((item, idx) => {
+            const trimmed = typeof item === 'string' ? item.trim() : ''
+            if (!trimmed) return ''
+            const slotLabel = EQUIPMENT_LABELS[idx] ?? `Slot ${idx + 1}`
+            return `${slotLabel}: ${trimmed}`
+          })
+          .filter(Boolean)
+          .join(', ')
 
   const invPreview = member.inventory
     ? formatInventoryForPrompt(member.inventory).slice(0, 600)
@@ -211,17 +258,30 @@ function formatPartyMemberForPrompt(
     .map((s) => `${s.name} (Cost: ${s.cost}${s.description ? ` - ${s.description}` : ''})`)
     .join(' | ')
 
+  const customBioEntries = tpl
+    ? tpl.textFields
+        .filter((f) => !isColumnTextFieldId(f.id))
+        .map((f) => {
+          const val = (custom?.fields[f.id] || '').replace(/\n+/g, ' ').trim().slice(0, 300)
+          return val ? `${f.label}: ${val}` : ''
+        })
+        .filter(Boolean)
+    : []
+
   const traits = [
     member.strengths ? `จุดเด่น: ${member.strengths.replace(/\n+/g, ' ')}` : '',
     member.weaknesses ? `จุดด้อย: ${member.weaknesses.replace(/\n+/g, ' ')}` : '',
+    ...customBioEntries,
   ]
     .filter(Boolean)
     .join(' / ')
 
+  const statusJoined = [hpText, spText, customResourcesText, condText].filter(Boolean).join(' | ')
+
   const lines = [
     `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType}]`,
-    `   - [สเตตัสปัจจุบัน]: ${hpText} | ${spText} | ${condText}`,
-    `   - [ค่าสถานะทั้ง 6 (Stats & Dice Bonus)]: ${statsText}`,
+    `   - [สเตตัสปัจจุบัน]: ${statusJoined}`,
+    `   - [ค่าสถานะ (Stats & Dice Bonus)]: ${statsText}`,
     `   - [ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]: ${defenseInfo.summaryText}`,
   ]
 
@@ -444,9 +504,20 @@ const THAI_CONDITION_MAP: Record<string, (typeof CHARACTER_CONDITIONS)[number]> 
   เหนื่อยล้า: 'Exhausted',
 }
 
-function normalizeParsedCondition(raw: string, fallback: string): string {
+function normalizeParsedCondition(
+  raw: string,
+  fallback: string,
+  allowedConditions?: readonly string[]
+): string {
   const cleaned = raw.replace(/[*[\]()]/g, '').trim()
   if (!cleaned) return fallback
+
+  if (allowedConditions && allowedConditions.length > 0) {
+    const tplMatch = allowedConditions.find(
+      (c) => c.toLowerCase() === cleaned.toLowerCase()
+    )
+    if (tplMatch) return tplMatch
+  }
 
   const exactMatch = CHARACTER_CONDITIONS.find(
     (c) => c.toLowerCase() === cleaned.toLowerCase()
@@ -591,7 +662,11 @@ export function extractPartyStateUpdates(
 
       const condMatch = matchingSegment.match(/(?:สถานะ|Condition)\s*[:：]\s*([^|;,\n]+)/i)
       if (condMatch) {
-        target.condition = normalizeParsedCondition(condMatch[1], target.condition)
+        target.condition = normalizeParsedCondition(
+          condMatch[1],
+          target.condition,
+          member.sheetTemplate?.conditions
+        )
       }
     }
   }
