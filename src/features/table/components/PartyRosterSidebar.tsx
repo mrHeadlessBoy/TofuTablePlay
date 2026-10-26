@@ -3,7 +3,23 @@
 import { useMemo, useState } from 'react'
 import { BookOpen, Check, ChevronDown, Users, UserX } from 'lucide-react'
 import { extractCharacterSkillCost, getHpTailwindClass } from '@/features/character/domain'
+import {
+  readCharacterTemplate,
+  readCustomValues,
+  type ResourceColor,
+} from '@/features/character/template'
 import { buildPlayerColorMap, getPlayerNameColor, type LorebookEntry, type Member } from '../types'
+
+const ROSTER_RESOURCE_TEXT_COLOR: Record<ResourceColor, string> = {
+  red: 'text-red-400',
+  amber: 'text-amber-400',
+  cyan: 'text-cyan-400',
+  emerald: 'text-emerald-400',
+  violet: 'text-violet-400',
+  rose: 'text-rose-400',
+  sky: 'text-sky-400',
+  zinc: 'text-zinc-300',
+}
 
 type PartyRosterSidebarProps = {
   members: Member[]
@@ -91,6 +107,8 @@ export default function PartyRosterSidebar({
                 ? getPlayerNameColor(char.name, playerColorMap)
                 : 'text-white'
               const skillCost = char ? extractCharacterSkillCost(char) : null
+              const charTemplate = char ? readCharacterTemplate(char) : null
+              const charCustom = char ? readCustomValues(char) : null
 
               return (
                 <div
@@ -111,20 +129,51 @@ export default function PartyRosterSidebar({
                       </div>
                       <div className="flex items-center flex-wrap gap-2 mt-0.5 text-[10px] text-zinc-400 drop-shadow-sm">
                         <span className="text-zinc-300">{char?.class_archetype || 'No class'}</span>
-                        {char?.current_hp !== undefined && (
-                          <span
-                            className={`font-mono font-semibold ${
-                              getHpTailwindClass(char.current_hp, char.max_hp ?? 1).text
-                            }`}
-                          >
-                            HP: {char.current_hp}/{char.max_hp}
-                          </span>
-                        )}
-                        {skillCost && (
-                          <span className="text-cyan-400 font-mono font-semibold">
-                            SP: {skillCost.currentSkillCost}/{skillCost.maxSkillCost}
-                          </span>
-                        )}
+                        {char &&
+                          charTemplate &&
+                          charTemplate.resources.map((res) => {
+                            if (res.id === 'hp') {
+                              const curHp = char.current_hp ?? 0
+                              const maxHp = char.max_hp ?? res.defaultMax
+                              const shortLabel =
+                                /^hit\s*points/i.test(res.label)
+                                  ? 'HP'
+                                  : res.label.split(/[（(]/)[0].trim() || 'HP'
+                              return (
+                                <span
+                                  key={res.id}
+                                  className={`font-mono font-semibold ${
+                                    getHpTailwindClass(curHp, maxHp || 1).text
+                                  }`}
+                                >
+                                  {shortLabel}: {curHp}/{maxHp}
+                                </span>
+                              )
+                            }
+                            if (res.id === 'skill_cost' && skillCost) {
+                              const shortLabel =
+                                /^skill\s*cost$/i.test(res.label)
+                                  ? 'SP'
+                                  : res.label.split(/[（(]/)[0].trim() || 'SP'
+                              return (
+                                <span key={res.id} className="text-cyan-400 font-mono font-semibold">
+                                  {shortLabel}: {skillCost.currentSkillCost}/{skillCost.maxSkillCost}
+                                </span>
+                              )
+                            }
+                            const customVal = charCustom?.resources[res.id] ?? {
+                              current: res.defaultMax,
+                              max: res.defaultMax,
+                            }
+                            const shortLabel = res.label.split(/[（(]/)[0].trim() || res.label
+                            const colorCls =
+                              ROSTER_RESOURCE_TEXT_COLOR[res.color] || 'text-zinc-300'
+                            return (
+                              <span key={res.id} className={`font-mono font-semibold ${colorCls}`}>
+                                {shortLabel}: {customVal.current}/{customVal.max}
+                              </span>
+                            )
+                          })}
                         {char?.status_condition && char.status_condition !== 'Normal' && (
                           <span className="text-amber-400 font-mono">
                             [{char.status_condition}]

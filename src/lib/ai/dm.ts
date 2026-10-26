@@ -2,16 +2,14 @@ import { GoogleGenAI } from '@google/genai'
 import { extractTriggeredLore, LoreEntry } from './lorebook'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
 import {
-  ABILITY_SCORE_KEYS,
   CHARACTER_CONDITIONS,
-  EQUIPMENT_LABELS,
   formatInventoryForPrompt,
   type AbilityScoreKey,
   type CharacterSkill,
 } from '@/features/character/domain'
 import {
+  CLASSIC_TEMPLATE,
   COLUMN_EQUIPMENT_SLOT_INDEX,
-  COLUMN_RESOURCE_IDS,
   isColumnStatId,
   isColumnTextFieldId,
   type CharacterTemplate,
@@ -55,6 +53,103 @@ export interface PartyMemberStateUpdate {
   currentSkillCost: number
   maxSkillCost: number
   condition: string
+  customResources: Record<string, { current: number; max: number }>
+}
+
+interface MemberResourceDescriptor {
+  id: string
+  label: string
+  shortTag: string
+  current: number
+  max: number
+  aliases: string[]
+}
+
+function escapeRegexLiteral(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function buildResourceAliases(id: string, label: string): string[] {
+  const set = new Set<string>()
+  const add = (val: string) => {
+    const cleaned = val.replace(/[*_`[\]"']/g, '').trim().toLowerCase()
+    if (cleaned) set.add(cleaned)
+  }
+
+  add(id)
+  add(label)
+  for (const part of label.split(/[()（）/／|]/)) {
+    add(part)
+  }
+
+  if (id === 'hp') {
+    add('hp')
+    add('hit points')
+    add('health')
+    add('เลือด')
+    add('พลังชีวิต')
+  } else if (id === 'skill_cost') {
+    add('skill cost')
+    add('sp')
+    add('skill pt')
+    add('skill point')
+  }
+
+  return Array.from(set).sort((a, b) => b.length - a.length)
+}
+
+function getMemberResourceDescriptors(member: PartyMemberAction): MemberResourceDescriptor[] {
+  const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
+  const custom = member.sheetCustom
+  const sourceResources =
+    tpl.resources.length > 0 ? tpl.resources : CLASSIC_TEMPLATE.resources
+
+  return sourceResources.map((res) => {
+    if (res.id === 'hp') {
+      const max = Math.max(1, Number(member.maxHp ?? res.defaultMax) || 10)
+      const current = Math.max(0, Math.min(max, Number(member.currentHp ?? max)))
+      const shortTag =
+        /^hit\s*points/i.test(res.label) ? 'HP' : res.label.split(/[（(]/)[0].trim() || 'HP'
+      return {
+        id: res.id,
+        label: res.label,
+        shortTag,
+        current,
+        max,
+        aliases: buildResourceAliases(res.id, res.label),
+      }
+    }
+
+    if (res.id === 'skill_cost') {
+      const max = Math.max(0, Number(member.maxSkillCost ?? res.defaultMax))
+      const current = Math.max(0, Math.min(max, Number(member.currentSkillCost ?? max)))
+      const shortTag =
+        /^skill\s*cost$/i.test(res.label)
+          ? 'Skill Cost'
+          : res.label.split(/[（(]/)[0].trim() || 'Skill Cost'
+      return {
+        id: res.id,
+        label: res.label,
+        shortTag,
+        current,
+        max,
+        aliases: buildResourceAliases(res.id, res.label),
+      }
+    }
+
+    const stored = custom?.resources[res.id]
+    const max = Math.max(0, Number(stored?.max ?? res.defaultMax))
+    const current = Math.max(0, Math.min(max, Number(stored?.current ?? max)))
+    const shortTag = res.label.split(/[（(]/)[0].trim() || res.label || res.id
+    return {
+      id: res.id,
+      label: res.label,
+      shortTag,
+      current,
+      max,
+      aliases: buildResourceAliases(res.id, res.label),
+    }
+  })
 }
 
 export interface DmTurnInput {
@@ -89,7 +184,11 @@ interface PartyDamageBenchmark {
 
 function computePartyDamageBenchmark(partyActions: PartyMemberAction[]): PartyDamageBenchmark {
   const validMaxHps = partyActions
-    .map((m) => Number(m.maxHp))
+    .map((m) => {
+      const descriptors = getMemberResourceDescriptors(m)
+      const hpDesc = descriptors.find((d) => d.id === 'hp') ?? descriptors[0]
+      return Number(hpDesc?.max ?? m.maxHp)
+    })
     .filter((hp) => Number.isFinite(hp) && hp > 0)
 
   const avgPartyMaxHp =
@@ -109,6 +208,8 @@ function computePartyDamageBenchmark(partyActions: PartyMemberAction[]): PartyDa
 }
 
 const SHIELD_OR_GUARD_REGEX = /โล่|เกราะ|ปัดป้อง|shield|buckler|guard|aegis|armor|armour/i
+const RESILIENCE_STAT_REGEX =
+  /^(con|constitution|physique|endurance|vitality|stamina|willpower|nerves|courage|ความอึด|ความทนทาน|ร่างกาย|จิตใจ|ความกล้า)/i
 
 function computeCharacterDefenseInfo(
   member: PartyMemberAction,
@@ -119,22 +220,54 @@ function computeCharacterDefenseInfo(
   conModifier: number
   summaryText: string
 } {
-  const conScore = member.stats?.CON ?? 0
-  const conModifier = abilityModifier(conScore)
-  const equip = member.equipment || []
+  const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
+  const custom = member.sheetCustom
 
-  // Slots 0..3 are Head, Torso, Leg, Foot (wearable armor/clothing slots).
-  // Slots 4..5 are Left Hand, Right Hand (count as defensive gear if holding a shield/guard).
+  // Dynamically locate CON or an equivalent resilience stat in the character's template.
+  // If the template does not include CON or a resilience stat, do not penalize with abilityModifier(0) = -5!
+  const resilienceStat =
+    tpl.stats.find((s) => s.id.toUpperCase() === 'CON') ??
+    tpl.stats.find(
+      (s) => RESILIENCE_STAT_REGEX.test(s.id) || RESILIENCE_STAT_REGEX.test(s.label)
+    )
+
+  let conModifier = 0
+  let resilienceStatLabel = 'CON'
+  if (resilienceStat) {
+    const rawScore = isColumnStatId(resilienceStat.id)
+      ? (member.stats?.[resilienceStat.id] ?? resilienceStat.default)
+      : (custom?.stats[resilienceStat.id] ?? resilienceStat.default)
+    conModifier = abilityModifier(rawScore)
+    resilienceStatLabel =
+      resilienceStat.label.split(/[（(]/)[0].trim() || resilienceStat.id
+  }
+
+  const equip = member.equipment || []
   let armorPiecesCount = 0
-  for (let i = 0; i < Math.min(equip.length, 6); i++) {
-    const item = typeof equip[i] === 'string' ? equip[i].trim() : ''
-    if (!item) continue
-    if (i <= 3 || SHIELD_OR_GUARD_REGEX.test(item)) {
-      armorPiecesCount++
+
+  if (tpl.equipmentSlots.length > 0) {
+    for (const slot of tpl.equipmentSlots) {
+      const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slot.id]
+      const rawItem =
+        colIdx !== undefined ? equip[colIdx] : custom?.equipment[slot.id]
+      const item = typeof rawItem === 'string' ? rawItem.trim() : ''
+      if (!item) continue
+      const isHandSlot = slot.id === 'left_hand' || slot.id === 'right_hand'
+      if (!isHandSlot || SHIELD_OR_GUARD_REGEX.test(item)) {
+        armorPiecesCount++
+      }
+    }
+  } else {
+    for (let i = 0; i < Math.min(equip.length, 6); i++) {
+      const item = typeof equip[i] === 'string' ? equip[i].trim() : ''
+      if (!item) continue
+      if (i <= 3 || SHIELD_OR_GUARD_REGEX.test(item)) {
+        armorPiecesCount++
+      }
     }
   }
 
-  // Each +1 CON modifier grants ~3% of avgPartyMaxHp reduction; each armor piece grants ~1.5%
+  // Each +1 resilience modifier grants ~3% of avgPartyMaxHp reduction; each armor/gear piece grants ~1.5%
   const rawConMitigation =
     conModifier >= 0
       ? conModifier * (avgPartyMaxHp * 0.03)
@@ -152,7 +285,7 @@ function computeCharacterDefenseInfo(
       damageReduction,
       armorPiecesCount,
       conModifier,
-      summaryText: `ลดทอนความเสียหายที่ได้รับ -${damageReduction} HP ต่อครั้ง (จาก CON ${formatModifier(conModifier)} และอุปกรณ์ป้องกัน ${armorPiecesCount} ชิ้น | ดาเมจสุทธิขั้นต่ำต้องไม่ต่ำกว่า 1 HP)`,
+      summaryText: `ลดทอนความเสียหายที่ได้รับ -${damageReduction} หน่วยต่อครั้ง (จาก ${resilienceStatLabel} ${formatModifier(conModifier)} และอุปกรณ์สวมใส่ ${armorPiecesCount} ชิ้น | ดาเมจสุทธิขั้นต่ำต้องไม่ต่ำกว่า 1 หน่วย)`,
     }
   }
 
@@ -162,7 +295,7 @@ function computeCharacterDefenseInfo(
       damageReduction,
       armorPiecesCount,
       conModifier,
-      summaryText: `รับความเสียหายเพิ่มขึ้น +${extraDmg} HP ต่อครั้ง (เนื่องจากค่า CON ${formatModifier(conModifier)} ติดลบและไม่มีเกราะชดเชย)`,
+      summaryText: `รับความเสียหายเพิ่มขึ้น +${extraDmg} หน่วยต่อครั้ง (เนื่องจากค่า ${resilienceStatLabel} ${formatModifier(conModifier)} ติดลบและไม่มีอุปกรณ์ป้องกันชดเชย)`,
     }
   }
 
@@ -170,7 +303,7 @@ function computeCharacterDefenseInfo(
     damageReduction: 0,
     armorPiecesCount,
     conModifier,
-    summaryText: `ไม่มีโบนัสลดทอนความเสียหาย (0 HP — รับดาเมจตามฐานความรุนแรงของศัตรูเต็มจำนวน)`,
+    summaryText: `ไม่มีโบนัสลดทอนความเสียหาย (0 หน่วย — รับดาเมจตามฐานความรุนแรงของศัตรูเต็มจำนวน)`,
   }
 }
 
@@ -180,24 +313,27 @@ function formatPartyMemberForPrompt(
   isFirstPlayerTurn: boolean,
   benchmark: PartyDamageBenchmark
 ): string {
-  const tpl = member.sheetTemplate
+  const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
   const custom = member.sheetCustom
-  const hpText = `HP: ${member.currentHp ?? '?'}/${member.maxHp ?? '?'}`
-  const spText = `Skill Cost (SP): ${member.currentSkillCost ?? '?'}/${member.maxSkillCost ?? '?'}`
-  const condText = `สถานะ: ${member.condition || 'Normal'}`
+  const resourceDescriptors = getMemberResourceDescriptors(member)
 
-  const customResourcesText = tpl
-    ? tpl.resources
-        .filter((r) => !(COLUMN_RESOURCE_IDS as readonly string[]).includes(r.id))
-        .map((r) => {
-          const val = custom?.resources[r.id] || { current: r.defaultMax, max: r.defaultMax }
-          return `${r.label}: ${val.current}/${val.max}`
-        })
-        .join(' | ')
-    : ''
+  const resourcesPromptText = resourceDescriptors
+    .map((r) => {
+      if (r.id === 'hp' && r.shortTag.toUpperCase() !== 'HP') {
+        return `${r.shortTag} (HP): ${r.current}/${r.max}`
+      }
+      if (r.id === 'skill_cost' && r.shortTag.toUpperCase() !== 'SP') {
+        return `${r.shortTag} (SP): ${r.current}/${r.max}`
+      }
+      return `${r.shortTag}: ${r.current}/${r.max}`
+    })
+    .join(' | ')
+
+  const allowedConds = tpl.conditions.length > 0 ? tpl.conditions : CHARACTER_CONDITIONS
+  const condText = `สถานะ: ${member.condition || allowedConds[0] || 'Normal'} (สถานะของชีทนี้: ${allowedConds.join(', ')})`
 
   const statsText =
-    tpl && tpl.stats.length > 0
+    tpl.stats.length > 0
       ? tpl.stats
           .map((stat) => {
             const score = isColumnStatId(stat.id)
@@ -207,16 +343,12 @@ function formatPartyMemberForPrompt(
             return `${stat.label}: ${score} (${mod})`
           })
           .join(', ')
-      : ABILITY_SCORE_KEYS.map((key) => {
-          const score = member.stats?.[key] ?? 0
-          const mod = formatModifier(abilityModifier(score))
-          return `${key}: ${score} (${mod})`
-        }).join(', ')
+      : '(ชีทนี้ไม่มีค่า Stat แยกย่อย)'
 
   const defenseInfo = computeCharacterDefenseInfo(member, benchmark.avgPartyMaxHp)
 
   const equipList =
-    tpl && tpl.equipmentSlots.length > 0
+    tpl.equipmentSlots.length > 0
       ? tpl.equipmentSlots
           .map((slot) => {
             const colIdx = COLUMN_EQUIPMENT_SLOT_INDEX[slot.id]
@@ -229,59 +361,69 @@ function formatPartyMemberForPrompt(
           })
           .filter(Boolean)
           .join(', ')
-      : (member.equipment || [])
-          .map((item, idx) => {
-            const trimmed = typeof item === 'string' ? item.trim() : ''
-            if (!trimmed) return ''
-            const slotLabel = EQUIPMENT_LABELS[idx] ?? `Slot ${idx + 1}`
-            return `${slotLabel}: ${trimmed}`
-          })
-          .filter(Boolean)
-          .join(', ')
+      : ''
 
-  const invPreview = member.inventory
-    ? formatInventoryForPrompt(member.inventory).slice(0, 600)
-    : ''
+  const invPreview =
+    tpl.sections.inventory && member.inventory
+      ? formatInventoryForPrompt(member.inventory).slice(0, 600)
+      : ''
 
-  const appearancePreview = member.appearance
-    ? member.appearance.replace(/\n+/g, ' ').trim().slice(0, 300)
-    : ''
+  const hasAppearanceField = tpl.textFields.some((f) => f.id === 'appearance')
+  const hasBackstoryField = tpl.textFields.some((f) => f.id === 'backstory')
+  const hasStrengthsField = tpl.textFields.some((f) => f.id === 'strengths')
+  const hasWeaknessesField = tpl.textFields.some((f) => f.id === 'weaknesses')
 
-  const backstoryPreview = member.backstory
-    ? member.backstory
-        .replace(/\n+/g, ' ')
-        .trim()
-        .slice(0, isFirstPlayerTurn ? 500 : 350)
-    : ''
+  const appearancePreview =
+    hasAppearanceField && member.appearance
+      ? member.appearance.replace(/\n+/g, ' ').trim().slice(0, 300)
+      : ''
 
-  const skillsList = (member.skills || [])
-    .map((s) => `${s.name} (Cost: ${s.cost}${s.description ? ` - ${s.description}` : ''})`)
-    .join(' | ')
+  const backstoryPreview =
+    hasBackstoryField && member.backstory
+      ? member.backstory
+          .replace(/\n+/g, ' ')
+          .trim()
+          .slice(0, isFirstPlayerTurn ? 500 : 350)
+      : ''
 
-  const customBioEntries = tpl
-    ? tpl.textFields
-        .filter((f) => !isColumnTextFieldId(f.id))
-        .map((f) => {
-          const val = (custom?.fields[f.id] || '').replace(/\n+/g, ' ').trim().slice(0, 300)
-          return val ? `${f.label}: ${val}` : ''
-        })
-        .filter(Boolean)
-    : []
+  const skillsList =
+    tpl.sections.skills && (member.skills || []).length > 0
+      ? (member.skills || [])
+          .map((s) => `${s.name} (Cost: ${s.cost}${s.description ? ` - ${s.description}` : ''})`)
+          .join(' | ')
+      : ''
+
+  const customBioEntries = tpl.textFields
+    .filter((f) => !isColumnTextFieldId(f.id))
+    .map((f) => {
+      const val = (custom?.fields[f.id] || '').replace(/\n+/g, ' ').trim().slice(0, 300)
+      return val ? `${f.label}: ${val}` : ''
+    })
+    .filter(Boolean)
+
+  const strengthsLabel =
+    tpl.textFields.find((f) => f.id === 'strengths')?.label || 'จุดเด่น'
+  const weaknessesLabel =
+    tpl.textFields.find((f) => f.id === 'weaknesses')?.label || 'จุดด้อย'
 
   const traits = [
-    member.strengths ? `จุดเด่น: ${member.strengths.replace(/\n+/g, ' ')}` : '',
-    member.weaknesses ? `จุดด้อย: ${member.weaknesses.replace(/\n+/g, ' ')}` : '',
+    hasStrengthsField && member.strengths
+      ? `${strengthsLabel}: ${member.strengths.replace(/\n+/g, ' ')}`
+      : '',
+    hasWeaknessesField && member.weaknesses
+      ? `${weaknessesLabel}: ${member.weaknesses.replace(/\n+/g, ' ')}`
+      : '',
     ...customBioEntries,
   ]
     .filter(Boolean)
     .join(' / ')
 
-  const statusJoined = [hpText, spText, customResourcesText, condText].filter(Boolean).join(' | ')
+  const statusJoined = [resourcesPromptText, condText].filter(Boolean).join(' | ')
 
   const lines = [
-    `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType}]`,
-    `   - [สเตตัสปัจจุบัน]: ${statusJoined}`,
-    `   - [ค่าสถานะ (Stats & Dice Bonus)]: ${statsText}`,
+    `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType} | รูปแบบชีท: ${tpl.name}]`,
+    `   - [สเตตัสและทรัพยากรปัจจุบัน (Resources & Condition)]: ${statusJoined}`,
+    `   - [ค่าสถานะประจำตัวละคร (Stats & Dice Bonus)]: ${statsText}`,
     `   - [ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]: ${defenseInfo.summaryText}`,
   ]
 
@@ -351,7 +493,60 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
       ? triggeredLore.map((l) => `[LORE: ${l.title} (${l.category})]: ${l.content}`).join('\n')
       : null
 
-  // 3. STATIC SYSTEM INSTRUCTION
+  // 3. BUILD DYNAMIC PARTY TEMPLATE METADATA FOR SYSTEM INSTRUCTION
+  const partyStatLabelsSet = new Set<string>()
+  const partyEquipLabelsSet = new Set<string>()
+  const partyResourceTagsSet = new Set<string>()
+  const partyConditionSet = new Set<string>()
+
+  for (const member of partyActions) {
+    const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
+    for (const st of tpl.stats) {
+      partyStatLabelsSet.add(st.label.split(/[（(]/)[0].trim() || st.id)
+    }
+    for (const eq of tpl.equipmentSlots) {
+      partyEquipLabelsSet.add(eq.label)
+    }
+    for (const res of getMemberResourceDescriptors(member)) {
+      partyResourceTagsSet.add(res.shortTag)
+    }
+    for (const cond of tpl.conditions) {
+      partyConditionSet.add(cond)
+    }
+  }
+
+  const dynamicStatsSummary =
+    partyStatLabelsSet.size > 0
+      ? Array.from(partyStatLabelsSet).join(', ')
+      : 'STR, DEX, CON, INT, WIS, CHA'
+  const dynamicEquipSummary =
+    partyEquipLabelsSet.size > 0
+      ? Array.from(partyEquipLabelsSet).join(', ')
+      : 'Head, Torso, Leg, Foot, Left Hand, Right Hand'
+  const dynamicResourcesSummary =
+    partyResourceTagsSet.size > 0
+      ? Array.from(partyResourceTagsSet).join(', ')
+      : 'HP, Skill Cost'
+  const dynamicConditionsSummary =
+    partyConditionSet.size > 0
+      ? Array.from(partyConditionSet).join(', ')
+      : CHARACTER_CONDITIONS.join(', ')
+
+  // Build dynamic Overview example per character so AI reports every resource in each player's template
+  const dynamicPartyStatusFormatExample =
+    partyActions.length > 0
+      ? partyActions
+          .slice(0, 2)
+          .map((m) => {
+            const resParts = getMemberResourceDescriptors(m)
+              .map((r) => `${r.shortTag} ${r.current}/${r.max}`)
+              .join(' | ')
+            const cond = m.condition || m.sheetTemplate?.conditions[0] || 'Normal'
+            return `${m.characterName}: ${resParts} | สถานะ: ${cond}`
+          })
+          .join(' ; ')
+      : 'Shacco: HP 80/100 | Skill Cost 7/10 | สถานะ: Normal'
+
   const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
 [WORLD SETTING & TONE]
@@ -368,11 +563,11 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่อง ห้ามรีเซ็ตฉากหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
    - ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในปาร์ตี้ให้ครบตามรายชื่อ
 
-2. การเคารพข้อมูลตัวละครอย่างครบถ้วน (Character Stats, Equipment, Inventory & Skills):
-   - คำนึงถึงค่า HP, ค่าสถานะทั้ง 6 (STR, DEX, CON, INT, WIS, CHA), สถานะผิดปกติ (Condition), อุปกรณ์ที่สวมใส่ในแต่ละช่อง (Head, Torso, Leg, Foot, Left Hand, Right Hand) และไอเทมในกระเป๋าจริงในการตัดสินผลลัพธ์
-   - หากผู้เล่นประกาศใช้ "สกิล (Skill)" หรือ "ไอเทม": ให้ตรวจสอบว่ามีอยู่ในข้อมูลตัวละครหรือไม่ และมีค่า Skill Cost (SP) เพียงพอหรือไม่:
-     * หากมีสกิลและ Skill Cost เพียงพอ: ต้องหักค่า Skill Cost ตาม Cost ของสกิลนั้นทันที และเขียนวงเล็บระบุชื่อตัวละครพร้อมการลดลงของ Skill Cost ในเนื้อเรื่องด้วยเสมอ เช่น "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])"
-     * หากไม่มีสกิลนั้น หรือ Skill Cost ปัจจุบันไม่พอ: ให้บรรยายว่าการร่ายสกิลล้มเหลวหรือเกิดผลเสียแทน
+2. การเคารพข้อมูลตัวละครตามรูปแบบชีทของแต่ละคน (Dynamic Character Sheet Templates, Resources, Stats, Equipment & Skills):
+   - ตัวละครแต่ละคนอาจใช้รูปแบบชีท (Character Template) ที่ปรับแต่งค่าต่างกัน ให้คำนึงถึงทรัพยากร (${dynamicResourcesSummary}), ค่าสถานะ (${dynamicStatsSummary}), สถานะผิดปกติ (${dynamicConditionsSummary}), ช่องอุปกรณ์สวมใส่ (${dynamicEquipSummary}) และไอเทมในกระเป๋าตามที่ระบุในบล็อกข้อมูลของตัวละครคนนั้นจริงในการตัดสินผลลัพธ์
+   - หากผู้เล่นประกาศใช้ "สกิล (Skill)" หรือทำแอ็กชันที่ใช้ทรัพยากรพิเศษ (เช่น Skill Cost / SP, Sanity, Stress, Luck ฯลฯ):
+     * หากมีสกิลและทรัพยากรเพียงพอ: ต้องหักหรือปรับค่าทรัพยากรนั้นทันที และเขียนวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรที่เปลี่ยนไปในเนื้อเรื่องเสมอ เช่น "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])" หรือ "(Shacco — Sanity: 50/50 -> 42/50 [-8])" หรือ "(Shacco — Stress: 2/10 -> 5/10 [+3])"
+     * หากไม่มีสกิลนั้น หรือทรัพยากรไม่พอ: ให้บรรยายว่าการกระทำนั้นล้มเหลวหรือเกิดผลเสียแทน
 
 3. กฎการตัดสินผลแอ็กชันและลูกเต๋า (Action & Dice Resolution):
    - [กรณีไม่ส่งแอ็กชัน]: ให้บรรยายว่าตัวละครนั้น "ยืนนิ่ง ชะงัก หรือคุมเชิงดูสถานการณ์อยู่กับที่" ห้ามคิดการเคลื่อนไหวหรือสั่งโจมตีแทนผู้เล่นเด็ดขาด
@@ -395,40 +590,39 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - ต้องดึงค่า HP% ล่าสุดของมอนสเตอร์จากหมวด [ Overview ] ของเทิร์นก่อนหน้ามาคำนวณต่อเสมอ ห้ามรีเซ็ตกลับเป็น 100%
    - มอนสเตอร์ที่ยังไม่ตาย (HP > 0%) ต้องมีการโจมตีสวนกลับ ใช้สกิล หรือคุกคามปาร์ตี้คืนในท้ายเทิร์นเสมอ!
 
-5. กฎความเด็ดขาดและการคำนวณดาเมจต่อผู้เล่น (High Stakes, Shared Flat Damage Benchmark & Defense Mitigation) [สำคัญที่สุด]:
-   - ห้ามมี Plot Armor ปกป้องผู้เล่นเด็ดขาด! (ไม่ว่าจะเล่นคนเดียว Solo หรือเล่นเป็นปาร์ตี้) หากทอยเต๋าล้มเหลว (FAIL หรือ NATURAL 1) ในจังหวะอันตราย, สั่งโจมตีโดยไม่ทอยเต๋า, ประมาท, หรือถูกมอนสเตอร์ที่ยังไม่ตายโจมตีสวนกลับ ให้บรรยายบาดแผล คำนวณความเสียหายเป็นจำนวนหน่วย HP ที่ผู้เล่นเสียไปจริง และระบุสถานะผิดปกติที่ผู้เล่นได้รับอย่างสมจริงเสมอ!
-   - [สำคัญมาก: ห้ามคิดดาเมจแยกตาม % เลือดของใครของมันเด็ดขาด เพราะจะทำให้คนที่มี Max HP สูง (เช่น 120 HP) กับคนที่มี Max HP น้อย (เช่น 90 HP) ตายในจำนวนครั้งเท่ากัน!]
-   - ให้ใช้ "ตารางฐานดาเมจกลางของศัตรูประจำโต๊ะนี้" (คำนวณจากค่าเฉลี่ย Max HP ของปาร์ตี้ = ${damageBenchmark.avgPartyMaxHp} HP) เป็นตัวเลขหน่วย HP คงที่เดียวกันสำหรับทุกคนในฉาก ดังนี้:
-     * โดนโจมตีเฉี่ยวๆ / กับดักเล็กน้อย / ปัดป้องหรือหลบได้บางส่วน: ฐานดาเมจ ${damageBenchmark.grazeMin} - ${damageBenchmark.grazeMax} HP
-     * โดนศัตรูโจมตีปกติ / ศัตรูสวนกลับท้ายเทิร์น / ทอยเต๋าได้ FAIL ในจังหวะปะทะหรือหลบหลีก / สั่งโจมตีโดยไม่ทอยเต๋า: ฐานดาเมจ ${damageBenchmark.normalMin} - ${damageBenchmark.normalMax} HP
-     * โดนท่าไม้ตายศัตรู / ศัตรูระดับ Elite หรือ Boss โจมตีเต็มแรง / ทอยติด NATURAL 1 (Critical Fail) / ประมาทอย่างรุนแรง: ฐานดาเมจ ${damageBenchmark.heavyMin} - ${damageBenchmark.heavyMax} HP
-   - [การหักลบด้วยค่า CON และชุดเกราะ (Defense Mitigation)]:
+5. กฎความเด็ดขาดและการคำนวณดาเมจ/การเปลี่ยนแปลงทรัพยากรของผู้เล่น (High Stakes, Shared Flat Damage Benchmark & Defense Mitigation) [สำคัญที่สุด]:
+   - ห้ามมี Plot Armor ปกป้องผู้เล่นเด็ดขาด! (ไม่ว่าจะเล่นคนเดียว Solo หรือเล่นเป็นปาร์ตี้) หากทอยเต๋าล้มเหลว (FAIL หรือ NATURAL 1) ในจังหวะอันตราย, สั่งโจมตีโดยไม่ทอยเต๋า, ประมาท, หรือถูกมอนสเตอร์ที่ยังไม่ตายโจมตีสวนกลับ ให้บรรยายบาดแผลหรือผลกระทบ คำนวณความเสียหายเป็นจำนวนหน่วยที่ผู้เล่นเสียไปจริง และระบุสถานะผิดปกติ (${dynamicConditionsSummary}) ที่ผู้เล่นได้รับอย่างสมจริงเสมอ!
+   - [สำคัญมาก: ห้ามคิดดาเมจแยกตาม % เลือดของใครของมันเด็ดขาด เพราะจะทำให้คนที่มี Max HP สูงกับคนที่มี Max HP น้อยตายในจำนวนครั้งเท่ากัน!]
+   - ให้ใช้ "ตารางฐานดาเมจกลางของศัตรูประจำโต๊ะนี้" (คำนวณจากค่าเฉลี่ยพลังหลักของปาร์ตี้ = ${damageBenchmark.avgPartyMaxHp} หน่วย) เป็นตัวเลขคงที่เดียวกันสำหรับทุกคนในฉาก ดังนี้:
+     * โดนโจมตีเฉี่ยวๆ / กับดักเล็กน้อย / ปัดป้องหรือหลบได้บางส่วน: ฐานดาเมจ ${damageBenchmark.grazeMin} - ${damageBenchmark.grazeMax} หน่วย
+     * โดนศัตรูโจมตีปกติ / ศัตรูสวนกลับท้ายเทิร์น / ทอยเต๋าได้ FAIL ในจังหวะปะทะหรือหลบหลีก / สั่งโจมตีโดยไม่ทอยเต๋า: ฐานดาเมจ ${damageBenchmark.normalMin} - ${damageBenchmark.normalMax} หน่วย
+     * โดนท่าไม้ตายศัตรู / ศัตรูระดับ Elite หรือ Boss โจมตีเต็มแรง / ทอยติด NATURAL 1 (Critical Fail) / ประมาทอย่างรุนแรง: ฐานดาเมจ ${damageBenchmark.heavyMin} - ${damageBenchmark.heavyMax} หน่วย
+   - [การหักลบด้วยค่าความทนทานและอุปกรณ์ป้องกัน (Defense Mitigation)]:
      * เมื่อได้ "ฐานดาเมจของศัตรู" ข้างต้นแล้ว ให้นำไปหักลบกับค่าในบรรทัด "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้นเสมอ!
-     * สูตรคำนวณ: ดาเมจสุทธิที่ผู้เล่นได้รับ = (ฐานดาเมจของศัตรู - ค่าลดทอนดาเมจจาก CON และชุดเกราะของผู้เล่นคนนั้น) โดยต้องเสียเลือดขั้นต่ำอย่างน้อย 1 HP เสมอ
-     * ด้วยวิธีนี้ ผู้เล่นที่มี Max HP สูง (เช่น 120 HP) และมีค่า CON + ชุดเกราะดี จะโดนดาเมจเข้าเนื้อน้อยกว่าและทนรับการโจมตีได้หลายเทิร์นกว่าผู้เล่นที่ตัวบาง (เช่น 90 HP) อย่างแท้จริง!
-     * หากการโจมตีของศัตรูมีพิษ มึนงง คำสาป หรือบาดเจ็บสาหัส (HP เหลือน้อยกว่า 30%) ให้เปลี่ยนสถานะ Condition เป็น Bloodied, Poisoned, Stunned, Blinded, Exhausted หรือ Unconscious เมื่อ HP เหลือ 0
-   - [บังคับระบุชื่อตัวละครและตัวเลข HP ในวงเล็บทุกครั้งที่เสียเลือดหรือฟื้นฟูเลือด]:
-     * ทุกครั้งที่ผู้เล่นได้รับความเสียหายหรือฟื้นฟู HP ต้องเขียนวงเล็บระบุ "ชื่อตัวละคร" ตามด้วยค่า HP เดิม -> ค่า HP ใหม่ พร้อมจำนวนหน่วยสุทธิที่ลดลง/เพิ่มขึ้นในเนื้อเรื่องทันที เช่น "(Shacco — HP: 120/120 -> 108/120 [-12 HP])" หรือ "(ไมค์ — HP: 90/90 -> 68/90 [-22 HP])" เพื่อไม่ให้สับสนเมื่อมีผู้เล่นหลายคนโดนโจมตีพร้อมกัน (ส่วนมอนสเตอร์ให้เขียนเป็น % เช่น "(HP: 100% -> 80%)" ตามเดิม)
-     * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "ถูกโจมตี" โดยไม่ระบุตัวเลขหน่วย HP ที่ลดลงเด็ดขาด!
+     * สูตรคำนวณ: ดาเมจสุทธิที่ผู้เล่นได้รับ = (ฐานดาเมจของศัตรู - ค่าลดทอนดาเมจของผู้เล่นคนนั้น) โดยต้องเสียขั้นต่ำอย่างน้อย 1 หน่วยเสมอ
+     * หากได้รับผลกระทบทางร่างกายหรือจิตใจอย่างหนัก หรือพลังหลักเหลือน้อยกว่า 30% ให้เปลี่ยนสถานะ Condition ตามรายการสถานะของชีทตัวละครคนนั้น (เช่น ${dynamicConditionsSummary})
+   - [บังคับระบุชื่อตัวละครและชื่อ Resource ในวงเล็บทุกครั้งที่มีการเปลี่ยนแปลงค่าในชีท]:
+     * ทุกครั้งที่ผู้เล่นเสียหรือฟื้นฟูค่าทรัพยากรใดๆ ในชีท (${dynamicResourcesSummary}) ต้องเขียนวงเล็บระบุ "ชื่อตัวละคร — ชื่อ Resource: ค่าเดิม/Max -> ค่าใหม่/Max [±จำนวน]" ในเนื้อเรื่องทันที เช่น "(Shacco — HP: 120/120 -> 108/120 [-12 HP])" หรือ "(ไมค์ — Sanity: 50/50 -> 42/50 [-8])" เพื่อไม่ให้สับสนเมื่อมีผู้เล่นหลายคนโดนผลกระทบพร้อมกัน (ส่วนมอนสเตอร์ให้เขียนเป็น % เช่น "(HP: 100% -> 80%)" ตามเดิม)
+     * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "เสียสติ" โดยไม่ระบุตัวเลขที่เปลี่ยนแปลงเด็ดขาด!
 
 6. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
-   - เรียกตัวละครด้วย "ชื่อ" เท่านั้น (เช่น "**Shacco**", "**ไมค์**", "**Pantheon**") ห้ามเขียนสร้อยฉายา อาชีพ หรือลักษณะชุดต่อท้ายชื่อซ้ำๆ เด็ดขาด (เช่น ห้ามเขียน "Shacco นักฆ่าในชุดตัวตลก...", "ไมค์ นักบวชผู้ควบคุมเปลวไฟ...", "Pantheon ทหารรับจ้างสไตล์สปาร์ตา...")
-   - ห้ามนำนิสัยท่าทางเดิมๆ หรือจุดด้อย (เช่น ความซุ่มซ่ามเกือบสะดุดล้ม, ฝีเท้าหนักแน่นและเชื่องช้า, รังสีความน่ากลัว) ที่เคยบรรยายไปแล้วในเทิร์นก่อนหน้า มาเขียนซ้ำอีกในเทิร์นนี้ ยกเว้นผู้เล่นจะทอยเต๋าได้ FAIL หรือสั่งทำแอ็กชันที่กระตุ้นจุดด้อยนั้นโดยตรง
+   - เรียกตัวละครด้วย "ชื่อ" เท่านั้น (เช่น "**Shacco**", "**ไมค์**", "**Pantheon**") ห้ามเขียนสร้อยฉายา อาชีพ หรือลักษณะชุดต่อท้ายชื่อซ้ำๆ เด็ดขาด
+   - ห้ามนำนิสัยท่าทางเดิมๆ หรือจุดด้อยที่เคยบรรยายไปแล้วในเทิร์นก่อนหน้า มาเขียนซ้ำอีกในเทิร์นนี้ ยกเว้นผู้เล่นจะทอยเต๋าได้ FAIL หรือสั่งทำแอ็กชันที่กระตุ้นจุดด้อยนั้นโดยตรง
    - โฟกัสเฉพาะ "แอ็กชันที่ผู้เล่นสั่งในเทิร์นนี้" และ "ผลลัพธ์ใหม่ที่เกิดขึ้น" เท่านั้น
   
 [REQUIRED OUTPUT FORMAT]
-(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และวงเล็บระบุชื่อตัวละคร (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-Z HP]) หรือ (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Z SP]) เมื่อผู้เล่นเสียเลือดหรือใช้สกิล)
+(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรตามชีทจริง เช่น (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-Z]) หรือ (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Z]) หรือทรัพยากรอื่นๆ ในชีทของตัวละครนั้นเมื่อมีการเปลี่ยนแปลง)
 
 [ Overview ]
 สถานที่และเวลา : (ชื่อสถานที่ สภาพแวดล้อมโดยย่อ และเวลาปัจจุบัน เช่น 14:30 น.)
 สถานการณ์ปัจจุบัน : (สรุปสิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยย่อ)
 สถานะศัตรู : (ระบุชื่อศัตรูทุกตัวในฉากพร้อม HP% คงเหลือล่าสุด เช่น "หมาป่าทมิฬ A: 55%, หมาป่าทมิฬ B: 100%" / หากศัตรูตายให้ระบุว่า "0% (ตายแล้ว)" / หากไม่มีศัตรูในฉากให้เขียนว่า "ไม่มี")
-สถานะปาร์ตี้ : (ระบุสถานะล่าสุดหลังจบเทิร์นของสมาชิกทุกคนในปาร์ตี้ให้ครบทุกคน คั่นแต่ละคนด้วย " ; " ตามรูปแบบ: "ชื่อตัวละคร: HP X/MaxHP | SP Y/MaxSP | สถานะ: Normal" เช่น "Shacco: HP 80/100 | SP 7/10 | สถานะ: Normal ; ไมค์: HP 68/90 | SP 10/10 | สถานะ: Normal")
+สถานะปาร์ตี้ : (ระบุค่าทรัพยากรทุกตัวตามชีทของสมาชิกแต่ละคนและสถานะล่าสุดหลังจบเทิร์นให้ครบทุกคน คั่นแต่ละคนด้วย " ; " เช่น "${dynamicPartyStatusFormatExample}")
 
 [ Decision ]
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าเพื่อโจมตี ป้องกัน หรือรับมือเหตุการณ์ในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ตัดหัวข้อ [ Decision ] ทิ้งทันที)*
-(ระบุ 1 บรรทัดต่อ 1 คน พร้อมกำหนดค่า DC มาตรฐาน: ง่าย DC 8-10, ปานกลาง DC 12-14, ยาก DC 15-17, วิกฤต DC 18+):
-- [ชื่อตัวละคร]: สิ่งที่ต้องทำ/รับมือ: (สิ่งที่กำลังเผชิญ) | [d20 + สเตตัส (STR/DEX/CON/INT/WIS/CHA) vs DC XX]`
+(ระบุ 1 บรรทัดต่อ 1 คน โดยเลือกใช้ชื่อค่าสถานะที่มีอยู่จริงในชีทของตัวละครคนนั้น เช่น ${dynamicStatsSummary} พร้อมกำหนดค่า DC มาตรฐาน: ง่าย DC 8-10, ปานกลาง DC 12-14, ยาก DC 15-17, วิกฤต DC 18+):
+- [ชื่อตัวละคร]: สิ่งที่ต้องทำ/รับมือ: (สิ่งที่กำลังเผชิญ) | [d20 + <ชื่อ Stat ในชีทของตัวละครนั้น> vs DC XX]`
 
   // 4. CONSTRUCT MULTI-TURN CONTENTS (Sliding Window 4 เทิร์นล่าสุด)
   const turnsWindow = recentTurns.slice(-4)
@@ -456,13 +650,13 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
   // 5. CURRENT TURN PAYLOAD + AUTHOR'S NOTE REMINDER
   const currentTurnUserParts = [
     loreContext ? `[DYNAMIC LORE INJECTION FOR THIS TURN]\n${loreContext}\n` : '',
-    `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members | Party Avg Max HP: ${damageBenchmark.avgPartyMaxHp})]\n${actionsSummary || 'The party surveys their surroundings.'}`,
+    `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members | Party Avg Primary Max: ${damageBenchmark.avgPartyMaxHp})]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE - ต้องปฏิบัติตามอย่างเคร่งครัด]
-- กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน โดยอ้างอิงค่าสถานะทั้ง 6 (STR, DEX, CON, INT, WIS, CHA) อุปกรณ์สวมใส่ และสกิลที่มีจริง
-- [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ (เช่น **Shacco**, **ไมค์**, **Pantheon**) ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
+- กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน โดยอ้างอิงค่าสถานะประจำชีทของแต่ละคน (${dynamicStatsSummary}), ทรัพยากร (${dynamicResourcesSummary}), อุปกรณ์สวมใส่ และสกิลที่มีจริง
+- [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
 - หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจศัตรูเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
-- [ห้ามมี Plot Armor & ใช้ฐานดาเมจกลางของปาร์ตี้หักลบด้วย CON/เกราะ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) หรือโจมตีโดยไม่ทอยเต๋า ให้ใช้ฐานดาเมจกลางของโต๊ะนี้ (เฉี่ยว ${damageBenchmark.grazeMin}-${damageBenchmark.grazeMax} HP, ปกติ/สวนกลับ/FAIL ${damageBenchmark.normalMin}-${damageBenchmark.normalMax} HP, รุนแรง/NAT 1/Boss ${damageBenchmark.heavyMin}-${damageBenchmark.heavyMax} HP) แล้วนำมาหักลบด้วยค่า "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" (จาก CON + ชุดเกราะ) ของผู้เล่นคนนั้น และต้องเขียนวงเล็บระบุชื่อตัวละคร (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-X HP]) ในเนื้อเรื่องเสมอ! หากใช้สกิลต้องหัก Skill Cost และเขียน (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Y SP]) ด้วย!
-- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :" ของสมาชิกทุกคน) และ [ Decision ] เท่านั้น`,
+- [ห้ามมี Plot Armor & ใช้ฐานดาเมจกลางของปาร์ตี้หักลบด้วยค่าลดทอนดาเมจ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) หรือโจมตีโดยไม่ทอยเต๋า ให้ใช้ฐานดาเมจกลางของโต๊ะนี้ (เฉี่ยว ${damageBenchmark.grazeMin}-${damageBenchmark.grazeMax}, ปกติ/สวนกลับ/FAIL ${damageBenchmark.normalMin}-${damageBenchmark.normalMax}, รุนแรง/NAT 1/Boss ${damageBenchmark.heavyMin}-${damageBenchmark.heavyMax}) แล้วนำมาหักลบด้วยค่า "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้น และต้องเขียนวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรที่เปลี่ยนไป เช่น (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-X]) หรือทรัพยากรอื่นตามชีท (${dynamicResourcesSummary}) ในเนื้อเรื่องเสมอ!
+- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :" พร้อมทรัพยากรทุกตัวตามชีทของสมาชิกแต่ละคน) และ [ Decision ] (โดยอ้างอิงชื่อ Stat ที่มีอยู่ในชีทของตัวละครคนนั้นจริง) เท่านั้น`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -531,8 +725,8 @@ function normalizeParsedCondition(
 }
 
 /**
- * Extracts updated HP, Skill Cost (SP), and Status Condition for each party member
- * from the AI Dungeon Master's narrative and `[ Overview ]` section.
+ * Extracts updated HP, Skill Cost (SP), Custom Template Resources (Sanity, Stress, Luck, etc.),
+ * and Status Condition for each party member from the AI Dungeon Master's narrative and `[ Overview ]` section.
  */
 export function extractPartyStateUpdates(
   narrative: string,
@@ -545,14 +739,43 @@ export function extractPartyStateUpdates(
   if (trackedMembers.length === 0) return updates
 
   const stateByCharId = new Map<string, PartyMemberStateUpdate>()
+  const descriptorsByCharId = new Map<string, MemberResourceDescriptor[]>()
+  const initialCustomByCharId = new Map<string, Record<string, { current: number; max: number }>>()
+
   for (const member of trackedMembers) {
-    const maxHp = Math.max(1, Number(member.maxHp) || 10)
-    const currentHp = Math.max(0, Math.min(maxHp, Number(member.currentHp ?? maxHp)))
-    const maxSkillCost = Math.max(0, Number(member.maxSkillCost ?? 10))
-    const currentSkillCost = Math.max(
-      0,
-      Math.min(maxSkillCost, Number(member.currentSkillCost ?? maxSkillCost))
-    )
+    const descriptors = getMemberResourceDescriptors(member)
+    descriptorsByCharId.set(member.characterId, descriptors)
+
+    const hpDesc = descriptors.find((d) => d.id === 'hp')
+    const spDesc = descriptors.find((d) => d.id === 'skill_cost')
+
+    const maxHp = hpDesc
+      ? hpDesc.max
+      : Math.max(1, Number(member.maxHp) || 10)
+    const currentHp = hpDesc
+      ? hpDesc.current
+      : Math.max(0, Math.min(maxHp, Number(member.currentHp ?? maxHp)))
+
+    const maxSkillCost = spDesc
+      ? spDesc.max
+      : Math.max(0, Number(member.maxSkillCost ?? 10))
+    const currentSkillCost = spDesc
+      ? spDesc.current
+      : Math.max(0, Math.min(maxSkillCost, Number(member.currentSkillCost ?? maxSkillCost)))
+
+    const customResources: Record<string, { current: number; max: number }> = {}
+    const initialCustom: Record<string, { current: number; max: number }> = {}
+    for (const desc of descriptors) {
+      if (desc.id !== 'hp' && desc.id !== 'skill_cost') {
+        customResources[desc.id] = { current: desc.current, max: desc.max }
+        initialCustom[desc.id] = { current: desc.current, max: desc.max }
+      }
+    }
+    initialCustomByCharId.set(member.characterId, initialCustom)
+
+    const defaultCondition =
+      member.condition || member.sheetTemplate?.conditions[0] || 'Normal'
+
     stateByCharId.set(member.characterId, {
       characterId: member.characterId,
       characterName: member.characterName,
@@ -560,7 +783,8 @@ export function extractPartyStateUpdates(
       maxHp,
       currentSkillCost,
       maxSkillCost,
-      condition: member.condition || 'Normal',
+      condition: defaultCondition,
+      customResources,
     })
   }
 
@@ -573,7 +797,67 @@ export function extractPartyStateUpdates(
   const cleanCandidateName = (raw: string) =>
     raw.replace(/[*_`[\]"']/g, '').trim().toLowerCase()
 
-  // Resolve a party member from an explicit name written inside "(Name — HP: ...)"
+  // Match a resource label from AI text against a specific member's resource descriptors
+  const matchMemberResource = (
+    charId: string,
+    rawResourceName: string
+  ): MemberResourceDescriptor | undefined => {
+    const cleaned = cleanCandidateName(rawResourceName)
+    if (!cleaned) return undefined
+    const descriptors = descriptorsByCharId.get(charId) ?? []
+
+    // 1. Exact alias match
+    for (const desc of descriptors) {
+      if (desc.aliases.includes(cleaned)) return desc
+    }
+
+    // 2. Substring alias match (longest alias first)
+    for (const desc of descriptors) {
+      for (const alias of desc.aliases) {
+        if (alias.length >= 2 && (cleaned.includes(alias) || alias.includes(cleaned))) {
+          return desc
+        }
+      }
+    }
+
+    return undefined
+  }
+
+  const applyResourceValueToTarget = (
+    target: PartyMemberStateUpdate,
+    desc: MemberResourceDescriptor,
+    newVal: number
+  ) => {
+    if (!Number.isFinite(newVal)) return
+    const rounded = Math.round(newVal)
+    if (desc.id === 'hp') {
+      target.currentHp = Math.max(0, Math.min(target.maxHp, rounded))
+    } else if (desc.id === 'skill_cost') {
+      target.currentSkillCost = Math.max(0, Math.min(target.maxSkillCost, rounded))
+    } else {
+      const existing = target.customResources[desc.id] ?? {
+        current: desc.current,
+        max: desc.max,
+      }
+      target.customResources[desc.id] = {
+        current: Math.max(0, Math.min(existing.max, rounded)),
+        max: existing.max,
+      }
+    }
+  }
+
+  const getCurrentResourceValue = (
+    target: PartyMemberStateUpdate,
+    desc: MemberResourceDescriptor
+  ): { current: number; max: number } => {
+    if (desc.id === 'hp') return { current: target.currentHp, max: target.maxHp }
+    if (desc.id === 'skill_cost') {
+      return { current: target.currentSkillCost, max: target.maxSkillCost }
+    }
+    return target.customResources[desc.id] ?? { current: desc.current, max: desc.max }
+  }
+
+  // Resolve a party member from an explicit name written inside "(Name — Resource: ...)"
   const findMemberByExplicitName = (rawName: string): PartyMemberStateUpdate | undefined => {
     const cleaned = cleanCandidateName(rawName)
     if (!cleaned) return undefined
@@ -597,109 +881,119 @@ export function extractPartyStateUpdates(
   }
 
   // Fallback helper when an inline parenthesis omits the character name (legacy format):
-  // Scopes lookbehind to the current clause/line and verifies old/max stat compatibility.
+  // Scopes lookbehind to the current clause/line and verifies resource + old/max compatibility.
   const resolveUnnamedFallbackMember = (
     matchIndex: number,
+    rawResourceName: string,
     parsedOld?: number,
-    parsedMax?: number,
-    isSp = false
-  ): PartyMemberStateUpdate | undefined => {
+    parsedMax?: number
+  ): { target: PartyMemberStateUpdate; desc: MemberResourceDescriptor } | undefined => {
     if (trackedMembers.length === 1) {
-      return stateByCharId.get(trackedMembers[0].characterId)
+      const sole = stateByCharId.get(trackedMembers[0].characterId)
+      const desc = sole
+        ? matchMemberResource(sole.characterId, rawResourceName)
+        : undefined
+      return sole && desc ? { target: sole, desc } : undefined
     }
 
-    // Restrict lookbehind to the current line / after any previous inline stat parenthesis
     const windowStart = Math.max(0, matchIndex - 220)
     const rawSlice = narrative.slice(windowStart, matchIndex)
     const lastBreak = Math.max(rawSlice.lastIndexOf('\n'), rawSlice.lastIndexOf(')'))
     const clauseText = (lastBreak >= 0 ? rawSlice.slice(lastBreak + 1) : rawSlice).toLowerCase()
 
-    // Filter members compatible with parsedMax / parsedOld when possible
-    const compatibleMembers = membersByNameLength.filter((m) => {
+    const candidatesWithResource = membersByNameLength.flatMap((m) => {
       const st = stateByCharId.get(m.characterId)
-      if (!st) return false
-      const memberMax = isSp ? st.maxSkillCost : st.maxHp
-      if (typeof parsedMax === 'number' && Number.isFinite(parsedMax) && memberMax !== parsedMax) {
-        return false
+      const desc = matchMemberResource(m.characterId, rawResourceName)
+      if (!st || !desc) return []
+      const { max } = getCurrentResourceValue(st, desc)
+      if (typeof parsedMax === 'number' && Number.isFinite(parsedMax) && max !== parsedMax) {
+        return []
       }
-      return true
+      return [{ member: m, target: st, desc }]
     })
 
-    const searchPool = compatibleMembers.length > 0 ? compatibleMembers : membersByNameLength
+    if (candidatesWithResource.length === 0) return undefined
 
-    let bestMember: PartyMemberStateUpdate | undefined
+    let bestCandidate: { target: PartyMemberStateUpdate; desc: MemberResourceDescriptor } | undefined
     let bestEndPos = -1
 
-    for (const member of searchPool) {
-      const nameLower = cleanCandidateName(member.characterName)
+    for (const cand of candidatesWithResource) {
+      const nameLower = cleanCandidateName(cand.member.characterName)
       if (!nameLower) continue
       const pos = clauseText.lastIndexOf(nameLower)
       if (pos >= 0) {
         const endPos = pos + nameLower.length
         if (endPos > bestEndPos) {
           bestEndPos = endPos
-          bestMember = stateByCharId.get(member.characterId)
+          bestCandidate = { target: cand.target, desc: cand.desc }
         }
       }
     }
 
-    if (bestMember) return bestMember
+    if (bestCandidate) return bestCandidate
 
-    // If no name was in the immediate clause, only assign if a single member uniquely matches old+max
     if (typeof parsedMax === 'number' && typeof parsedOld === 'number') {
-      const exactStatMatches = compatibleMembers.filter((m) => {
-        const st = stateByCharId.get(m.characterId)
-        if (!st) return false
-        const curVal = isSp ? st.currentSkillCost : st.currentHp
-        return curVal === parsedOld
+      const exactStatMatches = candidatesWithResource.filter((cand) => {
+        const { current } = getCurrentResourceValue(cand.target, cand.desc)
+        return current === parsedOld
       })
       if (exactStatMatches.length === 1) {
-        return stateByCharId.get(exactStatMatches[0].characterId)
+        return { target: exactStatMatches[0].target, desc: exactStatMatches[0].desc }
       }
     }
 
-    if (compatibleMembers.length === 1) {
-      return stateByCharId.get(compatibleMembers[0].characterId)
+    if (candidatesWithResource.length === 1) {
+      return { target: candidatesWithResource[0].target, desc: candidatesWithResource[0].desc }
     }
 
     return undefined
   }
 
-  // 1. Scan inline player HP changes in the narrative:
-  // Supports named format "(Shacco — HP: 100/100 -> 80/100 [-20 HP])" and legacy "(HP: 100/100 -> 80/100)"
-  const inlineHpRegex =
-    /\((?:([^()\n—–\-:]+?)\s*(?:—|–|-|:)\s*)?HP:\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
-  for (const match of narrative.matchAll(inlineHpRegex)) {
+  // 1. Scan all inline resource changes in the narrative (HP, Skill Cost, Sanity, Stress, Luck, Heart, etc.):
+  // Supports "(Shacco — HP: 100/100 -> 80/100 [-20])", "(Shacco — Sanity: 50/50 -> 42/50 [-8])", and legacy "(HP: 100/100 -> 80/100)"
+  const inlineResourceRegex =
+    /\((?:([^()\n—–\-:]+?)\s*(?:—|–|-|:)\s*)?([^\n:：]+?)\s*[:：]\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
+  for (const match of narrative.matchAll(inlineResourceRegex)) {
     const explicitName = match[1]
-    const oldHp = Number(match[2])
-    const newHp = Number(match[4])
-    const parsedMax = Number(match[5])
-    const target = explicitName
-      ? findMemberByExplicitName(explicitName)
-      : resolveUnnamedFallbackMember(match.index ?? 0, oldHp, parsedMax, false)
-    if (target && Number.isFinite(newHp)) {
-      target.currentHp = Math.max(0, Math.min(target.maxHp, Math.round(newHp)))
+    const rawResourceLabel = match[2]
+    const oldVal = Number(match[3])
+    const newVal = Number(match[5])
+    const parsedMax = Number(match[6])
+
+    if (explicitName) {
+      const target = findMemberByExplicitName(explicitName)
+      if (target) {
+        const desc = matchMemberResource(target.characterId, rawResourceLabel)
+        if (desc) {
+          applyResourceValueToTarget(target, desc, newVal)
+          continue
+        }
+      }
+      // Also handle case where rawResourceLabel had no character name and match[1] was actually part of resource name
+      const combinedLabel = `${explicitName} - ${rawResourceLabel}`
+      const fallbackCombined = resolveUnnamedFallbackMember(
+        match.index ?? 0,
+        combinedLabel,
+        oldVal,
+        parsedMax
+      )
+      if (fallbackCombined) {
+        applyResourceValueToTarget(fallbackCombined.target, fallbackCombined.desc, newVal)
+      }
+    } else {
+      const resolved = resolveUnnamedFallbackMember(
+        match.index ?? 0,
+        rawResourceLabel,
+        oldVal,
+        parsedMax
+      )
+      if (resolved) {
+        applyResourceValueToTarget(resolved.target, resolved.desc, newVal)
+      }
     }
   }
 
-  // 2. Scan inline Skill Cost changes in the narrative:
-  // Supports named format "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])" and legacy "(Skill Cost: 10/10 -> 7/10)"
-  const inlineSpRegex =
-    /\((?:([^()\n—–\-:]+?)\s*(?:—|–|-|:)\s*)?(?:Skill\s*Cost|SP):\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
-  for (const match of narrative.matchAll(inlineSpRegex)) {
-    const explicitName = match[1]
-    const oldSp = Number(match[2])
-    const newSp = Number(match[4])
-    const parsedMax = Number(match[5])
-    const target = explicitName
-      ? findMemberByExplicitName(explicitName)
-      : resolveUnnamedFallbackMember(match.index ?? 0, oldSp, parsedMax, true)
-    if (target && Number.isFinite(newSp)) {
-      target.currentSkillCost = Math.max(0, Math.min(target.maxSkillCost, Math.round(newSp)))
-    }
-  }
-
-  // 3. Parse "สถานะปาร์ตี้ :" inside [ Overview ] (authoritative end-of-turn lock)
+  // 2. Parse "สถานะปาร์ตี้ :" inside [ Overview ] (authoritative end-of-turn lock for all template resources & condition)
   // Supports both single-line (";"-separated) and multi-line / bulleted party status blocks.
   const partyStatusBlockMatch = narrative.match(
     /สถานะปาร์ตี้\s*[:：]\s*([\s\S]*?)(?=\n\s*(?:\[\s*Decision\s*\]|สถานที่และเวลา|สถานการณ์ปัจจุบัน|สถานะศัตรู)|$)/i
@@ -707,7 +1001,7 @@ export function extractPartyStateUpdates(
   if (partyStatusBlockMatch) {
     const statusBlock = partyStatusBlockMatch[1].trim()
     const segments = statusBlock
-      .split(/\s*;\s*|\r?\n+|\s*,\s*(?=[^:：\n]+[:：]\s*HP)/i)
+      .split(/\s*;\s*|\r?\n+|\s*,\s*(?=[^:：\n]+[:：]\s*[A-Za-zก-๙])/i)
       .map((s) => s.replace(/^\s*[-*•]\s*/, '').trim())
       .filter(Boolean)
 
@@ -733,26 +1027,23 @@ export function extractPartyStateUpdates(
       usedSegmentIndices.add(matchedSegIdx)
       const matchingSegment = segments[matchedSegIdx]
 
-      const hpMatch = matchingSegment.match(
-        /HP\s*[:：]?\s*(\d+)\s*\/\s*(\d+)(?:\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+))?/i
-      )
-      if (hpMatch) {
-        const latestHp = Number(hpMatch[3] ?? hpMatch[1])
-        if (Number.isFinite(latestHp)) {
-          target.currentHp = Math.max(0, Math.min(target.maxHp, Math.round(latestHp)))
-        }
-      }
-
-      const spMatch = matchingSegment.match(
-        /(?:Skill\s*Cost|SP)\s*[:：]?\s*(\d+)\s*\/\s*(\d+)(?:\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+))?/i
-      )
-      if (spMatch) {
-        const latestSp = Number(spMatch[3] ?? spMatch[1])
-        if (Number.isFinite(latestSp)) {
-          target.currentSkillCost = Math.max(
-            0,
-            Math.min(target.maxSkillCost, Math.round(latestSp))
+      // Match every resource defined on this character's template within their status segment
+      const descriptors = descriptorsByCharId.get(member.characterId) ?? []
+      for (const desc of descriptors) {
+        for (const alias of desc.aliases) {
+          const escapedAlias = escapeRegexLiteral(alias)
+          const resRegex = new RegExp(
+            `(?:^|[|;,:\\s(（])${escapedAlias}(?:\\s*\\([^)]*\\))?\\s*[:：]?\\s*(\\d+)\\s*\\/\\s*(\\d+)(?:\\s*(?:->|→|=>)\\s*(\\d+)\\s*\\/\\s*(\\d+))?`,
+            'i'
           )
+          const resMatch = matchingSegment.match(resRegex)
+          if (resMatch) {
+            const latestVal = Number(resMatch[3] ?? resMatch[1])
+            if (Number.isFinite(latestVal)) {
+              applyResourceValueToTarget(target, desc, latestVal)
+              break
+            }
+          }
         }
       }
 
@@ -767,23 +1058,42 @@ export function extractPartyStateUpdates(
     }
   }
 
-  // 4. Synchronize automatic Bloodied / Unconscious condition thresholds & collect changed records
+  // 3. Synchronize automatic vitality condition thresholds (respecting template conditions) & collect changed records
   for (const member of trackedMembers) {
     const target = stateByCharId.get(member.characterId)
     if (!target) continue
 
-    if (target.currentHp === 0) {
-      target.condition = 'Unconscious'
-    } else if (
-      target.currentHp <= Math.floor(target.maxHp * 0.3) &&
-      target.condition === 'Normal'
-    ) {
-      target.condition = 'Bloodied'
-    } else if (
-      target.currentHp > Math.floor(target.maxHp * 0.3) &&
-      target.condition === 'Bloodied'
-    ) {
-      target.condition = 'Normal'
+    const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
+    const hasHpResource = tpl.resources.length === 0 || tpl.resources.some((r) => r.id === 'hp')
+    const allowedConds = tpl.conditions.length > 0 ? tpl.conditions : CHARACTER_CONDITIONS
+    const normalCond =
+      allowedConds.find((c) => c.toLowerCase() === 'normal') ?? allowedConds[0] ?? 'Normal'
+    const lowHpCond =
+      allowedConds.find((c) => c.toLowerCase() === 'bloodied') ??
+      allowedConds.find((c) => c.toLowerCase() === 'wounded') ??
+      null
+    const zeroHpCond =
+      allowedConds.find((c) => c.toLowerCase() === 'unconscious') ??
+      allowedConds.find((c) => c.toLowerCase() === 'heartbroken') ??
+      null
+
+    if (hasHpResource) {
+      if (target.currentHp === 0 && zeroHpCond) {
+        target.condition = zeroHpCond
+      } else if (
+        lowHpCond &&
+        target.currentHp > 0 &&
+        target.currentHp <= Math.floor(target.maxHp * 0.3) &&
+        target.condition === normalCond
+      ) {
+        target.condition = lowHpCond
+      } else if (
+        lowHpCond &&
+        target.currentHp > Math.floor(target.maxHp * 0.3) &&
+        target.condition === lowHpCond
+      ) {
+        target.condition = normalCond
+      }
     }
 
     const origHp = Math.max(0, Math.min(target.maxHp, Number(member.currentHp ?? target.maxHp)))
@@ -791,12 +1101,17 @@ export function extractPartyStateUpdates(
       0,
       Math.min(target.maxSkillCost, Number(member.currentSkillCost ?? target.maxSkillCost))
     )
-    const origCond = member.condition || 'Normal'
+    const origCond = member.condition || normalCond
+    const initialCustom = initialCustomByCharId.get(member.characterId) ?? {}
+    const customChanged = Object.entries(target.customResources).some(
+      ([resId, val]) => (initialCustom[resId]?.current ?? val.max) !== val.current
+    )
 
     if (
       target.currentHp !== origHp ||
       target.currentSkillCost !== origSp ||
-      target.condition !== origCond
+      target.condition !== origCond ||
+      customChanged
     ) {
       updates.push(target)
     }

@@ -454,101 +454,105 @@ export default function CharacterInspectorPanel({
             ) : isEditingChar ? (
               /* Inline Character Combat Editor */
               <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Current {hpLabel}
-                    </label>
-                    <input
-                      type="number"
-                      max={charForm.max_hp}
-                      value={charForm.current_hp}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        onChangeCharForm({
-                          ...charForm,
-                          current_hp: Number.isNaN(val)
-                            ? 0
-                            : Math.min(charForm.max_hp, val),
-                        });
-                      }}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
-                    />
+                {(hpResourceDef || activeTemplate.resources.length === 0) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                        Current {hpLabel}
+                      </label>
+                      <input
+                        type="number"
+                        max={charForm.max_hp}
+                        value={charForm.current_hp}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          onChangeCharForm({
+                            ...charForm,
+                            current_hp: Number.isNaN(val)
+                              ? 0
+                              : Math.min(charForm.max_hp, val),
+                          });
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                        Max {hpLabel}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={charForm.max_hp}
+                        onChange={(e) => {
+                          const newMax = Number(e.target.value);
+                          const clampedMax = Number.isNaN(newMax) ? 1 : newMax;
+                          onChangeCharForm({
+                            ...charForm,
+                            max_hp: clampedMax,
+                            current_hp: Math.min(clampedMax, charForm.current_hp),
+                          });
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Max {hpLabel}
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={charForm.max_hp}
-                      onChange={(e) => {
-                        const newMax = Number(e.target.value);
-                        const clampedMax = Number.isNaN(newMax) ? 1 : newMax;
-                        onChangeCharForm({
-                          ...charForm,
-                          max_hp: clampedMax,
-                          current_hp: Math.min(clampedMax, charForm.current_hp),
-                        });
-                      }}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Current {spResourceDef?.label || "Skill Cost"}
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={charForm.max_skill_cost}
-                      value={charForm.current_skill_cost}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        const clamped = Number.isNaN(val)
-                          ? 0
-                          : Math.max(0, Math.min(charForm.max_skill_cost, val));
-                        onChangeCharForm({
-                          ...charForm,
-                          current_skill_cost: clamped,
-                          armor_class: clamped,
-                        });
-                      }}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
-                    />
+                {spResourceDef && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                        Current {spResourceDef.label || "Skill Cost"}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={charForm.max_skill_cost}
+                        value={charForm.current_skill_cost}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const clamped = Number.isNaN(val)
+                            ? 0
+                            : Math.max(0, Math.min(charForm.max_skill_cost, val));
+                          onChangeCharForm({
+                            ...charForm,
+                            current_skill_cost: clamped,
+                            armor_class: clamped,
+                          });
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono">
+                        Max {spResourceDef.label || "Skill Cost"}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={charForm.max_skill_cost}
+                        onChange={(e) => {
+                          const newMax = Number(e.target.value);
+                          const clampedMax = Number.isNaN(newMax)
+                            ? 0
+                            : Math.max(0, newMax);
+                          const nextCur = Math.min(
+                            clampedMax,
+                            charForm.current_skill_cost,
+                          );
+                          onChangeCharForm({
+                            ...charForm,
+                            max_skill_cost: clampedMax,
+                            current_skill_cost: nextCur,
+                            armor_class: nextCur,
+                          });
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                      Max {spResourceDef?.label || "Skill Cost"}
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={charForm.max_skill_cost}
-                      onChange={(e) => {
-                        const newMax = Number(e.target.value);
-                        const clampedMax = Number.isNaN(newMax)
-                          ? 0
-                          : Math.max(0, newMax);
-                        const nextCur = Math.min(
-                          clampedMax,
-                          charForm.current_skill_cost,
-                        );
-                        onChangeCharForm({
-                          ...charForm,
-                          max_skill_cost: clampedMax,
-                          current_skill_cost: nextCur,
-                          armor_class: nextCur,
-                        });
-                      }}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-xs text-white focus:border-amber-400 outline-none"
-                    />
-                  </div>
-                </div>
+                )}
 
                 {/* Custom Template Resource Bars Editor (Stress, Luck, etc.) */}
                 {customResourceDefs.map((res) => {
@@ -1069,49 +1073,62 @@ export default function CharacterInspectorPanel({
                     />
                   </div>
 
-                  {/* SAO Linear HP & Skill Point Gauge Bars right beneath the dial */}
-                  <div className="w-full grid grid-cols-2 gap-3 mt-2 pt-2.5 border-t border-white/10">
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                        <span className="flex items-center gap-1 text-zinc-300 truncate">
-                          <Heart className={`w-3 h-3 shrink-0 ${hpColors.text}`} />{" "}
-                          {hpLabel}
-                        </span>
-                        <span className="text-white font-bold shrink-0">
-                          {activeChar.current_hp} / {activeChar.max_hp}
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 ${hpColors.bg}`}
-                          style={{ width: `${hpPercent}%` }}
-                        />
-                      </div>
-                    </div>
+                  {/* SAO Linear Resource Gauge Bars right beneath the dial (ordered by template.resources) */}
+                  {activeTemplate.resources.length > 0 && (
+                    <div
+                      className={`w-full grid ${
+                        activeTemplate.resources.length === 1
+                          ? "grid-cols-1"
+                          : "grid-cols-2"
+                      } gap-3 mt-2 pt-2.5 border-t border-white/10`}
+                    >
+                      {activeTemplate.resources.map((res) => {
+                        if (res.id === "hp") {
+                          return (
+                            <div key={res.id}>
+                              <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                                <span className="flex items-center gap-1 text-zinc-300 truncate">
+                                  <Heart
+                                    className={`w-3 h-3 shrink-0 ${hpColors.text}`}
+                                  />{" "}
+                                  {hpLabel}
+                                </span>
+                                <span className="text-white font-bold shrink-0">
+                                  {activeChar.current_hp} / {activeChar.max_hp}
+                                </span>
+                              </div>
+                              <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
+                                <div
+                                  className={`h-full transition-all duration-300 ${hpColors.bg}`}
+                                  style={{ width: `${hpPercent}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
 
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                        <span className="flex items-center gap-1 text-zinc-300 truncate">
-                          <Zap className="w-3 h-3 text-sky-400 shrink-0" />{" "}
-                          {spLabel}
-                        </span>
-                        <span className="text-sky-300 font-bold shrink-0">
-                          {currentSkillCost} / {maxSkillCost}
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
-                        <div
-                          className="h-full bg-sky-400 transition-all duration-300"
-                          style={{ width: `${spPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                        if (res.id === "skill_cost") {
+                          return (
+                            <div key={res.id}>
+                              <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                                <span className="flex items-center gap-1 text-zinc-300 truncate">
+                                  <Zap className="w-3 h-3 text-sky-400 shrink-0" />{" "}
+                                  {spLabel}
+                                </span>
+                                <span className="text-sky-300 font-bold shrink-0">
+                                  {currentSkillCost} / {maxSkillCost}
+                                </span>
+                              </div>
+                              <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
+                                <div
+                                  className="h-full bg-sky-400 transition-all duration-300"
+                                  style={{ width: `${spPercent}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
 
-                  {/* Custom Resource Bars (Stress, Luck, etc.) */}
-                  {customResourceDefs.length > 0 && (
-                    <div className="w-full grid grid-cols-2 gap-3 mt-2.5 pt-2 border-t border-white/10">
-                      {customResourceDefs.map((res) => {
                         const val = activeCustom.resources[res.id] || {
                           current: res.defaultMax,
                           max: res.defaultMax,
@@ -1141,7 +1158,7 @@ export default function CharacterInspectorPanel({
                                 {val.current} / {val.max}
                               </span>
                             </div>
-                            <div className="h-1.5 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
+                            <div className="h-2 w-full bg-zinc-950 border border-white/15 rounded-xs overflow-hidden">
                               <div
                                 className={`h-full transition-all duration-300 ${colorTheme.bg}`}
                                 style={{ width: `${pct}%` }}

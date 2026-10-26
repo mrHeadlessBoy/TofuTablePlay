@@ -8,6 +8,10 @@ import {
   isColumnStatId,
   readCharacterTemplate,
   readCustomValues,
+  type ResourceColor,
+  type SheetCustomValues,
+  type TemplateResource,
+  type TemplateStat,
 } from '@/features/character/template'
 import type { Character } from '../types'
 
@@ -133,6 +137,97 @@ export function getSaoHpStroke(ratio: number): string {
   return getHpColorHex(ratio)
 }
 
+const RESOURCE_STROKE_HEX: Record<ResourceColor, string> = {
+  red: '#ef4444',
+  amber: '#fbbf24',
+  cyan: '#38bdf8',
+  emerald: '#34d399',
+  violet: '#a855f7',
+  rose: '#fb7185',
+  sky: '#38bdf8',
+  zinc: '#a1a1aa',
+}
+
+function formatShortResourceLabel(res: TemplateResource): string {
+  if (res.id === 'hp' && /^hit\s*points/i.test(res.label)) return 'HP'
+  if (res.id === 'skill_cost' && /^skill\s*cost$/i.test(res.label)) return 'SKILL PT'
+  const base = res.label.split(/[（(]/)[0].trim() || res.label.trim() || res.id
+  return base.toUpperCase().slice(0, 10)
+}
+
+function formatShortStatLabel(stat: TemplateStat, maxChars: number): string {
+  if (isColumnStatId(stat.id)) return stat.id.slice(0, maxChars)
+  const base = (stat.label || stat.id).split(/[（(]/)[0].trim() || stat.label || stat.id
+  return base.toUpperCase().slice(0, maxChars)
+}
+
+type ResolvedDialResource = {
+  id: string
+  arcLabel: string
+  current: number
+  max: number
+  ratio: number
+  strokeColor: string
+  wedgeFill: string
+}
+
+function resolveDialResource(
+  res: TemplateResource,
+  activeChar: Character | null | undefined,
+  currentSkillCost: number,
+  maxSkillCost: number,
+  customValues: SheetCustomValues
+): ResolvedDialResource {
+  if (res.id === 'hp') {
+    const current = activeChar ? (activeChar.current_hp ?? res.defaultMax) : 0
+    const max = Math.max(1, activeChar ? (activeChar.max_hp ?? res.defaultMax) : res.defaultMax || 1)
+    const ratio = activeChar ? Math.max(0, Math.min(1, current / max)) : 0
+    const strokeColor = activeChar ? getSaoHpStroke(ratio) : '#52525b'
+    return {
+      id: res.id,
+      arcLabel: formatShortResourceLabel(res),
+      current,
+      max: activeChar ? (activeChar.max_hp ?? res.defaultMax) : res.defaultMax,
+      ratio,
+      strokeColor,
+      wedgeFill: 'rgba(74,222,128,0.045)',
+    }
+  }
+
+  if (res.id === 'skill_cost') {
+    const current = activeChar ? currentSkillCost : 0
+    const rawMax = activeChar ? maxSkillCost : res.defaultMax
+    const max = Math.max(1, rawMax || 1)
+    const ratio = activeChar && rawMax > 0 ? Math.max(0, Math.min(1, current / max)) : 0
+    const strokeColor = activeChar ? (RESOURCE_STROKE_HEX[res.color] ?? '#38bdf8') : '#52525b'
+    return {
+      id: res.id,
+      arcLabel: formatShortResourceLabel(res),
+      current,
+      max: rawMax,
+      ratio,
+      strokeColor,
+      wedgeFill: 'rgba(56,189,248,0.045)',
+    }
+  }
+
+  const stored = customValues.resources[res.id] ?? { current: res.defaultMax, max: res.defaultMax }
+  const current = activeChar ? stored.current : 0
+  const rawMax = activeChar ? stored.max : res.defaultMax
+  const max = Math.max(1, rawMax || 1)
+  const ratio = activeChar && rawMax > 0 ? Math.max(0, Math.min(1, current / max)) : 0
+  const strokeColor = activeChar ? (RESOURCE_STROKE_HEX[res.color] ?? '#a855f7') : '#52525b'
+  return {
+    id: res.id,
+    arcLabel: formatShortResourceLabel(res),
+    current,
+    max: rawMax,
+    ratio,
+    strokeColor,
+    wedgeFill: 'rgba(168,85,247,0.045)',
+  }
+}
+
 export type SaoDualSemicircleDialProps = {
   activeChar: Character | null | undefined
   currentSkillCost: number
@@ -143,8 +238,8 @@ export type SaoDualSemicircleDialProps = {
 
 /**
  * 2-Part Semicircle SAO HUD Dial:
- * - Upper Semicircle (ด้านบน): { HP, Skill Point } curved gauges + concentric curved SVG <textPath> readouts
- * - Lower Semicircle (ด้านล่าง): { Stat ทั้ง 6 } (STR, DEX, CON, INT, WIS, CHA) in 6 radial sectors
+ * - Upper Semicircle (ด้านบน): Dynamic template resource gauges + concentric curved SVG <textPath> readouts
+ * - Lower Semicircle (ด้านล่าง): Dynamic template stats (supports < 6, = 6, or > 6 stats via adaptive sectors / dual rings)
  */
 export function SaoDualSemicircleDial({
   activeChar,
@@ -157,47 +252,36 @@ export function SaoDualSemicircleDial({
   const cx = 100
   const cy = 100
 
-  const curHp = activeChar?.current_hp ?? 0
-  const maxHp = Math.max(1, activeChar?.max_hp ?? 1)
-  const hpRatio = activeChar ? Math.max(0, Math.min(1, curHp / maxHp)) : 0
-
-  const curSp = activeChar ? currentSkillCost : 0
-  const maxSp = Math.max(1, maxSkillCost || 1)
-  const spRatio = activeChar
-    ? maxSkillCost > 0
-      ? Math.max(0, Math.min(1, curSp / maxSp))
-      : 0
-    : 0
-
-  const hpColor = activeChar ? getSaoHpStroke(hpRatio) : '#52525b'
-  const spColor = activeChar ? '#38bdf8' : '#52525b'
-
   const activeTemplate = activeChar ? readCharacterTemplate(activeChar) : CLASSIC_TEMPLATE
-  const customValues = activeChar ? readCustomValues(activeChar) : { stats: {}, resources: {}, fields: {}, equipment: {} }
-  const hpRes = activeTemplate.resources.find((r) => r.id === 'hp')
-  const spRes = activeTemplate.resources.find((r) => r.id === 'skill_cost')
-  const hpArcLabel = (hpRes?.label || 'HP').toUpperCase().slice(0, 10)
-  const spArcLabel = (
-    spRes?.id === 'skill_cost' && spRes.label === 'Skill Cost' ? 'SKILL PT' : spRes?.label || 'SKILL PT'
-  )
-    .toUpperCase()
-    .slice(0, 10)
+  const customValues = activeChar
+    ? readCustomValues(activeChar)
+    : { stats: {}, resources: {}, fields: {}, equipment: {} }
 
-  const dialStats =
-    activeTemplate.stats.length > 0 ? activeTemplate.stats.slice(0, 6) : CLASSIC_TEMPLATE.stats.slice(0, 6)
-  const sectorCount = Math.max(1, dialStats.length)
-  const sectorSpanDeg = 174 / sectorCount
+  const resolvedResources = activeTemplate.resources.map((res) =>
+    resolveDialResource(res, activeChar, currentSkillCost, maxSkillCost, customValues)
+  )
+  const leftRes = resolvedResources[0] ?? null
+  const rightRes = resolvedResources[1] ?? null
+  const isSingleResource = resolvedResources.length === 1
+
+  const dialStats = activeChar ? activeTemplate.stats : CLASSIC_TEMPLATE.stats
+  const totalStats = dialStats.length
+  const useTwoStatRings = totalStats > 8
+
+  const outerRingStats = useTwoStatRings
+    ? dialStats.slice(0, Math.ceil(totalStats / 2))
+    : dialStats
+  const innerRingStats = useTwoStatRings ? dialStats.slice(Math.ceil(totalStats / 2)) : []
 
   // Upper Semicircle gauge arcs (r = 84):
-  // Left upper quadrant (HP): 184° -> 266° (82° sweep rising from left horizon to top clockwise)
-  const hpTrackPath = describeClockwiseArc(cx, cy, 84, 184, 266)
+  // Single-resource full upper arc (184° -> 356°), or Dual left (184° -> 266°) & right (356° -> 274°)
+  const fullUpperTrackPath = describeClockwiseArc(cx, cy, 84, 184, 356)
+  const fullUpperLabelArcPath = describeClockwiseArc(cx, cy, 65, 184, 356)
+  const fullUpperValueArcPath = describeClockwiseArc(cx, cy, 48, 184, 356)
 
-  // Right upper quadrant (Skill Point): 356° -> 274° (82° sweep rising from right horizon to top counter-clockwise)
+  const hpTrackPath = describeClockwiseArc(cx, cy, 84, 184, 266)
   const spTrackPath = describeCounterClockwiseArc(cx, cy, 84, 356, 274)
 
-  // Concentric curved text paths inside Upper-Left (184° -> 266°) and Upper-Right (274° -> 356°):
-  // Outer arc (r = 65): curved label ("HP" / "SKILL PT")
-  // Inner arc (r = 48): curved numeric value ("20/20" / "10/10")
   const hpLabelArcPath = describeClockwiseArc(cx, cy, 65, 184, 266)
   const hpValueArcPath = describeClockwiseArc(cx, cy, 48, 184, 266)
   const spLabelArcPath = describeClockwiseArc(cx, cy, 65, 274, 356)
@@ -205,12 +289,8 @@ export function SaoDualSemicircleDial({
 
   // Lower Semicircle outer frame: 3° -> 177° (174° sweep along bottom for the Stats)
   const lowerOuterArc = describeClockwiseArc(cx, cy, 89, 3, 177)
+  const lowerMidArc = describeClockwiseArc(cx, cy, 64.5, 3.5, 176.5)
   const lowerInnerArc = describeClockwiseArc(cx, cy, 40, 4, 176)
-
-  // Internal divider angles splitting 177°..3° into equal sectors
-  const statDividerAngles = Array.from({ length: Math.max(0, sectorCount - 1) }, (_, idx) =>
-    177 - (idx + 1) * sectorSpanDeg
-  )
 
   const shortName = activeChar?.name
     ? activeChar.name.length > 10
@@ -224,6 +304,99 @@ export function SaoDualSemicircleDial({
   const hpValuePathId = `hpValueArc-${variant}-${uid}`
   const spLabelPathId = `spLabelArc-${variant}-${uid}`
   const spValuePathId = `spValueArc-${variant}-${uid}`
+  const fullLabelPathId = `fullLabelArc-${variant}-${uid}`
+  const fullValuePathId = `fullValueArc-${variant}-${uid}`
+
+  const renderStatRing = (
+    ringStats: TemplateStat[],
+    innerR: number,
+    outerR: number,
+    labelR: number,
+    valR: number,
+    ringKey: string
+  ) => {
+    const count = ringStats.length
+    if (count === 0) return null
+    const spanDeg = 174 / count
+    const dividerAngles = Array.from({ length: Math.max(0, count - 1) }, (_, idx) =>
+      177 - (idx + 1) * spanDeg
+    )
+    const isCompactRing = useTwoStatRings || count >= 7
+    const labelFontSize = useTwoStatRings ? '6.4' : count <= 4 ? '9' : count <= 6 ? '8.5' : '7.2'
+    const valFontSize = useTwoStatRings ? '9.2' : count <= 4 ? '13' : count <= 6 ? '12.5' : '10.2'
+    const maxLabelChars = count <= 4 ? 6 : isCompactRing ? 3 : 4
+
+    return (
+      <g key={ringKey}>
+        {ringStats.map((stat, idx) => {
+          const endDeg = 177 - idx * spanDeg
+          const startDeg = endDeg - spanDeg
+          return (
+            <path
+              key={`wedge-${ringKey}-${stat.id}`}
+              d={describeSectorWedge(cx, cy, innerR, outerR, startDeg, endDeg)}
+              fill={idx % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(245,158,11,0.045)'}
+            />
+          )
+        })}
+
+        {dividerAngles.map((deg) => {
+          const innerPt = polarToCartesian(cx, cy, innerR, deg)
+          const outerPt = polarToCartesian(cx, cy, outerR, deg)
+          return (
+            <line
+              key={`div-${ringKey}-${deg}`}
+              x1={innerPt.x}
+              y1={innerPt.y}
+              x2={outerPt.x}
+              y2={outerPt.y}
+              stroke="rgba(255,255,255,0.24)"
+              strokeWidth="1.2"
+            />
+          )
+        })}
+
+        {ringStats.map((stat, idx) => {
+          const centerDeg = 177 - (idx * spanDeg + spanDeg / 2)
+          const labelPos = polarToCartesian(cx, cy, labelR, centerDeg)
+          const valPos = polarToCartesian(cx, cy, valR, centerDeg)
+          const rawScore = activeChar
+            ? isColumnStatId(stat.id)
+              ? (activeChar.stats?.[stat.id] ?? stat.default)
+              : (customValues.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
+            : '--'
+          const shortStatLabel = formatShortStatLabel(stat, maxLabelChars)
+
+          return (
+            <g key={`stat-${ringKey}-${stat.id}`}>
+              <text
+                x={labelPos.x}
+                y={labelPos.y + (useTwoStatRings ? 2.2 : 3)}
+                textAnchor="middle"
+                fill="#d4d4d8"
+                fontSize={labelFontSize}
+                fontFamily="monospace"
+                fontWeight="800"
+              >
+                {shortStatLabel}
+              </text>
+              <text
+                x={valPos.x}
+                y={valPos.y + (useTwoStatRings ? 3 : 4)}
+                textAnchor="middle"
+                fill={isOpen ? '#fde68a' : '#ffffff'}
+                fontSize={valFontSize}
+                fontFamily="monospace"
+                fontWeight="900"
+              >
+                {String(rawScore)}
+              </text>
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
 
   return (
     <svg
@@ -244,11 +417,13 @@ export function SaoDualSemicircleDial({
           </feMerge>
         </filter>
 
-        {/* Curved guide paths for Upper-Left HP & Upper-Right SKILL PT text readouts */}
+        {/* Curved guide paths for Upper Semicircle resource readouts */}
         <path id={hpLabelPathId} d={hpLabelArcPath} fill="none" />
         <path id={hpValuePathId} d={hpValueArcPath} fill="none" />
         <path id={spLabelPathId} d={spLabelArcPath} fill="none" />
         <path id={spValuePathId} d={spValueArcPath} fill="none" />
+        <path id={fullLabelPathId} d={fullUpperLabelArcPath} fill="none" />
+        <path id={fullValuePathId} d={fullUpperValueArcPath} fill="none" />
       </defs>
 
       {/* Main Circular Backdrop */}
@@ -272,17 +447,7 @@ export function SaoDualSemicircleDial({
         strokeDasharray="12 5 2.5 5"
       />
 
-      {/* ================= UPPER SEMICIRCLE: { HP, Skill Point } ================= */}
-      {/* Upper subtle quadrant wedges */}
-      <path
-        d={describeSectorWedge(cx, cy, 40, 76, 183, 268)}
-        fill="rgba(74,222,128,0.045)"
-      />
-      <path
-        d={describeSectorWedge(cx, cy, 40, 76, 272, 357)}
-        fill="rgba(56,189,248,0.045)"
-      />
-
+      {/* ================= UPPER SEMICIRCLE: Dynamic Template Resources ================= */}
       {/* Upper inner guide arc */}
       <path
         d={describeClockwiseArc(cx, cy, 40, 184, 356)}
@@ -291,111 +456,198 @@ export function SaoDualSemicircleDial({
         strokeWidth="1.2"
       />
 
-      {/* Top vertical split tick between HP (left) and Skill Point (right) */}
-      <line
-        x1={100}
-        y1={10}
-        x2={100}
-        y2={58}
-        stroke="rgba(255,255,255,0.3)"
-        strokeWidth="1.5"
-      />
+      {resolvedResources.length === 0 ? (
+        <>
+          <path
+            d={fullUpperTrackPath}
+            fill="none"
+            stroke="rgba(255,255,255,0.12)"
+            strokeWidth="8.5"
+            strokeLinecap="round"
+          />
+          <text
+            fill="#71717a"
+            fontSize="8.5"
+            fontFamily="monospace"
+            fontWeight="800"
+            letterSpacing="0.14em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${fullLabelPathId}`} startOffset="50%">
+              NO RESOURCE
+            </textPath>
+          </text>
+        </>
+      ) : isSingleResource && leftRes ? (
+        <>
+          <path
+            d={describeSectorWedge(cx, cy, 40, 76, 184, 356)}
+            fill={leftRes.wedgeFill}
+          />
+          <path
+            d={fullUpperTrackPath}
+            fill="none"
+            stroke="rgba(255,255,255,0.14)"
+            strokeWidth="8.5"
+            strokeLinecap="round"
+          />
+          {leftRes.ratio > 0 && (
+            <path
+              d={fullUpperTrackPath}
+              fill="none"
+              stroke={leftRes.strokeColor}
+              strokeWidth="8.5"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray="100"
+              strokeDashoffset={(1 - leftRes.ratio) * 100}
+              filter={`url(#${glowFilterId})`}
+            />
+          )}
+          <text
+            fill="#d4d4d8"
+            fontSize="8.8"
+            fontFamily="monospace"
+            fontWeight="800"
+            letterSpacing="0.14em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${fullLabelPathId}`} startOffset="50%">
+              {leftRes.arcLabel}
+            </textPath>
+          </text>
+          <text
+            fill={activeChar ? leftRes.strokeColor : '#71717a'}
+            fontSize="12.5"
+            fontFamily="monospace"
+            fontWeight="900"
+            letterSpacing="0.04em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${fullValuePathId}`} startOffset="50%">
+              {activeChar ? `${leftRes.current}/${leftRes.max}` : '--/--'}
+            </textPath>
+          </text>
+        </>
+      ) : (
+        <>
+          {/* Upper subtle quadrant wedges */}
+          <path
+            d={describeSectorWedge(cx, cy, 40, 76, 183, 268)}
+            fill={leftRes?.wedgeFill ?? 'rgba(74,222,128,0.045)'}
+          />
+          <path
+            d={describeSectorWedge(cx, cy, 40, 76, 272, 357)}
+            fill={rightRes?.wedgeFill ?? 'rgba(56,189,248,0.045)'}
+          />
 
-      {/* HP Track & Active Gauge (Upper-Left) — Exact Stroke Length via pathLength & strokeDashoffset */}
-      <path
-        d={hpTrackPath}
-        fill="none"
-        stroke="rgba(255,255,255,0.14)"
-        strokeWidth="8.5"
-        strokeLinecap="round"
-      />
-      {hpRatio > 0 && (
-        <path
-          d={hpTrackPath}
-          fill="none"
-          stroke={hpColor}
-          strokeWidth="8.5"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray="100"
-          strokeDashoffset={(1 - hpRatio) * 100}
-          filter={`url(#${glowFilterId})`}
-        />
+          {/* Top vertical split tick between Resource #1 (left) and Resource #2 (right) */}
+          <line
+            x1={100}
+            y1={10}
+            x2={100}
+            y2={58}
+            stroke="rgba(255,255,255,0.3)"
+            strokeWidth="1.5"
+          />
+
+          {/* Resource #1 Track & Active Gauge (Upper-Left) */}
+          <path
+            d={hpTrackPath}
+            fill="none"
+            stroke="rgba(255,255,255,0.14)"
+            strokeWidth="8.5"
+            strokeLinecap="round"
+          />
+          {leftRes && leftRes.ratio > 0 && (
+            <path
+              d={hpTrackPath}
+              fill="none"
+              stroke={leftRes.strokeColor}
+              strokeWidth="8.5"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray="100"
+              strokeDashoffset={(1 - leftRes.ratio) * 100}
+              filter={`url(#${glowFilterId})`}
+            />
+          )}
+
+          {/* Resource #2 Track & Active Gauge (Upper-Right) */}
+          <path
+            d={spTrackPath}
+            fill="none"
+            stroke="rgba(255,255,255,0.14)"
+            strokeWidth="8.5"
+            strokeLinecap="round"
+          />
+          {rightRes && rightRes.ratio > 0 && (
+            <path
+              d={spTrackPath}
+              fill="none"
+              stroke={rightRes.strokeColor}
+              strokeWidth="8.5"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray="100"
+              strokeDashoffset={(1 - rightRes.ratio) * 100}
+              filter={`url(#${glowFilterId})`}
+            />
+          )}
+
+          {/* Curved Resource #1 Text Readout (Upper-Left) */}
+          <text
+            fill="#d4d4d8"
+            fontSize="8.8"
+            fontFamily="monospace"
+            fontWeight="800"
+            letterSpacing="0.14em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${hpLabelPathId}`} startOffset="50%">
+              {leftRes?.arcLabel ?? 'HP'}
+            </textPath>
+          </text>
+          <text
+            fill={activeChar && leftRes ? leftRes.strokeColor : '#71717a'}
+            fontSize="12.5"
+            fontFamily="monospace"
+            fontWeight="900"
+            letterSpacing="0.04em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${hpValuePathId}`} startOffset="50%">
+              {activeChar && leftRes ? `${leftRes.current}/${leftRes.max}` : '--/--'}
+            </textPath>
+          </text>
+
+          {/* Curved Resource #2 Text Readout (Upper-Right) */}
+          <text
+            fill="#d4d4d8"
+            fontSize="8.5"
+            fontFamily="monospace"
+            fontWeight="800"
+            letterSpacing="0.1em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${spLabelPathId}`} startOffset="50%">
+              {rightRes?.arcLabel ?? 'SKILL PT'}
+            </textPath>
+          </text>
+          <text
+            fill={activeChar && rightRes ? rightRes.strokeColor : '#71717a'}
+            fontSize="12.5"
+            fontFamily="monospace"
+            fontWeight="900"
+            letterSpacing="0.04em"
+            textAnchor="middle"
+          >
+            <textPath href={`#${spValuePathId}`} startOffset="50%">
+              {activeChar && rightRes ? `${rightRes.current}/${rightRes.max}` : '--/--'}
+            </textPath>
+          </text>
+        </>
       )}
-
-      {/* Skill Point Track & Active Gauge (Upper-Right) — Symmetrical Counter-Clockwise Stroke */}
-      <path
-        d={spTrackPath}
-        fill="none"
-        stroke="rgba(255,255,255,0.14)"
-        strokeWidth="8.5"
-        strokeLinecap="round"
-      />
-      {spRatio > 0 && (
-        <path
-          d={spTrackPath}
-          fill="none"
-          stroke={spColor}
-          strokeWidth="8.5"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray="100"
-          strokeDashoffset={(1 - spRatio) * 100}
-          filter={`url(#${glowFilterId})`}
-        />
-      )}
-
-      {/* Curved HP Text Readout (Upper-Left, following 184° -> 266° curve) */}
-      <text
-        fill="#d4d4d8"
-        fontSize="8.8"
-        fontFamily="monospace"
-        fontWeight="800"
-        letterSpacing="0.14em"
-        textAnchor="middle"
-      >
-        <textPath href={`#${hpLabelPathId}`} startOffset="50%">
-          {hpArcLabel}
-        </textPath>
-      </text>
-      <text
-        fill={activeChar ? hpColor : '#71717a'}
-        fontSize="12.5"
-        fontFamily="monospace"
-        fontWeight="900"
-        letterSpacing="0.04em"
-        textAnchor="middle"
-      >
-        <textPath href={`#${hpValuePathId}`} startOffset="50%">
-          {activeChar ? `${curHp}/${activeChar.max_hp ?? 0}` : '--/--'}
-        </textPath>
-      </text>
-
-      {/* Curved Skill Point Text Readout (Upper-Right, following 274° -> 356° curve) */}
-      <text
-        fill="#d4d4d8"
-        fontSize="8.5"
-        fontFamily="monospace"
-        fontWeight="800"
-        letterSpacing="0.1em"
-        textAnchor="middle"
-      >
-        <textPath href={`#${spLabelPathId}`} startOffset="50%">
-          {spArcLabel}
-        </textPath>
-      </text>
-      <text
-        fill={activeChar ? '#38bdf8' : '#71717a'}
-        fontSize="12.5"
-        fontFamily="monospace"
-        fontWeight="900"
-        letterSpacing="0.04em"
-        textAnchor="middle"
-      >
-        <textPath href={`#${spValuePathId}`} startOffset="50%">
-          {activeChar ? `${curSp}/${maxSkillCost}` : '--/--'}
-        </textPath>
-      </text>
 
       {/* Horizontal Split Bar separating Upper Semicircle & Lower Semicircle */}
       <line
@@ -415,19 +667,34 @@ export function SaoDualSemicircleDial({
         strokeWidth="2"
       />
 
-      {/* ================= LOWER SEMICIRCLE: { Stats } ================= */}
-      {/* Alternating subtle sector backgrounds for crisp visual separation */}
-      {dialStats.map((stat, idx) => {
-        const endDeg = 177 - idx * sectorSpanDeg
-        const startDeg = endDeg - sectorSpanDeg
-        return (
+      {/* ================= LOWER SEMICIRCLE: Dynamic Template Stats ================= */}
+      {totalStats === 0 ? (
+        <text
+          x={cx}
+          y={cy + 66}
+          textAnchor="middle"
+          fill="#71717a"
+          fontSize="8.5"
+          fontFamily="monospace"
+          fontWeight="800"
+          letterSpacing="0.12em"
+        >
+          NO STATS
+        </text>
+      ) : useTwoStatRings ? (
+        <>
+          {renderStatRing(outerRingStats, 64.5, 89, 71, 82.5, 'outer')}
+          {renderStatRing(innerRingStats, 40, 64.5, 46.5, 57.5, 'inner')}
           <path
-            key={`wedge-${stat.id}`}
-            d={describeSectorWedge(cx, cy, 40, 89, startDeg, endDeg)}
-            fill={idx % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(245,158,11,0.045)'}
+            d={lowerMidArc}
+            fill="none"
+            stroke="rgba(255,255,255,0.22)"
+            strokeWidth="1"
           />
-        )
-      })}
+        </>
+      ) : (
+        renderStatRing(outerRingStats, 40, 89, 55, 74.5, 'single')
+      )}
 
       <path
         d={lowerOuterArc}
@@ -441,65 +708,6 @@ export function SaoDualSemicircleDial({
         stroke="rgba(255,255,255,0.22)"
         strokeWidth="1.2"
       />
-
-      {/* Radial dividers for the stats */}
-      {statDividerAngles.map((deg) => {
-        const innerPt = polarToCartesian(cx, cy, 40, deg)
-        const outerPt = polarToCartesian(cx, cy, 89, deg)
-        return (
-          <line
-            key={deg}
-            x1={innerPt.x}
-            y1={innerPt.y}
-            x2={outerPt.x}
-            y2={outerPt.y}
-            stroke="rgba(255,255,255,0.24)"
-            strokeWidth="1.2"
-          />
-        )
-      })}
-
-      {/* Stats arranged left-to-right across the Lower Semicircle */}
-      {dialStats.map((stat, idx) => {
-        const centerDeg = 177 - (idx * sectorSpanDeg + sectorSpanDeg / 2)
-        const labelPos = polarToCartesian(cx, cy, 55, centerDeg)
-        const valPos = polarToCartesian(cx, cy, 74.5, centerDeg)
-        const rawScore = activeChar
-          ? isColumnStatId(stat.id)
-            ? (activeChar.stats?.[stat.id] ?? stat.default)
-            : (customValues.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
-          : '--'
-        const shortStatLabel = isColumnStatId(stat.id)
-          ? stat.id
-          : (stat.label || stat.id).toUpperCase().slice(0, 4)
-
-        return (
-          <g key={stat.id}>
-            <text
-              x={labelPos.x}
-              y={labelPos.y + 3}
-              textAnchor="middle"
-              fill="#d4d4d8"
-              fontSize="8.5"
-              fontFamily="monospace"
-              fontWeight="800"
-            >
-              {shortStatLabel}
-            </text>
-            <text
-              x={valPos.x}
-              y={valPos.y + 4}
-              textAnchor="middle"
-              fill={isOpen ? '#fde68a' : '#ffffff'}
-              fontSize="12.5"
-              fontFamily="monospace"
-              fontWeight="900"
-            >
-              {String(rawScore)}
-            </text>
-          </g>
-        )
-      })}
 
       {/* ================= CENTER SAO EMBLEM CORE ================= */}
       <circle

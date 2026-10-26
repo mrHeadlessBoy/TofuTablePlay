@@ -462,7 +462,7 @@ export async function resolveTurn(tableId: string) {
       partyActions,
     })
 
-    // Automatically apply any HP, Skill Cost (SP), or Condition changes reported by the AI DM
+    // Automatically apply any HP, Skill Cost (SP), Custom Resource, or Condition changes reported by the AI DM
     const partyStateUpdates = extractPartyStateUpdates(aiNarrative, partyActions)
     if (partyStateUpdates.length > 0) {
       await Promise.all(
@@ -472,6 +472,28 @@ export async function resolveTurn(tableId: string) {
             existingChar?.stats && typeof existingChar.stats === 'object'
               ? (existingChar.stats as Record<string, unknown>)
               : {}
+          const existingCustom = readCustomValues(existingChar)
+          const mergedCustomResources = {
+            ...existingCustom.resources,
+            ...stateUpdate.customResources,
+          }
+          const hasCustomData =
+            Object.keys(existingCustom.stats).length > 0 ||
+            Object.keys(mergedCustomResources).length > 0 ||
+            Object.keys(existingCustom.fields).length > 0 ||
+            Object.keys(existingCustom.equipment).length > 0
+
+          const nextStats: Record<string, unknown> = {
+            ...existingStats,
+            current_skill_cost: stateUpdate.currentSkillCost,
+            max_skill_cost: stateUpdate.maxSkillCost,
+          }
+          if (hasCustomData) {
+            nextStats.sheet_custom = {
+              ...existingCustom,
+              resources: mergedCustomResources,
+            }
+          }
 
           const { error: charUpdateErr } = await db
             .from('characters')
@@ -479,11 +501,7 @@ export async function resolveTurn(tableId: string) {
               current_hp: stateUpdate.currentHp,
               armor_class: stateUpdate.currentSkillCost,
               status_condition: stateUpdate.condition,
-              stats: {
-                ...existingStats,
-                current_skill_cost: stateUpdate.currentSkillCost,
-                max_skill_cost: stateUpdate.maxSkillCost,
-              },
+              stats: nextStats,
             })
             .eq('id', stateUpdate.characterId)
 
