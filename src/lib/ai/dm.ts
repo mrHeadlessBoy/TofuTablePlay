@@ -371,7 +371,7 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
 2. การเคารพข้อมูลตัวละครอย่างครบถ้วน (Character Stats, Equipment, Inventory & Skills):
    - คำนึงถึงค่า HP, ค่าสถานะทั้ง 6 (STR, DEX, CON, INT, WIS, CHA), สถานะผิดปกติ (Condition), อุปกรณ์ที่สวมใส่ในแต่ละช่อง (Head, Torso, Leg, Foot, Left Hand, Right Hand) และไอเทมในกระเป๋าจริงในการตัดสินผลลัพธ์
    - หากผู้เล่นประกาศใช้ "สกิล (Skill)" หรือ "ไอเทม": ให้ตรวจสอบว่ามีอยู่ในข้อมูลตัวละครหรือไม่ และมีค่า Skill Cost (SP) เพียงพอหรือไม่:
-     * หากมีสกิลและ Skill Cost เพียงพอ: ต้องหักค่า Skill Cost ตาม Cost ของสกิลนั้นทันที และเขียนวงเล็บระบุการลดลงของ Skill Cost ในเนื้อเรื่องด้วย เช่น "(Skill Cost: 10/10 -> 7/10 [-3 SP])"
+     * หากมีสกิลและ Skill Cost เพียงพอ: ต้องหักค่า Skill Cost ตาม Cost ของสกิลนั้นทันที และเขียนวงเล็บระบุชื่อตัวละครพร้อมการลดลงของ Skill Cost ในเนื้อเรื่องด้วยเสมอ เช่น "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])"
      * หากไม่มีสกิลนั้น หรือ Skill Cost ปัจจุบันไม่พอ: ให้บรรยายว่าการร่ายสกิลล้มเหลวหรือเกิดผลเสียแทน
 
 3. กฎการตัดสินผลแอ็กชันและลูกเต๋า (Action & Dice Resolution):
@@ -407,8 +407,8 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
      * สูตรคำนวณ: ดาเมจสุทธิที่ผู้เล่นได้รับ = (ฐานดาเมจของศัตรู - ค่าลดทอนดาเมจจาก CON และชุดเกราะของผู้เล่นคนนั้น) โดยต้องเสียเลือดขั้นต่ำอย่างน้อย 1 HP เสมอ
      * ด้วยวิธีนี้ ผู้เล่นที่มี Max HP สูง (เช่น 120 HP) และมีค่า CON + ชุดเกราะดี จะโดนดาเมจเข้าเนื้อน้อยกว่าและทนรับการโจมตีได้หลายเทิร์นกว่าผู้เล่นที่ตัวบาง (เช่น 90 HP) อย่างแท้จริง!
      * หากการโจมตีของศัตรูมีพิษ มึนงง คำสาป หรือบาดเจ็บสาหัส (HP เหลือน้อยกว่า 30%) ให้เปลี่ยนสถานะ Condition เป็น Bloodied, Poisoned, Stunned, Blinded, Exhausted หรือ Unconscious เมื่อ HP เหลือ 0
-   - [บังคับเขียนตัวเลข HP ของผู้เล่นในเนื้อเรื่องทุกครั้งที่เสียเลือดหรือฟื้นฟูเลือด]:
-     * ทุกครั้งที่ผู้เล่นได้รับความเสียหายหรือฟื้นฟู HP ต้องเขียนวงเล็บระบุค่า HP เดิม -> ค่า HP ใหม่ พร้อมจำนวนหน่วยสุทธิที่ลดลง/เพิ่มขึ้นในเนื้อเรื่องทันที เช่น "(HP: 120/120 -> 108/120 [-12 HP])" หรือ "(HP: 90/90 -> 68/90 [-22 HP])"
+   - [บังคับระบุชื่อตัวละครและตัวเลข HP ในวงเล็บทุกครั้งที่เสียเลือดหรือฟื้นฟูเลือด]:
+     * ทุกครั้งที่ผู้เล่นได้รับความเสียหายหรือฟื้นฟู HP ต้องเขียนวงเล็บระบุ "ชื่อตัวละคร" ตามด้วยค่า HP เดิม -> ค่า HP ใหม่ พร้อมจำนวนหน่วยสุทธิที่ลดลง/เพิ่มขึ้นในเนื้อเรื่องทันที เช่น "(Shacco — HP: 120/120 -> 108/120 [-12 HP])" หรือ "(ไมค์ — HP: 90/90 -> 68/90 [-22 HP])" เพื่อไม่ให้สับสนเมื่อมีผู้เล่นหลายคนโดนโจมตีพร้อมกัน (ส่วนมอนสเตอร์ให้เขียนเป็น % เช่น "(HP: 100% -> 80%)" ตามเดิม)
      * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "ถูกโจมตี" โดยไม่ระบุตัวเลขหน่วย HP ที่ลดลงเด็ดขาด!
 
 6. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
@@ -417,13 +417,13 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - โฟกัสเฉพาะ "แอ็กชันที่ผู้เล่นสั่งในเทิร์นนี้" และ "ผลลัพธ์ใหม่ที่เกิดขึ้น" เท่านั้น
   
 [REQUIRED OUTPUT FORMAT]
-(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และวงเล็บ (HP: เดิม/Max -> ใหม่/Max [-Z HP]) หรือ (Skill Cost: เดิม/Max -> ใหม่/Max [-Z SP]) เมื่อผู้เล่นเสียเลือดหรือใช้สกิล)
+(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และวงเล็บระบุชื่อตัวละคร (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-Z HP]) หรือ (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Z SP]) เมื่อผู้เล่นเสียเลือดหรือใช้สกิล)
 
 [ Overview ]
 สถานที่และเวลา : (ชื่อสถานที่ สภาพแวดล้อมโดยย่อ และเวลาปัจจุบัน เช่น 14:30 น.)
 สถานการณ์ปัจจุบัน : (สรุปสิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยย่อ)
 สถานะศัตรู : (ระบุชื่อศัตรูทุกตัวในฉากพร้อม HP% คงเหลือล่าสุด เช่น "หมาป่าทมิฬ A: 55%, หมาป่าทมิฬ B: 100%" / หากศัตรูตายให้ระบุว่า "0% (ตายแล้ว)" / หากไม่มีศัตรูในฉากให้เขียนว่า "ไม่มี")
-สถานะปาร์ตี้ : (ระบุสถานะล่าสุดหลังจบเทิร์นของสมาชิกทุกคนในปาร์ตี้ คั่นแต่ละคนด้วย " ; " ตามรูปแบบ: "ชื่อตัวละคร: HP X/MaxHP | SP Y/MaxSP | สถานะ: Normal" เช่น "Shacco: HP 80/100 | SP 7/10 | สถานะ: Normal")
+สถานะปาร์ตี้ : (ระบุสถานะล่าสุดหลังจบเทิร์นของสมาชิกทุกคนในปาร์ตี้ให้ครบทุกคน คั่นแต่ละคนด้วย " ; " ตามรูปแบบ: "ชื่อตัวละคร: HP X/MaxHP | SP Y/MaxSP | สถานะ: Normal" เช่น "Shacco: HP 80/100 | SP 7/10 | สถานะ: Normal ; ไมค์: HP 68/90 | SP 10/10 | สถานะ: Normal")
 
 [ Decision ]
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าเพื่อโจมตี ป้องกัน หรือรับมือเหตุการณ์ในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ตัดหัวข้อ [ Decision ] ทิ้งทันที)*
@@ -461,8 +461,8 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
 - กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน โดยอ้างอิงค่าสถานะทั้ง 6 (STR, DEX, CON, INT, WIS, CHA) อุปกรณ์สวมใส่ และสกิลที่มีจริง
 - [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ (เช่น **Shacco**, **ไมค์**, **Pantheon**) ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
 - หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจศัตรูเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
-- [ห้ามมี Plot Armor & ใช้ฐานดาเมจกลางของปาร์ตี้หักลบด้วย CON/เกราะ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) หรือโจมตีโดยไม่ทอยเต๋า ให้ใช้ฐานดาเมจกลางของโต๊ะนี้ (เฉี่ยว ${damageBenchmark.grazeMin}-${damageBenchmark.grazeMax} HP, ปกติ/สวนกลับ/FAIL ${damageBenchmark.normalMin}-${damageBenchmark.normalMax} HP, รุนแรง/NAT 1/Boss ${damageBenchmark.heavyMin}-${damageBenchmark.heavyMax} HP) แล้วนำมาหักลบด้วยค่า "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" (จาก CON + ชุดเกราะ) ของผู้เล่นคนนั้น และต้องเขียนวงเล็บ (HP: เดิม/Max -> ใหม่/Max [-X HP]) ในเนื้อเรื่องเสมอ! หากใช้สกิลต้องหัก Skill Cost และเขียน (Skill Cost: เดิม/Max -> ใหม่/Max [-Y SP]) ด้วย!
-- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :") และ [ Decision ] เท่านั้น`,
+- [ห้ามมี Plot Armor & ใช้ฐานดาเมจกลางของปาร์ตี้หักลบด้วย CON/เกราะ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) หรือโจมตีโดยไม่ทอยเต๋า ให้ใช้ฐานดาเมจกลางของโต๊ะนี้ (เฉี่ยว ${damageBenchmark.grazeMin}-${damageBenchmark.grazeMax} HP, ปกติ/สวนกลับ/FAIL ${damageBenchmark.normalMin}-${damageBenchmark.normalMax} HP, รุนแรง/NAT 1/Boss ${damageBenchmark.heavyMin}-${damageBenchmark.heavyMax} HP) แล้วนำมาหักลบด้วยค่า "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" (จาก CON + ชุดเกราะ) ของผู้เล่นคนนั้น และต้องเขียนวงเล็บระบุชื่อตัวละคร (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-X HP]) ในเนื้อเรื่องเสมอ! หากใช้สกิลต้องหัก Skill Cost และเขียน (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Y SP]) ด้วย!
+- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :" ของสมาชิกทุกคน) และ [ Decision ] เท่านั้น`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -564,78 +564,174 @@ export function extractPartyStateUpdates(
     })
   }
 
-  // Helper to find which member a match at `matchIndex` belongs to
-  const resolveTargetMember = (matchIndex: number, parsedMax?: number) => {
-    if (trackedMembers.length === 1) {
-      return stateByCharId.get(trackedMembers[0].characterId)
-    }
+  // Sort members by characterName length descending so prefix names (e.g. "เรน" vs "เรนเจอร์")
+  // never collide when matching names in text or status segments.
+  const membersByNameLength = [...trackedMembers].sort(
+    (a, b) => b.characterName.trim().length - a.characterName.trim().length
+  )
 
-    const beforeText = narrative.slice(Math.max(0, matchIndex - 350), matchIndex).toLowerCase()
-    let bestMember: PartyMemberStateUpdate | undefined
-    let bestPos = -1
+  const cleanCandidateName = (raw: string) =>
+    raw.replace(/[*_`[\]"']/g, '').trim().toLowerCase()
 
-    for (const member of trackedMembers) {
-      const nameLower = member.characterName.trim().toLowerCase()
-      if (!nameLower) continue
-      const pos = beforeText.lastIndexOf(nameLower)
-      if (pos > bestPos) {
-        bestPos = pos
-        bestMember = stateByCharId.get(member.characterId)
+  // Resolve a party member from an explicit name written inside "(Name — HP: ...)"
+  const findMemberByExplicitName = (rawName: string): PartyMemberStateUpdate | undefined => {
+    const cleaned = cleanCandidateName(rawName)
+    if (!cleaned) return undefined
+
+    for (const member of membersByNameLength) {
+      const nameLower = cleanCandidateName(member.characterName)
+      if (nameLower && nameLower === cleaned) {
+        return stateByCharId.get(member.characterId)
       }
     }
 
-    if (bestMember) return bestMember
-
-    if (typeof parsedMax === 'number') {
-      const matchingMax = trackedMembers.filter((m) => (m.maxHp ?? 10) === parsedMax)
-      if (matchingMax.length === 1) {
-        return stateByCharId.get(matchingMax[0].characterId)
+    for (const member of membersByNameLength) {
+      const nameLower = cleanCandidateName(member.characterName)
+      if (!nameLower) continue
+      if (cleaned.includes(nameLower) || (nameLower.length >= 2 && nameLower.includes(cleaned))) {
+        return stateByCharId.get(member.characterId)
       }
     }
 
     return undefined
   }
 
-  // 1. Scan inline player HP changes in the narrative: e.g. "(HP: 100/100 -> 80/100 [-20 HP])"
+  // Fallback helper when an inline parenthesis omits the character name (legacy format):
+  // Scopes lookbehind to the current clause/line and verifies old/max stat compatibility.
+  const resolveUnnamedFallbackMember = (
+    matchIndex: number,
+    parsedOld?: number,
+    parsedMax?: number,
+    isSp = false
+  ): PartyMemberStateUpdate | undefined => {
+    if (trackedMembers.length === 1) {
+      return stateByCharId.get(trackedMembers[0].characterId)
+    }
+
+    // Restrict lookbehind to the current line / after any previous inline stat parenthesis
+    const windowStart = Math.max(0, matchIndex - 220)
+    const rawSlice = narrative.slice(windowStart, matchIndex)
+    const lastBreak = Math.max(rawSlice.lastIndexOf('\n'), rawSlice.lastIndexOf(')'))
+    const clauseText = (lastBreak >= 0 ? rawSlice.slice(lastBreak + 1) : rawSlice).toLowerCase()
+
+    // Filter members compatible with parsedMax / parsedOld when possible
+    const compatibleMembers = membersByNameLength.filter((m) => {
+      const st = stateByCharId.get(m.characterId)
+      if (!st) return false
+      const memberMax = isSp ? st.maxSkillCost : st.maxHp
+      if (typeof parsedMax === 'number' && Number.isFinite(parsedMax) && memberMax !== parsedMax) {
+        return false
+      }
+      return true
+    })
+
+    const searchPool = compatibleMembers.length > 0 ? compatibleMembers : membersByNameLength
+
+    let bestMember: PartyMemberStateUpdate | undefined
+    let bestEndPos = -1
+
+    for (const member of searchPool) {
+      const nameLower = cleanCandidateName(member.characterName)
+      if (!nameLower) continue
+      const pos = clauseText.lastIndexOf(nameLower)
+      if (pos >= 0) {
+        const endPos = pos + nameLower.length
+        if (endPos > bestEndPos) {
+          bestEndPos = endPos
+          bestMember = stateByCharId.get(member.characterId)
+        }
+      }
+    }
+
+    if (bestMember) return bestMember
+
+    // If no name was in the immediate clause, only assign if a single member uniquely matches old+max
+    if (typeof parsedMax === 'number' && typeof parsedOld === 'number') {
+      const exactStatMatches = compatibleMembers.filter((m) => {
+        const st = stateByCharId.get(m.characterId)
+        if (!st) return false
+        const curVal = isSp ? st.currentSkillCost : st.currentHp
+        return curVal === parsedOld
+      })
+      if (exactStatMatches.length === 1) {
+        return stateByCharId.get(exactStatMatches[0].characterId)
+      }
+    }
+
+    if (compatibleMembers.length === 1) {
+      return stateByCharId.get(compatibleMembers[0].characterId)
+    }
+
+    return undefined
+  }
+
+  // 1. Scan inline player HP changes in the narrative:
+  // Supports named format "(Shacco — HP: 100/100 -> 80/100 [-20 HP])" and legacy "(HP: 100/100 -> 80/100)"
   const inlineHpRegex =
-    /\(HP:\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
+    /\((?:([^()\n—–\-:]+?)\s*(?:—|–|-|:)\s*)?HP:\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
   for (const match of narrative.matchAll(inlineHpRegex)) {
-    const newHp = Number(match[3])
-    const parsedMax = Number(match[4])
-    const target = resolveTargetMember(match.index ?? 0, parsedMax)
+    const explicitName = match[1]
+    const oldHp = Number(match[2])
+    const newHp = Number(match[4])
+    const parsedMax = Number(match[5])
+    const target = explicitName
+      ? findMemberByExplicitName(explicitName)
+      : resolveUnnamedFallbackMember(match.index ?? 0, oldHp, parsedMax, false)
     if (target && Number.isFinite(newHp)) {
       target.currentHp = Math.max(0, Math.min(target.maxHp, Math.round(newHp)))
     }
   }
 
-  // 2. Scan inline Skill Cost changes in the narrative: e.g. "(Skill Cost: 10/10 -> 7/10 [-3 SP])"
+  // 2. Scan inline Skill Cost changes in the narrative:
+  // Supports named format "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])" and legacy "(Skill Cost: 10/10 -> 7/10)"
   const inlineSpRegex =
-    /\((?:Skill\s*Cost|SP):\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
+    /\((?:([^()\n—–\-:]+?)\s*(?:—|–|-|:)\s*)?(?:Skill\s*Cost|SP):\s*(\d+)\s*\/\s*(\d+)\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+)[^)\n]*\)/gi
   for (const match of narrative.matchAll(inlineSpRegex)) {
-    const newSp = Number(match[3])
-    const target = resolveTargetMember(match.index ?? 0)
+    const explicitName = match[1]
+    const oldSp = Number(match[2])
+    const newSp = Number(match[4])
+    const parsedMax = Number(match[5])
+    const target = explicitName
+      ? findMemberByExplicitName(explicitName)
+      : resolveUnnamedFallbackMember(match.index ?? 0, oldSp, parsedMax, true)
     if (target && Number.isFinite(newSp)) {
       target.currentSkillCost = Math.max(0, Math.min(target.maxSkillCost, Math.round(newSp)))
     }
   }
 
-  // 3. Parse "สถานะปาร์ตี้ :" line inside [ Overview ] (authoritative end-of-turn summary)
-  const partyStatusLineMatch = narrative.match(/สถานะปาร์ตี้\s*[:：]\s*([^\n]+)/i)
-  if (partyStatusLineMatch) {
-    const statusLine = partyStatusLineMatch[1]
-    const segments = statusLine.split(/\s*;\s*|\s*,\s*(?=[^:：]+[:：]\s*HP)/i)
+  // 3. Parse "สถานะปาร์ตี้ :" inside [ Overview ] (authoritative end-of-turn lock)
+  // Supports both single-line (";"-separated) and multi-line / bulleted party status blocks.
+  const partyStatusBlockMatch = narrative.match(
+    /สถานะปาร์ตี้\s*[:：]\s*([\s\S]*?)(?=\n\s*(?:\[\s*Decision\s*\]|สถานที่และเวลา|สถานการณ์ปัจจุบัน|สถานะศัตรู)|$)/i
+  )
+  if (partyStatusBlockMatch) {
+    const statusBlock = partyStatusBlockMatch[1].trim()
+    const segments = statusBlock
+      .split(/\s*;\s*|\r?\n+|\s*,\s*(?=[^:：\n]+[:：]\s*HP)/i)
+      .map((s) => s.replace(/^\s*[-*•]\s*/, '').trim())
+      .filter(Boolean)
 
-    for (const member of trackedMembers) {
+    const usedSegmentIndices = new Set<number>()
+
+    for (const member of membersByNameLength) {
       const target = stateByCharId.get(member.characterId)
       if (!target) continue
 
-      const nameLower = member.characterName.trim().toLowerCase()
-      const matchingSegment =
-        trackedMembers.length === 1
-          ? statusLine
-          : segments.find((seg) => seg.toLowerCase().includes(nameLower))
+      const nameLower = cleanCandidateName(member.characterName)
+      let matchedSegIdx = -1
 
-      if (!matchingSegment) continue
+      if (trackedMembers.length === 1 && segments.length === 1) {
+        matchedSegIdx = 0
+      } else if (nameLower) {
+        matchedSegIdx = segments.findIndex(
+          (seg, idx) =>
+            !usedSegmentIndices.has(idx) && cleanCandidateName(seg).includes(nameLower)
+        )
+      }
+
+      if (matchedSegIdx === -1) continue
+      usedSegmentIndices.add(matchedSegIdx)
+      const matchingSegment = segments[matchedSegIdx]
 
       const hpMatch = matchingSegment.match(
         /HP\s*[:：]?\s*(\d+)\s*\/\s*(\d+)(?:\s*(?:->|→|=>)\s*(\d+)\s*\/\s*(\d+))?/i
