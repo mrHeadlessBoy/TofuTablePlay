@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "D&D Playground | AI-Powered Tabletop RPG",
+  title: "TofuTablePlay | AI-Powered Tabletop RPG",
   description: "Synchronized tabletop roleplay with private turn drafting and an intelligent AI Dungeon Master.",
 };
 

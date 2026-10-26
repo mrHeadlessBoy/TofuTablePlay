@@ -9,7 +9,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Shield className="w-6 h-6 text-amber-500" />
-            <span className="font-bold tracking-tight text-lg text-white">D&D Playground</span>
+            <span className="font-bold tracking-tight text-lg text-white">TofuTablePlay</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -92,7 +92,7 @@ export default function LandingPage() {
       </main>
       {/* Footer */}
       <footer className="border-t border-zinc-900 py-6 text-center text-xs text-zinc-600">
-        D&D Playground &copy; 2026 &mdash; Pure text tabletop RPG engine.
+        TofuTablePlay &copy; 2026 &mdash; Pure text tabletop RPG engine.
       </footer>
     </div>
   )
