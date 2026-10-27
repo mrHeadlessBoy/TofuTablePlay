@@ -557,7 +557,38 @@ export default function TablePlayground({
     if (typeof table.current_turn !== 'number') return
 
     const nextState = !activeMember.is_ready
-    const submittedAction = nextState ? draftAction.trim() : null
+
+    // Client validation: Require a character linked before readying up
+    if (nextState && !activeMember.characters) {
+      showAlert({
+        title: 'ยังไม่ได้เลือกตัวละคร',
+        message: 'กรุณาเลือกหรือสร้างตัวละครสำหรับแคมเปญนี้ก่อนกดยืนยันความพร้อม (Please select a character before readying up)',
+        status: 'warning',
+        badge: 'Character Required',
+      })
+      return
+    }
+
+    // Combine typed action text with attached dice roll badges into a single submission string
+    const rollTexts = attachedRolls.map((roll) => {
+      const result = describeRoll(roll)
+      return result.startsWith(roll.label)
+        ? `[ทอยเต๋า ${result}]`
+        : `[ทอยเต๋า ${roll.label}: ${result}]`
+    })
+    const combinedAction = [draftAction.trim(), ...rollTexts].filter(Boolean).join(' ')
+
+    // Client validation: Action length check
+    if (nextState && combinedAction.length > 2500) {
+      showAlert({
+        title: 'ข้อความการกระทำยาวเกินไป',
+        message: 'ข้อความการกระทำมีความยาวเกินกำหนด สูงสุดไม่เกิน 2,500 ตัวอักษร (Action text exceeds 2,500 characters)',
+        status: 'warning',
+      })
+      return
+    }
+
+    const submittedAction = nextState ? (combinedAction || null) : null
     const setOwnReady = (ready: boolean, actionText?: string | null) =>
       setMembers((prev) =>
         prev.map((m) =>
