@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, type ReactNode } fro
 import dynamic from 'next/dynamic'
 import { Check, CheckCircle2, CircleDot, Clock, Compass, Dices, Edit3, Loader2, ShieldAlert, X } from 'lucide-react'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
-import type { DiceRoll } from '@/components/dice/dice'
+import { describeRoll, type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
 import { buildPlayerColorMap, getPlayerNameColor, type Turn } from '../types'
 
@@ -341,6 +341,8 @@ type NarrativeFeedPanelProps = {
   draftLocked: boolean
   diceOpen: boolean
   diceActors: DiceActor[]
+  attachedRolls: DiceRoll[]
+  onRemoveRoll: (rollId: string) => void
   onStartEditTurn: (turn: Turn) => void
   onCancelEditTurn: () => void
   onChangeEditText: (text: string) => void
@@ -350,6 +352,16 @@ type NarrativeFeedPanelProps = {
   onCloseDice: () => void
   onDiceRoll: (roll: DiceRoll) => void
   onReadyToggle: () => void
+}
+
+
+function formatBadgeCalculation(roll: DiceRoll): string {
+  const faces =
+    roll.dropped === null
+      ? roll.kept.join(' + ')
+      : `${roll.kept[0]}, ทิ้ง ${roll.dropped}`
+  const mod = roll.modifier !== 0 ? ` ${roll.modifier >= 0 ? '+' : ''}${roll.modifier}` : ''
+  return `(${faces}${mod})`
 }
 
 export default function NarrativeFeedPanel({
@@ -367,6 +379,8 @@ export default function NarrativeFeedPanel({
   draftLocked,
   diceOpen,
   diceActors,
+  attachedRolls,
+  onRemoveRoll,
   onStartEditTurn,
   onCancelEditTurn,
   onChangeEditText,
@@ -556,6 +570,50 @@ export default function NarrativeFeedPanel({
             </div>
           )}
 
+          {/* Attached Dice Badges (Read-Only) */}
+          {attachedRolls && attachedRolls.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <span className="text-[11px] font-medium text-zinc-400 flex items-center gap-1">
+                <Dices className="w-3.5 h-3.5 text-amber-400" /> Attached Rolls:
+              </span>
+              {attachedRolls.map((roll) => (
+                <div
+                  key={roll.id}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-500/50 text-amber-300 text-xs font-mono select-none shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                >
+                  <Dices className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="font-semibold text-amber-200">
+                    {roll.label}
+                    {roll.mode === 'advantage' ? ' [ADV]' : roll.mode === 'disadvantage' ? ' [DIS]' : ''}:
+                  </span>
+                  <span className="font-bold text-amber-300 text-sm">{roll.total}</span>
+                  <span className="text-amber-400/80 text-[11px]">{formatBadgeCalculation(roll)}</span>
+                  {roll.critical === 'hit' && (
+                    <span className="px-1 py-0.5 rounded bg-amber-400 text-zinc-950 font-black text-[10px]">
+                      NAT 20
+                    </span>
+                  )}
+                  {roll.critical === 'fail' && (
+                    <span className="px-1 py-0.5 rounded bg-rose-500 text-white font-black text-[10px]">
+                      NAT 1
+                    </span>
+                  )}
+                  {!draftLocked && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveRoll(roll.id)}
+                      title="ลบผลทอยนี้"
+                      aria-label="Remove roll"
+                      className="text-amber-400/60 hover:text-rose-300 hover:bg-rose-950/50 transition-colors ml-0.5 p-0.5 rounded cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-3">
             <input
               type="text"
@@ -595,7 +653,7 @@ export default function NarrativeFeedPanel({
                     actors={diceActors}
                     onRoll={onDiceRoll}
                     onClose={onCloseDice}
-                    hint="เลือกลูกเต๋าแล้วกด ROLL ผลทอยจะถูกใส่ในช่อง action ให้"
+                    hint="เลือกลูกเต๋าแล้วกด ROLL ผลทอยจะถูกแนบเป็น Badge ผลเต๋าให้"
                     className="bg-zinc-950"
                   />
                 </div>
