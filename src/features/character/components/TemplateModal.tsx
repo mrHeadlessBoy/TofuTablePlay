@@ -15,6 +15,7 @@ import {
   Shield,
   FileText,
   AlertCircle,
+  RotateCcw,
 } from 'lucide-react'
 import {
   RESOURCE_COLORS,
@@ -22,6 +23,9 @@ import {
   encodeTemplateKey,
   decodeTemplateKey,
   sanitizeTemplate,
+  isBuiltinTemplateId,
+  newTemplateId,
+  BUILTIN_TEMPLATES,
   type CharacterTemplate,
   type ResourceColor,
   type TemplateStat,
@@ -245,7 +249,17 @@ export default function TemplateModal({
   }
 
   const handleApplyCustomization = () => {
-    const sanitized = sanitizeTemplate(workingTemplate)
+    let toApply = { ...workingTemplate }
+    if (isBuiltinTemplateId(toApply.id)) {
+      // Fork from built-in preset to custom template
+      const isUntouchedName = BUILTIN_TEMPLATES.some((b) => b.id === toApply.id && b.name === toApply.name)
+      toApply = {
+        ...toApply,
+        id: newTemplateId(),
+        name: isUntouchedName ? `${toApply.name} (Custom)` : toApply.name,
+      }
+    }
+    const sanitized = sanitizeTemplate(toApply)
     if (sanitized) {
       onApplyTemplate(sanitized)
       onClose()
@@ -259,11 +273,15 @@ export default function TemplateModal({
   const handleParseImport = async () => {
     setImportError(null)
     setPreviewTemplate(null)
+    if (!importInput.trim()) {
+      setImportError('กรุณาวาง Template Key ก่อนนำเข้า (Please paste a template key first)')
+      return
+    }
     try {
       const decoded = await decodeTemplateKey(importInput)
       setPreviewTemplate(decoded)
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Invalid template key')
+      setImportError(err instanceof Error ? err.message : 'รูปแบบ Template Key ไม่ถูกต้อง (Invalid template key)')
     }
   }
 
@@ -349,6 +367,44 @@ export default function TemplateModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {tab === 'customize' && (
             <div className="space-y-6">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs text-zinc-400">
+                  กำหนดโครงสร้างสเตตัส หลอดพลัง และช่องสวมใส่ตามที่คุณต้องการ
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkingTemplate({
+                      ...workingTemplate,
+                      resources: [],
+                      stats: [],
+                      equipmentSlots: [],
+                      conditions: ['Normal'],
+                      textFields: [],
+                    })
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-lg transition cursor-pointer border border-zinc-700/80 shadow-sm"
+                  title="Clear all fields to a blank canvas"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>ล้างเป็นชีทว่าง (Start from Blank)</span>
+                </button>
+              </div>
+
+              {isBuiltinTemplateId(workingTemplate.id) && (
+                <div className="p-3 bg-amber-950/30 border border-amber-800/50 rounded-xl text-xs text-amber-300 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      คุณกำลังปรับแต่งจากเทมเพลตเริ่มต้น: <strong>{workingTemplate.name}</strong> (เมื่อบันทึก ระบบจะแปลงเป็นชีท Custom ให้อัตโนมัติ)
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700/60 shrink-0 font-medium">
+                    Fork to Custom
+                  </span>
+                </div>
+              )}
+
               {/* Template Meta */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800/80">
                 <div>
@@ -404,6 +460,11 @@ export default function TemplateModal({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {workingTemplate.resources.length === 0 && (
+                    <div className="col-span-full p-4 border border-dashed border-zinc-800 rounded-xl text-center text-xs text-zinc-500">
+                      ไม่มีหลอดพลัง (0 Resource Bars — เหมาะสำหรับแนวเน้นเนื้อเรื่อง ไอเทม หรือแนวสืบสวน)
+                    </div>
+                  )}
                   {workingTemplate.resources.map((res, idx) => (
                     <div
                       key={res.id}
@@ -413,15 +474,14 @@ export default function TemplateModal({
                         <span className="text-[10px] font-mono text-zinc-500 uppercase">
                           ID: {res.id}
                         </span>
-                        {workingTemplate.resources.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveResource(idx)}
-                            className="text-zinc-500 hover:text-red-400 transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveResource(idx)}
+                          className="text-zinc-500 hover:text-red-400 transition cursor-pointer"
+                          title="ลบหลอดพลังนี้"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="col-span-2">
@@ -485,6 +545,11 @@ export default function TemplateModal({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {workingTemplate.stats.length === 0 && (
+                    <div className="col-span-full p-4 border border-dashed border-zinc-800 rounded-xl text-center text-xs text-zinc-500">
+                      ไม่มีค่าสถานะแยกย่อย (0 Stats)
+                    </div>
+                  )}
                   {workingTemplate.stats.map((stat, idx) => (
                     <div
                       key={stat.id}
@@ -494,15 +559,14 @@ export default function TemplateModal({
                         <span className="text-[10px] font-mono text-zinc-500 uppercase">
                           ID: {stat.id}
                         </span>
-                        {workingTemplate.stats.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveStat(idx)}
-                            className="text-zinc-500 hover:text-red-400 transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStat(idx)}
+                          className="text-zinc-500 hover:text-red-400 transition cursor-pointer"
+                          title="ลบค่าสถานะนี้"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="col-span-2">

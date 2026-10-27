@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireAuthenticatedUser } from '@/lib/supabase/auth'
 import { revalidatePath } from 'next/cache'
+import { packCampaignTemplateIntoRules, type CharacterTemplate } from '@/features/character/template'
 
 export interface LoreEntryInput {
   id?: string
@@ -20,6 +21,7 @@ export interface CampaignPayload {
   world_setting: string
   core_description: string
   rule_mechanics: string
+  sheet_template?: CharacterTemplate | null
   loreEntries: LoreEntryInput[]
 }
 
@@ -28,20 +30,32 @@ export async function createCampaign(payload: CampaignPayload) {
 
   // Validation
   if (!payload.title || !payload.title.trim()) {
-    throw new Error('Campaign title is required')
+    throw new Error('กรุณากรอกชื่อแคมเปญ (Campaign title is required)')
+  }
+  if (payload.title.trim().length > 100) {
+    throw new Error('ชื่อแคมเปญต้องมีความยาวไม่เกิน 100 ตัวอักษร (Campaign title cannot exceed 100 characters)')
   }
   if (!payload.world_setting || !payload.world_setting.trim()) {
-    throw new Error('World setting is required')
+    throw new Error('กรุณากรอกข้อมูล World Setting / เซ็ตติ้งโลก (World setting is required)')
   }
   if (!payload.core_description || !payload.core_description.trim()) {
-    throw new Error('Core narrative description is required')
+    throw new Error('กรุณากรอกคำอธิบายเนื้อเรื่องหลัก (Core narrative description is required)')
   }
 
   const customCategory = payload.category === 'Custom' ? payload.custom_category?.trim() ?? '' : null
 
   if (payload.category === 'Custom' && (!customCategory || !customCategory.trim())) {
-    throw new Error('Custom category name is required when Genre is Custom')
+    throw new Error('กรุณาระบุชื่อหมวดหมู่ที่กำหนดเองเมื่อเลือกประเภท Custom (Custom category name is required)')
   }
+
+  if (!payload.sheet_template || !payload.sheet_template.id) {
+    throw new Error('กรุณาเลือกรูปแบบแผ่นตัวละครสำหรับแคมเปญนี้ (Character Sheet Template is required)')
+  }
+
+  const ruleMechanics = packCampaignTemplateIntoRules(
+    payload.rule_mechanics,
+    payload.sheet_template
+  )
 
   // Insert campaign
   const { data: campaign, error: campaignError } = await supabase
@@ -53,7 +67,7 @@ export async function createCampaign(payload: CampaignPayload) {
       custom_category: customCategory,
       world_setting: payload.world_setting.trim(),
       core_description: payload.core_description.trim(),
-      rule_mechanics: payload.rule_mechanics?.trim() || '',
+      rule_mechanics: ruleMechanics,
       is_public: true,
     })
     .select()
@@ -106,17 +120,35 @@ export async function updateCampaign(campaignId: string, payload: CampaignPayloa
     throw new Error('Only the campaign creator can edit this campaign')
   }
 
-  if (!payload.title?.trim()) throw new Error('Campaign title is required')
-  if (!payload.world_setting?.trim()) throw new Error('World setting is required')
-  if (!payload.core_description?.trim()) throw new Error('Core narrative description is required')
+  if (!payload.title?.trim()) {
+    throw new Error('กรุณากรอกชื่อแคมเปญ (Campaign title is required)')
+  }
+  if (payload.title.trim().length > 100) {
+    throw new Error('ชื่อแคมเปญต้องมีความยาวไม่เกิน 100 ตัวอักษร (Campaign title cannot exceed 100 characters)')
+  }
+  if (!payload.world_setting?.trim()) {
+    throw new Error('กรุณากรอกข้อมูล World Setting / เซ็ตติ้งโลก (World setting is required)')
+  }
+  if (!payload.core_description?.trim()) {
+    throw new Error('กรุณากรอกคำอธิบายเนื้อเรื่องหลัก (Core narrative description is required)')
+  }
 
   const customCategory = payload.category === 'Custom' ? payload.custom_category?.trim() ?? '' : null
   if (payload.category === 'Custom' && !customCategory) {
-    throw new Error('Custom category name is required when Genre is Custom')
+    throw new Error('กรุณาระบุชื่อหมวดหมู่ที่กำหนดเองเมื่อเลือกประเภท Custom (Custom category name is required)')
+  }
+
+  if (!payload.sheet_template || !payload.sheet_template.id) {
+    throw new Error('กรุณาเลือกรูปแบบแผ่นตัวละครสำหรับแคมเปญนี้ (Character Sheet Template is required)')
   }
 
   // Ownership is verified above, so the service role client may be used if RLS lacks an UPDATE policy.
   const db = createAdminClient() || supabase
+
+  const ruleMechanics = packCampaignTemplateIntoRules(
+    payload.rule_mechanics,
+    payload.sheet_template
+  )
 
   const { data: updated, error: updateErr } = await db
     .from('campaigns')
@@ -126,7 +158,7 @@ export async function updateCampaign(campaignId: string, payload: CampaignPayloa
       custom_category: customCategory,
       world_setting: payload.world_setting.trim(),
       core_description: payload.core_description.trim(),
-      rule_mechanics: payload.rule_mechanics?.trim() || '',
+      rule_mechanics: ruleMechanics,
     })
     .eq('id', existing.id)
     .select('id')

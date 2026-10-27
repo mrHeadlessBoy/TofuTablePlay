@@ -3,7 +3,18 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCampaign, updateCampaign, LoreEntryInput } from '../actions'
-import { Trash2, Plus, BookOpen, Sparkles, Pencil } from 'lucide-react'
+import { Trash2, Plus, BookOpen, Sparkles, Pencil, Sliders, Check, RotateCcw } from 'lucide-react'
+import {
+  BUILTIN_TEMPLATES,
+  createEmptyTemplate,
+  extractCampaignTemplate,
+  stripCampaignTemplateFromRules,
+  getPresetTemplateForCategory,
+  isBuiltinTemplateId,
+  newTemplateId,
+  type CharacterTemplate,
+} from '@/features/character/template'
+import TemplateModal from '@/features/character/components/TemplateModal'
 import Link from 'next/link'
 import { useAlert } from '@/components/ui/AlertModal'
 
@@ -25,6 +36,7 @@ export type CampaignFormInitial = {
   world_setting: string
   core_description: string
   rule_mechanics: string
+  sheet_template?: CharacterTemplate | null
   loreEntries: LoreEntryInput[]
 }
 
@@ -50,7 +62,18 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
   const [customCategory, setCustomCategory] = useState(initial?.custom_category ?? '')
   const [worldSetting, setWorldSetting] = useState(initial?.world_setting ?? '')
   const [coreDescription, setCoreDescription] = useState(initial?.core_description ?? '')
-  const [ruleMechanics, setRuleMechanics] = useState(initial?.rule_mechanics ?? '')
+  const [ruleMechanics, setRuleMechanics] = useState(
+    stripCampaignTemplateFromRules(initial?.rule_mechanics) ?? ''
+  )
+  const initialTpl =
+    initial?.sheet_template ??
+    extractCampaignTemplate({
+      category: initial?.category || 'Fantasy',
+      rule_mechanics: initial?.rule_mechanics,
+    })
+  const [selectedTemplate, setSelectedTemplate] = useState<CharacterTemplate>(initialTpl)
+  const [isCustomTemplate, setIsCustomTemplate] = useState<boolean>(!isBuiltinTemplateId(initialTpl.id))
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
 
   // Lorebook state
   const [loreEntries, setLoreEntries] = useState<LoreEntryInput[]>(initial?.loreEntries ?? [])
@@ -104,6 +127,79 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Client-side validations
+    if (!title.trim()) {
+      showAlert({
+        title: 'กรุณากรอกชื่อแคมเปญ',
+        status: 'warning',
+        badge: 'Campaign Title Required',
+        message: 'กรุณาระบุชื่อสำหรับแคมเปญของคุณก่อนบันทึกข้อมูล',
+      })
+      return
+    }
+
+    if (title.trim().length > 100) {
+      showAlert({
+        title: 'ชื่อแคมเปญยาวเกินไป',
+        status: 'warning',
+        badge: 'Title Too Long',
+        message: 'ชื่อแคมเปญต้องมีความยาวไม่เกิน 100 ตัวอักษร',
+      })
+      return
+    }
+
+    if (category === 'Custom' && !customCategory.trim()) {
+      showAlert({
+        title: 'กรุณาระบุชื่อหมวดหมู่ที่กำหนดเอง',
+        status: 'warning',
+        badge: 'Custom Genre Required',
+        message: 'คุณได้เลือกหมวดหมู่เป็น Custom กรุณาระบุชื่อแนว/ธีมที่คุณต้องการในช่อง Custom Genre Name',
+      })
+      return
+    }
+
+    if (!worldSetting.trim()) {
+      showAlert({
+        title: 'กรุณากรอกข้อมูล World Setting',
+        status: 'warning',
+        badge: 'World Setting Required',
+        message: 'กรุณาระบุสภาพแวดล้อม กฎเกณฑ์ หรือบรรยากาศของโลกในแคมเปญนี้อย่างน้อยพอสังเขป',
+      })
+      return
+    }
+
+    if (!coreDescription.trim()) {
+      showAlert({
+        title: 'กรุณากรอก Core Narrative',
+        status: 'warning',
+        badge: 'Core Narrative Required',
+        message: 'กรุณาระบุคำอธิบายเนื้อเรื่องหลักหรือเป้าหมายของการผจญภัย เพื่อให้ AI DM นำไปดำเนินเรื่องได้อย่างแม่นยำ',
+      })
+      return
+    }
+
+    if (!selectedTemplate || !selectedTemplate.id) {
+      showAlert({
+        title: 'กรุณาเลือกรูปแบบแผ่นตัวละคร',
+        status: 'warning',
+        badge: 'Sheet Template Required',
+        message: 'กรุณาเลือก Preset Template หรือ Custom Template ที่ต้องการให้ผู้เล่นในแคมเปญนี้ใช้',
+      })
+      return
+    }
+
+    // Check if user drafted an incomplete lore entry (one field filled but not the other)
+    if ((newEntry.title.trim() && !newEntry.content.trim()) || (!newEntry.title.trim() && newEntry.content.trim())) {
+      showAlert({
+        title: 'ข้อมูลบันทึกลอว์บุ๊กไม่ครบถ้วน',
+        status: 'warning',
+        badge: 'Incomplete Lore Draft',
+        message: 'คุณมีร่างบันทึกลอว์บุ๊กที่ยังกรอกไม่ครบ (ต้องมีทั้งหัวข้อและเนื้อหา) กรุณากรอกให้ครบหรือลบข้อความออกก่อนบันทึก',
+      })
+      return
+    }
+
     setLoading(true)
     try {
       // If user filled in a lore draft but forgot to click "Attach Entry to Lorebook", include it
@@ -125,6 +221,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
         world_setting: worldSetting,
         core_description: coreDescription,
         rule_mechanics: ruleMechanics,
+        sheet_template: selectedTemplate,
         loreEntries: finalEntries,
       }
 
@@ -139,8 +236,12 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
     } catch (err: unknown) {
       const message = err instanceof Error
         ? err.message
-        : `Something went wrong while ${isEdit ? 'saving' : 'creating'} the campaign.`
-      showAlert(message)
+        : `เกิดข้อผิดพลาดในการ${isEdit ? 'บันทึกการแก้ไข' : 'สร้าง'}แคมเปญ กรุณาลองใหม่อีกครั้ง`
+      showAlert({
+        title: isEdit ? 'ไม่สามารถบันทึกแคมเปญได้' : 'ไม่สามารถสร้างแคมเปญได้',
+        status: 'error',
+        message,
+      })
       setLoading(false)
     }
   }
@@ -185,7 +286,13 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                 <label className="text-xs text-zinc-400 uppercase font-medium">Genre / Category</label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    const nextCat = e.target.value
+                    setCategory(nextCat)
+                    if (!isCustomTemplate) {
+                      setSelectedTemplate(getPresetTemplateForCategory(nextCat))
+                    }
+                  }}
                   className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
                 >
                   {CATEGORIES.map((cat) => (
@@ -244,7 +351,197 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             </div>
           </div>
 
-          {/* Section 2: Lorebook Registry */}
+          {/* Section 2: Character Sheet Template Requirement */}
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-semibold text-white">Required Character Sheet Template</h2>
+              </div>
+              <span className="text-[11px] font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 px-2.5 py-0.5 rounded-full">
+                Strict Table Requirement
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Every player joining this campaign will play using this character sheet format. Choose a built-in genre preset or design your own custom sheet template.
+            </p>
+
+            {/* Built-in Presets Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {BUILTIN_TEMPLATES.map((preset) => {
+                const isSelected = !isCustomTemplate && selectedTemplate.id === preset.id
+                return (
+                  <div
+                    key={preset.id}
+                    className={`p-4 rounded-xl border text-left transition flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-500/30'
+                        : 'bg-zinc-950/80 border-zinc-800 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="font-semibold text-sm text-white flex items-center gap-1.5">
+                          {preset.name}
+                        </div>
+                        {isSelected && <Check className="w-4 h-4 text-amber-400" />}
+                      </div>
+                      <p className="text-xs text-zinc-400 leading-relaxed mb-3">
+                        {preset.description}
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex flex-wrap gap-1.5 text-[10px] mb-3">
+                        {preset.resources.length > 0 ? (
+                          preset.resources.map((r) => (
+                            <span
+                              key={r.id}
+                              className="bg-zinc-900 border border-zinc-700/60 text-zinc-300 px-2 py-0.5 rounded"
+                            >
+                              {r.label}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="bg-amber-950/60 border border-amber-800/80 text-amber-300 px-2 py-0.5 rounded font-medium">
+                            0 Resource Bars (Item & Gear Only)
+                          </span>
+                        )}
+                        <span className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+                          {preset.stats.length} Stats
+                        </span>
+                        <span className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+                          {preset.equipmentSlots.length} Gear Slots
+                        </span>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTemplate(preset)
+                            setIsCustomTemplate(false)
+                          }}
+                          className={`flex-1 py-1.5 px-2.5 text-xs rounded-lg font-medium transition cursor-pointer text-center ${
+                            isSelected
+                              ? 'bg-amber-600 text-white font-semibold shadow'
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60'
+                          }`}
+                        >
+                          {isSelected ? '✓ เลือกใช้อยู่' : 'เลือกพรีเซ็ตนี้'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const forked: CharacterTemplate = {
+                              ...JSON.parse(JSON.stringify(preset)),
+                              id: newTemplateId(),
+                              name: `${preset.name} (Custom)`,
+                            }
+                            setSelectedTemplate(forked)
+                            setIsCustomTemplate(true)
+                            setIsTemplateModalOpen(true)
+                          }}
+                          className="flex items-center gap-1 py-1.5 px-2.5 text-xs bg-zinc-900 hover:bg-zinc-800 text-amber-400 hover:text-amber-300 border border-amber-500/30 rounded-lg transition cursor-pointer shrink-0"
+                          title={`ปรับแต่งโดยใช้ ${preset.name} เป็นโครงสร้างเริ่มต้น`}
+                        >
+                          <Sliders className="w-3.5 h-3.5" />
+                          <span>ปรับแต่งจากพรีเซ็ต</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Custom Campaign Sheet Option */}
+            <div
+              onClick={() => {
+                setIsCustomTemplate(true)
+                if (!isCustomTemplate || isBuiltinTemplateId(selectedTemplate.id)) {
+                  const blank = createEmptyTemplate(
+                    title.trim() ? `${title.trim()} Sheet` : 'Custom Campaign Sheet'
+                  )
+                  setSelectedTemplate(blank)
+                }
+                setIsTemplateModalOpen(true)
+              }}
+              className={`p-4 rounded-xl border transition cursor-pointer ${
+                isCustomTemplate
+                  ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-500/30'
+                  : 'bg-zinc-950/80 border-zinc-800 hover:border-zinc-700'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-white flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      Custom Campaign Template (กำหนดโครงสร้างชีทเอง)
+                    </span>
+                    {isCustomTemplate ? (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Active Selection
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded">
+                        ชีทว่างเปล่า (Blank Canvas)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    {isCustomTemplate
+                      ? `"${selectedTemplate.name}" — ${selectedTemplate.resources.length === 0 ? '0 Resource Bars (Item-Only)' : `${selectedTemplate.resources.length} resources`}, ${selectedTemplate.stats.length} stats, ${selectedTemplate.equipmentSlots.length} equipment slots, ${selectedTemplate.conditions.length} conditions.`
+                      : 'ออกแบบโครงสร้างแผ่นตัวละครด้วยตัวเอง เริ่มต้นจากชีทว่างเปล่าโดยไม่มีสเตตัสหรือหลอดพลังงานค้างไว้ (สามารถใส่เฉพาะไอเทม หรือสเตตัสเฉพาะตามใจชอบ)'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {isCustomTemplate && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const blank = createEmptyTemplate(
+                          title.trim() ? `${title.trim()} Sheet` : 'Custom Campaign Sheet'
+                        )
+                        setSelectedTemplate(blank)
+                        setIsCustomTemplate(true)
+                        setIsTemplateModalOpen(true)
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition cursor-pointer border border-zinc-700"
+                      title="Reset to a blank sheet canvas"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>ล้างเป็นชีทว่างใหม่</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsCustomTemplate(true)
+                      if (!isCustomTemplate || isBuiltinTemplateId(selectedTemplate.id)) {
+                        const blank = createEmptyTemplate(
+                          title.trim() ? `${title.trim()} Sheet` : 'Custom Campaign Sheet'
+                        )
+                        setSelectedTemplate(blank)
+                      }
+                      setIsTemplateModalOpen(true)
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium cursor-pointer shadow"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>{isCustomTemplate ? 'Edit in Builder / Key' : 'สร้างชีท Custom ว่างเปล่า'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Lorebook Registry */}
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-6">
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-amber-500" />
@@ -404,6 +701,18 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
               : (isEdit ? 'Save Changes' : 'Publish Campaign')}
           </button>
         </form>
+
+        {/* Template Modal for Custom Campaign Sheet */}
+        <TemplateModal
+          isOpen={isTemplateModalOpen}
+          onClose={() => setIsTemplateModalOpen(false)}
+          currentTemplate={selectedTemplate}
+          onApplyTemplate={(newTpl) => {
+            setSelectedTemplate(newTpl)
+            setIsCustomTemplate(true)
+            setIsTemplateModalOpen(false)
+          }}
+        />
       </div>
     </div>
   )

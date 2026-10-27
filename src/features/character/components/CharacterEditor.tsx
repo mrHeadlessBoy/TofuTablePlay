@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { saveCharacter, deleteCharacter, CharacterFormData } from '../actions'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { saveCharacter, deleteCharacter, getCampaignRequiredTemplate, CharacterFormData } from '../actions'
 import {
   EMPTY_EQUIPMENT,
   clampHpValues,
@@ -14,7 +15,6 @@ import {
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
   sanitizeInventoryItems,
-  type AbilityScoreKey,
 } from '../domain'
 import {
   BUILTIN_TEMPLATES,
@@ -36,8 +36,6 @@ import TemplateModal from './TemplateModal'
 import { playSystemSound } from '@/lib/sound'
 import { Plus, Trash2, Loader2, Package, Sparkles, Sliders, Heart } from 'lucide-react'
 import { useAlert } from '@/components/ui/AlertModal'
-
-const defaultStats: Record<AbilityScoreKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 }
 
 type CharacterRecord = CharacterFormData & { id?: string | number; user_id?: string | null }
 
@@ -71,18 +69,59 @@ export default function CharacterEditor({
   currentUserId?: string | null
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const campaignIdParam = searchParams.get('campaignId')
+  const tableCodeParam = searchParams.get('tableCode')
+  const templateIdParam = searchParams.get('templateId')
+  const returnToParam = searchParams.get('returnTo')
   const { showAlert, showConfirm } = useAlert()
-  const [selectedChar, setSelectedChar] = useState<CharacterRecord | null>(null)
-  const [activeTemplate, setActiveTemplate] = useState<CharacterTemplate>(CLASSIC_TEMPLATE)
-  const [customValues, setCustomValues] = useState<SheetCustomValues>({
-    stats: {},
-    resources: {},
-    fields: {},
-    equipment: {},
+  const builtinInitial = templateIdParam ? BUILTIN_TEMPLATES.find((t) => t.id === templateIdParam) : null
+  const [activeTemplate, setActiveTemplate] = useState<CharacterTemplate>(() => {
+    return builtinInitial ?? CLASSIC_TEMPLATE
+  })
+  const [customValues, setCustomValues] = useState<SheetCustomValues>(() => {
+    if (!builtinInitial) return { stats: {}, resources: {}, fields: {}, equipment: {} }
+    const initialStats: Record<string, number> = {}
+    for (const s of builtinInitial.stats) initialStats[s.id] = s.default
+    const initialRes: Record<string, { current: number; max: number }> = {}
+    for (const r of builtinInitial.resources) initialRes[r.id] = { current: r.defaultMax, max: r.defaultMax }
+    return { stats: initialStats, resources: initialRes, fields: {}, equipment: {} }
+  })
+  const [selectedChar, setSelectedChar] = useState<CharacterRecord | null>(() => {
+    if (!builtinInitial || !returnToParam) return null
+    const initialStats: Record<string, number> = {}
+    for (const s of builtinInitial.stats) initialStats[s.id] = s.default
+    const hpDef = builtinInitial.resources.find((r) => r.id === 'hp')
+    const spDef = builtinInitial.resources.find((r) => r.id === 'skill_cost')
+    const hpVal = hpDef ? hpDef.defaultMax : (builtinInitial.resources.length === 0 ? 0 : 10)
+    const spVal = spDef ? spDef.defaultMax : 0
+    return {
+      name: '',
+      class_archetype: '',
+      current_hp: hpVal,
+      max_hp: hpVal,
+      armor_class: spVal,
+      current_skill_cost: spVal,
+      max_skill_cost: spVal,
+      stats: {
+        ...initialStats,
+        sheet_template: builtinInitial,
+      },
+      appearance: '',
+      backstory: '',
+      strengths: '',
+      weaknesses: '',
+      inventory: [],
+      status_condition: builtinInitial.conditions[0] || 'Normal',
+      equipment: [...EMPTY_EQUIPMENT],
+      skills: [],
+    }
   })
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+
 
   const isOwner = (char: CharacterRecord) => {
     if (!currentUserId || !char.user_id) return true
@@ -92,9 +131,12 @@ export default function CharacterEditor({
   const handleDelete = async (char: CharacterRecord) => {
     if (!char.id) return
     const charName = char.name?.trim() || 'this character'
-    const confirmed = await showConfirm(
-      `Delete character "${charName}"? This sheet will be permanently removed. This cannot be undone.`
-    )
+    const confirmed = await showConfirm({
+      title: 'ยืนยันการลบตัวละคร',
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบตัวละคร "${charName}"? แผ่นชีทนี้จะถูกลบถาวรและไม่สามารถกู้คืนได้ (This sheet will be permanently removed)`,
+      confirmText: 'ลบตัวละคร',
+      cancelText: 'ยกเลิก',
+    })
     if (!confirmed) {
       return
     }
@@ -108,8 +150,12 @@ export default function CharacterEditor({
       router.refresh()
     } catch (err: unknown) {
       playSystemSound('error')
-      const message = err instanceof Error ? err.message : 'Failed to delete character.'
-      showAlert(message)
+      const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบตัวละคร (Failed to delete character)'
+      showAlert({
+        title: 'ไม่สามารถลบตัวละครได้',
+        status: 'error',
+        message,
+      })
     } finally {
       setDeletingId(null)
     }
@@ -131,28 +177,79 @@ export default function CharacterEditor({
     })
   }
 
-  const handleNew = () => {
-    setActiveTemplate(CLASSIC_TEMPLATE)
-    setCustomValues({ stats: {}, resources: {}, fields: {}, equipment: {} })
+  const handleNew = useCallback((targetTpl?: unknown) => {
+    const tpl = (targetTpl && typeof targetTpl === 'object' && 'v' in targetTpl)
+      ? (targetTpl as CharacterTemplate)
+      : activeTemplate
+    setActiveTemplate(tpl)
+    const initialCustomStats: Record<string, number> = {}
+    for (const s of tpl.stats) {
+      initialCustomStats[s.id] = s.default
+    }
+    const initialResources: Record<string, { current: number; max: number }> = {}
+    for (const r of tpl.resources) {
+      initialResources[r.id] = { current: r.defaultMax, max: r.defaultMax }
+    }
+    setCustomValues({
+      stats: initialCustomStats,
+      resources: initialResources,
+      fields: {},
+      equipment: {},
+    })
+
+    const hpDef = tpl.resources.find((r) => r.id === 'hp')
+    const spDef = tpl.resources.find((r) => r.id === 'skill_cost')
+    const hpVal = hpDef ? hpDef.defaultMax : (tpl.resources.length === 0 ? 0 : 10)
+    const spVal = spDef ? spDef.defaultMax : 0
+
     setSelectedChar({
       name: '',
       class_archetype: '',
-      current_hp: 100,
-      max_hp: 100,
-      armor_class: 10,
-      current_skill_cost: 10,
-      max_skill_cost: 10,
-      stats: { ...defaultStats },
+      current_hp: hpVal,
+      max_hp: hpVal,
+      armor_class: spVal,
+      current_skill_cost: spVal,
+      max_skill_cost: spVal,
+      stats: {
+        ...initialCustomStats,
+        sheet_template: tpl,
+      },
       appearance: '',
       backstory: '',
       strengths: '',
       weaknesses: '',
       inventory: [],
-      status_condition: 'Normal',
+      status_condition: tpl.conditions[0] || 'Normal',
       equipment: [...EMPTY_EQUIPMENT],
       skills: [],
     })
-  }
+  }, [activeTemplate])
+
+  // Automatically fetch campaign's required template (including custom templates) if directed from a campaign/table
+  useEffect(() => {
+    const targetParam = campaignIdParam || tableCodeParam || templateIdParam
+    if (!targetParam) return
+
+    // If already initialized with a builtin template, no async fetch needed
+    if (templateIdParam && BUILTIN_TEMPLATES.some((t) => t.id === templateIdParam)) {
+      return
+    }
+
+    let isCancelled = false
+    getCampaignRequiredTemplate(targetParam)
+      .then((tpl) => {
+        if (!isCancelled && tpl) {
+          handleNew(tpl)
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load campaign template:', err)
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [campaignIdParam, tableCodeParam, templateIdParam, handleNew])
 
   const handleSwitchTemplate = async (targetTemplateId: string) => {
     if (!selectedChar) return
@@ -383,6 +480,30 @@ export default function CharacterEditor({
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedChar) return
+
+    // Client-side validations
+    if (!selectedChar.name?.trim()) {
+      playSystemSound('error')
+      showAlert({
+        title: 'กรุณากรอกชื่อตัวละคร',
+        status: 'warning',
+        badge: 'Character Name Required',
+        message: 'กรุณาระบุชื่อตัวละครของคุณก่อนทำการบันทึกข้อมูล (Character name is required)',
+      })
+      return
+    }
+
+    if (selectedChar.name.trim().length > 60) {
+      playSystemSound('error')
+      showAlert({
+        title: 'ชื่อตัวละครยาวเกินไป',
+        status: 'warning',
+        badge: 'Name Too Long',
+        message: 'ชื่อตัวละครต้องมีความยาวไม่เกิน 60 ตัวอักษร (Character name cannot exceed 60 characters)',
+      })
+      return
+    }
+
     setIsSaving(true)
     try {
       const { currentHp, maxHp } = clampHpValues(selectedChar.current_hp, selectedChar.max_hp)
@@ -415,17 +536,41 @@ export default function CharacterEditor({
       })
       setSelectedChar(null)
       router.refresh()
+      if (returnToParam) {
+        router.push(returnToParam)
+      }
     } catch (err: unknown) {
       playSystemSound('error')
-      const message = err instanceof Error ? err.message : 'Failed to save character.'
-      showAlert(message)
+      const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการบันทึกตัวละคร (Failed to save character)'
+      showAlert({
+        title: 'ไม่สามารถบันทึกตัวละครได้',
+        status: 'error',
+        message,
+      })
     } finally {
       setIsSaving(false)
     }
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div className="space-y-6">
+      {returnToParam && (
+        <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-3.5 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              กำลังสร้างตัวละครสำหรับแคมเปญนี้ด้วยรูปแบบชีท: <strong>{activeTemplate.name}</strong> (ระบบได้จัดรูปแบบชีทให้ตรงกับข้อกำหนดโดยอัตโนมัติ)
+            </span>
+          </div>
+          <Link
+            href={returnToParam}
+            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs transition"
+          >
+            กลับไปยังห้องเล่น (Back)
+          </Link>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       {/* Template Customizer & Key Modal */}
       <TemplateModal
         isOpen={isTemplateModalOpen}
@@ -437,7 +582,7 @@ export default function CharacterEditor({
       {/* Character Cards Roster */}
       <div className="md:col-span-1 space-y-4">
         <button
-          onClick={handleNew}
+          onClick={() => handleNew()}
           className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg text-sm transition cursor-pointer shadow-sm"
         >
           + Create New Character
@@ -544,8 +689,8 @@ export default function CharacterEditor({
                       </option>
                     ))}
                     {!isBuiltinTemplateId(activeTemplate.id) && (
-                      <option value={activeTemplate.id} className="bg-zinc-900 text-white">
-                        {activeTemplate.name} (Custom)
+                      <option value={activeTemplate.id} className="bg-zinc-900 text-amber-300 font-semibold">
+                        ★ {activeTemplate.name} (Custom)
                       </option>
                     )}
                   </select>
@@ -558,7 +703,7 @@ export default function CharacterEditor({
                   className="flex items-center gap-1.5 px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 hover:text-white text-zinc-200 border border-zinc-700 rounded-lg transition cursor-pointer shadow-sm"
                 >
                   <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                  <span>ปรับแต่ง / Key</span>
+                  <span>{isBuiltinTemplateId(activeTemplate.id) ? 'ปรับแต่งชีตนี้ (Customize)' : 'แก้ไขโครงสร้าง / Key'}</span>
                 </button>
               </div>
             </div>
@@ -1115,6 +1260,7 @@ export default function CharacterEditor({
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }

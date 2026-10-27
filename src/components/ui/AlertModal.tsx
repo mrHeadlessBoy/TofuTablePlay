@@ -5,6 +5,12 @@ import { AlertCircle, CheckCircle2, Loader2, AlertTriangle, Info, X } from 'luci
 
 export type AlertStatus = 'loading' | 'success' | 'error' | 'warning' | 'info'
 
+export type AlertModalAction = {
+  label: string
+  onClick: () => void
+  variant?: 'primary' | 'secondary' | 'accent'
+}
+
 export type AlertModalProps = {
   isOpen: boolean
   onClose?: () => void
@@ -18,6 +24,8 @@ export type AlertModalProps = {
   confirmText?: string
   cancelText?: string
   playSound?: boolean
+  maxWidth?: 'sm' | 'md' | 'lg'
+  action?: AlertModalAction
 }
 
 export function AlertModal({
@@ -32,6 +40,8 @@ export function AlertModal({
   buttonText,
   confirmText,
   cancelText,
+  maxWidth,
+  action,
 }: AlertModalProps) {
   useEffect(() => {
     if (!isOpen || status === 'loading') return
@@ -56,6 +66,7 @@ export function AlertModal({
 
   const displayTitle = title ?? defaultTitles[status]
   const displayButtonText = buttonText ?? (status === 'error' ? 'ปิดหน้าต่าง' : 'ตกลง')
+  const widthClass = maxWidth === 'lg' ? 'max-w-lg' : maxWidth === 'sm' ? 'max-w-sm' : 'max-w-md'
 
   return (
     <div
@@ -63,7 +74,7 @@ export function AlertModal({
       onClick={status !== 'loading' ? onClose : undefined}
     >
       <div
-        className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative text-center flex flex-col items-center animate-in zoom-in-95 duration-200"
+        className={`w-full ${widthClass} bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative flex flex-col items-center animate-in zoom-in-95 duration-200`}
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
@@ -109,7 +120,7 @@ export function AlertModal({
           </div>
         )}
 
-        <h3 className="text-lg font-bold text-white">{displayTitle}</h3>
+        <h3 className="text-lg font-bold text-white text-center">{displayTitle}</h3>
 
         {badge && (
           <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 font-mono text-xs font-semibold text-amber-400">
@@ -117,7 +128,7 @@ export function AlertModal({
           </div>
         )}
 
-        <div className="mt-3 text-xs text-zinc-400 leading-relaxed max-w-xs wrap-break-words">
+        <div className={`mt-3 text-xs leading-relaxed w-full wrap-break-words ${typeof message === 'string' ? 'text-zinc-400 text-center' : 'text-zinc-300 text-left'}`}>
           {message}
         </div>
 
@@ -144,6 +155,34 @@ export function AlertModal({
                   {confirmText ?? 'ยืนยัน'}
                 </button>
               </>
+            ) : action ? (
+              <div className="w-full flex flex-col sm:flex-row items-center gap-2">
+                {onClose && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full sm:flex-1 py-2.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer order-2 sm:order-1"
+                  >
+                    {displayButtonText}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    action.onClick()
+                    if (onClose) onClose()
+                  }}
+                  className={`w-full sm:flex-1 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer order-1 sm:order-2 ${
+                    action.variant === 'secondary'
+                      ? 'bg-zinc-700 hover:bg-zinc-600 text-white'
+                      : action.variant === 'accent'
+                      ? 'bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white shadow-md'
+                      : 'bg-amber-600 hover:bg-amber-500 text-white'
+                  }`}
+                >
+                  {action.label}
+                </button>
+              </div>
             ) : (
               onClose && (
                 <button
@@ -173,6 +212,8 @@ export type AlertOptions = {
   badge?: string
   buttonText?: string
   playSound?: boolean
+  maxWidth?: 'sm' | 'md' | 'lg'
+  action?: AlertModalAction
   onClose?: () => void
 }
 
@@ -206,6 +247,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
     confirmText?: string
     cancelText?: string
     playSound?: boolean
+    maxWidth?: 'sm' | 'md' | 'lg'
+    action?: AlertModalAction
     onCloseCallback?: () => void
     onConfirmCallback?: () => void
   }>({
@@ -246,6 +289,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         confirmText: undefined,
         cancelText: undefined,
         playSound: true,
+        maxWidth: 'sm',
+        action: undefined,
         onCloseCallback: undefined,
         onConfirmCallback: undefined,
       })
@@ -261,6 +306,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         confirmText: undefined,
         cancelText: undefined,
         playSound: options.playSound ?? true,
+        maxWidth: options.maxWidth ?? (typeof options.message === 'string' ? 'sm' : 'md'),
+        action: options.action,
         onCloseCallback: options.onClose,
         onConfirmCallback: undefined,
       })
@@ -281,6 +328,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         confirmText: opts.confirmText ?? 'ยืนยัน',
         cancelText: opts.cancelText ?? 'ยกเลิก',
         playSound: opts.playSound ?? true,
+        maxWidth: 'sm',
+        action: undefined,
         onConfirmCallback: () => resolve(true),
         onCloseCallback: () => resolve(false),
       })
@@ -303,6 +352,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         confirmText={modalState.confirmText}
         cancelText={modalState.cancelText}
         playSound={modalState.playSound}
+        maxWidth={modalState.maxWidth}
+        action={modalState.action}
       />
     </AlertContext.Provider>
   )

@@ -1,6 +1,6 @@
 'use server'
 
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireAuthenticatedUser } from '@/lib/supabase/auth'
 import { revalidatePath } from 'next/cache'
 import {
@@ -14,6 +14,7 @@ import {
   type EquipmentSlots,
 } from './domain'
 import {
+  extractCampaignTemplate,
   templateStatsPayload,
   type CharacterTemplate,
   type SheetCustomValues,
@@ -55,6 +56,13 @@ export interface CharacterFormData {
 
 export async function saveCharacter(data: CharacterFormData) {
   const { supabase, user } = await requireAuthenticatedUser()
+
+  if (!data.name || !data.name.trim()) {
+    throw new Error('กรุณากรอกชื่อตัวละคร (Character name is required)')
+  }
+  if (data.name.trim().length > 60) {
+    throw new Error('ชื่อตัวละครต้องมีความยาวไม่เกิน 60 ตัวอักษร (Character name cannot exceed 60 characters)')
+  }
 
   const sanitizedSkills =
     data.skills !== undefined
@@ -145,4 +153,47 @@ export async function deleteCharacter(characterId: string) {
 
   revalidatePath('/characters')
   return { success: true }
+}
+
+export async function getCampaignRequiredTemplate(
+  campaignIdOrTableCode: string
+): Promise<CharacterTemplate | null> {
+  const supabase = await createClient()
+
+  // 1. Try campaign ID
+  const { data: campaign } = await supabase
+    .from('campaigns')
+    .select('id, category, rule_mechanics')
+    .eq('id', campaignIdOrTableCode)
+    .maybeSingle()
+
+  if (campaign) {
+    return extractCampaignTemplate(campaign)
+  }
+
+  // 2. Try table code (e.g. 6-character code)
+  const { data: table } = await supabase
+    .from('tables')
+    .select('id, campaigns(*)')
+    .eq('table_code', campaignIdOrTableCode.toUpperCase())
+    .maybeSingle()
+
+  if (table?.campaigns) {
+    const camp = Array.isArray(table.campaigns) ? table.campaigns[0] : table.campaigns
+    return extractCampaignTemplate(camp as Parameters<typeof extractCampaignTemplate>[0])
+  }
+
+  // 3. Try finding by template ID embedded in campaign rule_mechanics
+  const { data: matchedCampaign } = await supabase
+    .from('campaigns')
+    .select('id, category, rule_mechanics')
+    .ilike('rule_mechanics', `%"id":"${campaignIdOrTableCode}"%`)
+    .limit(1)
+    .maybeSingle()
+
+  if (matchedCampaign) {
+    return extractCampaignTemplate(matchedCampaign)
+  }
+
+  return null
 }

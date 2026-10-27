@@ -4,6 +4,22 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+function localizeAuthError(msg: string): string {
+  if (/invalid login credentials/i.test(msg)) {
+    return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง (Invalid login credentials)'
+  }
+  if (/email not confirmed/i.test(msg)) {
+    return 'กรุณายืนยันอีเมลของคุณผ่านลิงก์ที่ได้รับก่อนเข้าสู่ระบบ (Email not confirmed)'
+  }
+  if (/user already registered/i.test(msg)) {
+    return 'อีเมลนี้ถูกลงทะเบียนแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านของคุณ (User already registered)'
+  }
+  if (/password should be at least/i.test(msg)) {
+    return 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร (Password should be at least 6 characters)'
+  }
+  return msg
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -12,7 +28,7 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       if (params.get('reason') === 'session-expired') {
-        return 'Your session has timed out (6-hour limit). Please log in again.'
+        return 'เซสชันของคุณหมดอายุแล้ว (จำกัด 6 ชั่วโมง) กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
       }
     }
     return ''
@@ -42,12 +58,12 @@ export default function LoginPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(targetPath)}`,
         },
       })
-      if (error) setErrorMsg(error.message)
-      else setErrorMsg('Check your email for the confirmation link.')
+      if (error) setErrorMsg(localizeAuthError(error.message))
+      else setErrorMsg('ระบบได้ส่งอีเมลยืนยันไปยังกล่องข้อความของคุณแล้ว กรุณากดลิงก์เพื่อเปิดใช้งานบัญชี')
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
-        setErrorMsg(error.message)
+        setErrorMsg(localizeAuthError(error.message))
       } else {
         // Set 6-hour session start timestamp cookie (21600 seconds)
         document.cookie = `dnd_session_start=${Date.now()}; path=/; max-age=21600; SameSite=Lax`

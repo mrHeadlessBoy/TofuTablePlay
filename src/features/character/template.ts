@@ -190,7 +190,86 @@ export const HORROR_TEMPLATE: CharacterTemplate = {
   sections: { skills: true, inventory: true },
 }
 
-export const BUILTIN_TEMPLATES: readonly CharacterTemplate[] = [CLASSIC_TEMPLATE, ROMANCE_TEMPLATE, HORROR_TEMPLATE]
+export const DRAMA_INVENTORY_TEMPLATE_ID = 'builtin-drama-inventory'
+
+export const DRAMA_INVENTORY_TEMPLATE: CharacterTemplate = {
+  v: TEMPLATE_SCHEMA_VERSION,
+  id: DRAMA_INVENTORY_TEMPLATE_ID,
+  name: 'Drama & Mystery (Inventory & Clues Only)',
+  description:
+    'Pure narrative, social intrigue, and mystery. No HP or SP bars. Conflict is resolved through items, clues, disguises, and social conditions.',
+  author: 'D&D Playground',
+  stats: [
+    { id: 'reputation', label: 'Reputation / Clout (บารมี)', min: 0, max: 20, default: 10 },
+    { id: 'composure', label: 'Composure (ความนิ่ง/การคุมอารมณ์)', min: 0, max: 20, default: 10 },
+    { id: 'subterfuge', label: 'Subterfuge (เล่ห์เหลี่ยม/ไหวพริบ)', min: 0, max: 20, default: 10 },
+  ],
+  resources: [],
+  textFields: [
+    {
+      id: 'secret_agenda',
+      label: 'Secret Agenda (เป้าหมายลับ)',
+      placeholder: 'What are you secretly trying to achieve, conceal, or investigate?',
+      rows: 2,
+    },
+    {
+      id: 'alibi',
+      label: 'Alibi / Cover Story (ตัวตนบังหน้า/ข้ออ้าง)',
+      placeholder: 'Who do people think you are, and why are you at this scene?',
+      rows: 2,
+    },
+    {
+      id: 'connections',
+      label: 'Allies & Foes (สายสัมพันธ์และความขัดแย้ง)',
+      placeholder: 'Whom do you trust, owe, suspect, or fear?',
+      rows: 2,
+    },
+    {
+      id: 'appearance',
+      label: 'Appearance & Demeanor',
+      placeholder: 'Attire, gait, tells, notable expressions...',
+      rows: 2,
+    },
+  ],
+  equipmentSlots: [
+    { id: 'outfit', label: 'Attire / Disguise (ชุดที่สวม/เครื่องแบบ)' },
+    { id: 'pocket', label: 'Pockets (ของพกติดตัว/กระเป๋าเสื้อ)' },
+    { id: 'bag', label: 'Bag / Briefcase (กระเป๋าถือ/เป้)' },
+    { id: 'accessory', label: 'Keepsake / Badge (ตราประจำตัว/ของสำคัญ)' },
+  ],
+  conditions: [
+    'Normal',
+    'Suspected (ถูกสงสัย)',
+    'Favored (เป็นที่โปรดปราน)',
+    'Blackmailed (ถูกแบล็กเมล)',
+    'Compromised (ความลับแตก)',
+    'Exiled (ถูกขับไล่)',
+  ],
+  sections: { skills: false, inventory: true },
+}
+
+export const BUILTIN_TEMPLATES: readonly CharacterTemplate[] = [
+  CLASSIC_TEMPLATE,
+  DRAMA_INVENTORY_TEMPLATE,
+  ROMANCE_TEMPLATE,
+  HORROR_TEMPLATE,
+]
+
+export function createEmptyTemplate(name = 'Custom Campaign Sheet'): CharacterTemplate {
+  return {
+    v: TEMPLATE_SCHEMA_VERSION,
+    id: newTemplateId(),
+    name,
+    description: 'Custom character sheet tailored for this campaign.',
+    author: 'Campaign Creator',
+    stats: [],
+    resources: [],
+    textFields: [],
+    equipmentSlots: [],
+    conditions: ['Normal'],
+    sections: { skills: true, inventory: true },
+  }
+}
 
 export function isBuiltinTemplateId(id: string | null | undefined): boolean {
   return BUILTIN_TEMPLATES.some((t) => t.id === id)
@@ -420,6 +499,67 @@ export function templateStatsPayload(
 }
 
 // ---------------------------------------------------------------------------------------------
+// Campaign templates
+// ---------------------------------------------------------------------------------------------
+
+export const CAMPAIGN_TEMPLATE_COMMENT_REGEX = /<!--\s*CAMPAIGN_TEMPLATE:\s*([\s\S]*?)\s*-->/
+
+export type CampaignLike = {
+  category?: string | null
+  rule_mechanics?: string | null
+  sheet_template?: unknown
+} | null | undefined
+
+export function getPresetTemplateForCategory(category: string | null | undefined): CharacterTemplate {
+  const normalized = (category || '').toLowerCase()
+  if (normalized.includes('drama')) return DRAMA_INVENTORY_TEMPLATE
+  if (
+    normalized.includes('romance') ||
+    normalized.includes('slice of life') ||
+    normalized.includes('cozy')
+  ) {
+    return ROMANCE_TEMPLATE
+  }
+  if (normalized.includes('horror')) return HORROR_TEMPLATE
+  return CLASSIC_TEMPLATE
+}
+
+export function extractCampaignTemplate(campaign: CampaignLike): CharacterTemplate {
+  if (campaign?.sheet_template) {
+    const direct = sanitizeTemplate(campaign.sheet_template)
+    if (direct) return direct
+  }
+  if (typeof campaign?.rule_mechanics === 'string') {
+    const match = campaign.rule_mechanics.match(CAMPAIGN_TEMPLATE_COMMENT_REGEX)
+    if (match?.[1]) {
+      try {
+        const raw = JSON.parse(match[1])
+        const parsed = sanitizeTemplate(raw)
+        if (parsed) return parsed
+      } catch {
+        // Fallback to category preset on parse failure
+      }
+    }
+  }
+  return getPresetTemplateForCategory(campaign?.category)
+}
+
+export function stripCampaignTemplateFromRules(rules: string | null | undefined): string {
+  if (!rules) return ''
+  return rules.replace(CAMPAIGN_TEMPLATE_COMMENT_REGEX, '').trim()
+}
+
+export function packCampaignTemplateIntoRules(
+  rules: string | null | undefined,
+  template: CharacterTemplate | null | undefined
+): string {
+  const stripped = stripCampaignTemplateFromRules(rules)
+  const cleanTpl = sanitizeTemplate(template) ?? CLASSIC_TEMPLATE
+  const marker = `\n\n<!-- CAMPAIGN_TEMPLATE: ${JSON.stringify(cleanTpl)} -->`
+  return stripped ? `${stripped}${marker}` : marker.trim()
+}
+
+// ---------------------------------------------------------------------------------------------
 // Share keys
 // ---------------------------------------------------------------------------------------------
 
@@ -504,14 +644,14 @@ export async function encodeTemplateKey(template: CharacterTemplate): Promise<st
 
 export async function decodeTemplateKey(input: string): Promise<CharacterTemplate> {
   const key = input.replace(/\s+/g, '')
-  if (!key) throw new Error('Paste a template key first.')
-  if (key.length > MAX_KEY_LENGTH) throw new Error('This template key is too large.')
+  if (!key) throw new Error('กรุณาวาง Template Key ก่อนนำเข้า (Paste a template key first)')
+  if (key.length > MAX_KEY_LENGTH) throw new Error('คีย์มีขนาดใหญ่เกินกำหนด (Template key is too large)')
 
   let jsonText: string
   try {
     if (key.startsWith(KEY_PREFIX_COMPRESSED)) {
       if (typeof DecompressionStream === 'undefined') {
-        throw new Error('This browser cannot open compressed template keys.')
+        throw new Error('เบราว์เซอร์นี้ไม่รองรับการคลายบีบอัดคีย์ (This browser cannot open compressed keys)')
       }
       const stream = streamFromBytes(base64UrlToBytes(key.slice(KEY_PREFIX_COMPRESSED.length))).pipeThrough(
         new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>
@@ -523,22 +663,22 @@ export async function decodeTemplateKey(input: string): Promise<CharacterTemplat
     } else if (input.trim().startsWith('{')) {
       jsonText = input.trim()
     } else {
-      throw new Error('This is not a template key. Keys start with "CST1." or "CST0."')
+      throw new Error('รูปแบบคีย์ไม่ถูกต้อง คีย์สำหรับแชร์ต้องขึ้นต้นด้วย "CST1." หรือ "CST0." (Keys start with CST1. or CST0.)')
     }
   } catch (err) {
-    if (err instanceof Error && /template key|browser cannot/.test(err.message)) throw err
-    throw new Error('This template key is damaged or incomplete. Copy the whole key and try again.')
+    if (err instanceof Error && /Template Key|เบราว์เซอร์|รูปแบบคีย์|CST/.test(err.message)) throw err
+    throw new Error('คีย์นี้ชำรุดหรือไม่สมบูรณ์ กรุณาคัดลอกคีย์ทั้งหมดแล้วลองใหม่อีกครั้ง (Template key is damaged or incomplete)')
   }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(jsonText)
   } catch {
-    throw new Error('This template key is damaged or incomplete. Copy the whole key and try again.')
+    throw new Error('คีย์นี้ชำรุดหรือไม่สมบูรณ์ กรุณาคัดลอกคีย์ทั้งหมดแล้วลองใหม่อีกครั้ง (Template key is damaged or incomplete)')
   }
 
   const template = sanitizeTemplate({ ...asRecord(parsed), id: undefined })
-  if (!template) throw new Error('This template key has no sheet in it.')
+  if (!template) throw new Error('ไม่พบโครงสร้างแผ่นตัวละครในคีย์นี้ (No sheet structure in this template key)')
   return { ...template, id: newTemplateId() }
 }
 

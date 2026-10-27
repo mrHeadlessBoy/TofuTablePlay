@@ -32,6 +32,7 @@ import {
   readCharacterTemplate,
   readCustomValues,
   templateStatsPayload,
+  extractCampaignTemplate,
 } from '@/features/character/template'
 import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
@@ -160,6 +161,12 @@ export default function TablePlayground({
   // Derive the active member and character dynamically from live members state
   const activeMember = members.find((m) => m.user_id === userId) || currentMember
   const activeChar = activeMember?.characters
+  const campaignData = Array.isArray(table.campaigns)
+    ? table.campaigns[0]
+    : table.campaigns ?? initialTable.campaigns
+  const campaignTemplate = extractCampaignTemplate(
+    campaignData as Parameters<typeof extractCampaignTemplate>[0]
+  )
 
   // The draft is locked once the player is ready, so the dice tray is locked with it
   // True on every player's screen while the Dungeon Master is writing the turn, not only the host's.
@@ -544,6 +551,28 @@ export default function TablePlayground({
     if (typeof table.current_turn !== 'number') return
 
     const nextState = !activeMember.is_ready
+
+    // Client validation: Require a character linked before readying up
+    if (nextState && !activeMember.characters) {
+      showAlert({
+        title: 'ยังไม่ได้เลือกตัวละคร',
+        message: 'กรุณาเลือกหรือสร้างตัวละครสำหรับแคมเปญนี้ก่อนกดยืนยันความพร้อม (Please select a character before readying up)',
+        status: 'warning',
+        badge: 'Character Required',
+      })
+      return
+    }
+
+    // Client validation: Action length check
+    if (nextState && draftAction.length > 2500) {
+      showAlert({
+        title: 'ข้อความการกระทำยาวเกินไป',
+        message: 'ข้อความการกระทำมีความยาวเกินกำหนด สูงสุดไม่เกิน 2,500 ตัวอักษร (Action text exceeds 2,500 characters)',
+        status: 'warning',
+      })
+      return
+    }
+
     const submittedAction = nextState ? draftAction.trim() : null
     const setOwnReady = (ready: boolean, actionText?: string | null) =>
       setMembers((prev) =>
@@ -601,9 +630,14 @@ export default function TablePlayground({
       setIsSwitchingChar(false)
       broadcastSync()
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to select character'
+      const message = err instanceof Error ? err.message : 'ไม่สามารถเลือกตัวละครนี้ได้'
       console.error(message)
-      showAlert(message)
+      showAlert({
+        title: 'ไม่สามารถเลือกตัวละครนี้ได้',
+        status: 'warning',
+        badge: 'Template Validation',
+        message,
+      })
     }
   }
 
@@ -676,7 +710,11 @@ export default function TablePlayground({
       setIsEditingChar(false)
       broadcastSync()
     } catch (err: unknown) {
-      showAlert(err instanceof Error ? err.message : 'Failed to update character')
+      showAlert({
+        title: 'ไม่สามารถบันทึกข้อมูลตัวละครได้',
+        status: 'error',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการบันทึกข้อมูลตัวละคร (Failed to update character)',
+      })
     } finally {
       setIsSavingChar(false)
     }
@@ -688,18 +726,31 @@ export default function TablePlayground({
       setEditingTurnId(null)
       broadcastSync()
     } catch (err: unknown) {
-      showAlert(err instanceof Error ? err.message : 'Failed to save narrative edit')
+      showAlert({
+        title: 'ไม่สามารถบันทึกเนื้อเรื่องได้',
+        status: 'error',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการแก้ไขเนื้อเรื่อง (Failed to save narrative edit)',
+      })
     }
   }
 
   const handleKick = async (targetUserId: string, targetName: string) => {
-    const confirmed = await showConfirm(`Remove ${targetName} from this table?`)
+    const confirmed = await showConfirm({
+      title: 'ยืนยันการนำผู้เล่นออกจากโต๊ะ',
+      message: `คุณแน่ใจหรือไม่ว่าต้องการนำ ${targetName} ออกจากโต๊ะนี้?`,
+      confirmText: 'นำออก',
+      cancelText: 'ยกเลิก',
+    })
     if (confirmed) {
       try {
         await voteKickMember(table.id, targetUserId)
         broadcastSync()
       } catch (err: unknown) {
-        showAlert(err instanceof Error ? err.message : 'Failed to remove member')
+        showAlert({
+          title: 'ไม่สามารถนำผู้เล่นออกจากโต๊ะได้',
+          status: 'error',
+          message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการนำผู้เล่นออกจากโต๊ะ (Failed to remove member)',
+        })
       }
     }
   }
@@ -751,6 +802,7 @@ export default function TablePlayground({
       <CharacterInspectorPanel
         activeChar={activeChar}
         userCharacters={userCharacters}
+        campaignTemplate={campaignTemplate}
         isEditingChar={isEditingChar}
         isSavingChar={isSavingChar}
         isSwitchingChar={isSwitchingChar}

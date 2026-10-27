@@ -57,6 +57,7 @@ export type TableData = {
   countdown_end?: string | null
   current_turn?: number
   head_table_id?: string
+  campaigns?: unknown
 }
 
 export type TablePlaygroundProps = {

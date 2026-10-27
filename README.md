@@ -7,7 +7,8 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 ## 🌟 Key Features
 
 ### 1. 📜 Campaign Studio & Dynamic Lorebook (`/campaigns`)
-* **World & Rule Authoring:** Create, view, and edit campaigns with custom genres, world settings, overarching story briefs, and specialized tabletop mechanics (`/campaigns/new`, `/campaigns/[id]`, `/campaigns/[id]/edit`).
+* **World, Rule & Sheet Template Authoring:** Create, view, and edit campaigns with custom genres, world settings, overarching story briefs, specialized tabletop mechanics, and **Mandatory Character Sheet Requirements** (`/campaigns/new`, `/campaigns/[id]`, `/campaigns/[id]/edit`). Every campaign strictly binds either a built-in genre preset or a custom-designed template enforced across all tables.
+* **Preset Customization & Blank Sheet Canvas in Campaigns:** Preset cards offer both direct 1-click selection ("เลือกพรีเซ็ตนี้") and immediate customization ("ปรับแต่งจากพรีเซ็ต") that forks into a custom template. The Custom Template card allows generating a completely blank template canvas ("สร้างชีท Custom ว่างเปล่า") or resetting to blank ("ล้างเป็นชีทว่างใหม่").
 * **Smart Lorebook Engine:** Automatically injects relevant world lore into AI DM prompts without bloating context tokens:
   * `Always Active`: Injected into every turn and opening scene.
   * `Keyword Triggered`: Scanned against recent turn history and player action drafts (automatically falls back to matching the entry's **Title** if no explicit keywords are set).
@@ -17,8 +18,14 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 ### 2. 🧙‍♂️ Character Codex, Sheet Templates & SAO-Style Floating HUD Inspector (`/characters` & In-Table)
 * **Reusable Character Sheets:** Build, edit, and delete persistent characters with class archetypes, appearance, backstory, strengths, weaknesses, and custom genre-specific fields.
 * **Customizable Character Sheet Templates & Shareable Keys (`template.ts` & `TemplateModal.tsx`):**
-  * **Built-In Genre Presets:** Switch between **Classic Fantasy RPG** (`STR/DEX/CON/INT/WIS/CHA`, `HP`, `Skill Cost`, 6 armor slots), **Romance / Slice of Life** (`Charm/Empathy/Wit/Style/Luck/Courage`, `Composure`, `Social Energy`, `Stress`, `Crush`, `Relationships`, outfit/accessory/keepsake slots), and **Horror Investigation** (`Physique/Nerves/Observation/Occult/Willpower/Luck`, `Health`, `Sanity`, `Luck`, `Phobia / Trauma`).
-  * **Visual Template Builder:** Customize template metadata, add/remove Resource Bars (with 8 color themes and default max values), Stats/Attributes (with optional min/max clamping and default scores), Text & Bio Fields, Equipment Slots, Status Conditions, and toggle Skills/Inventory sections.
+  * **Built-In Genre Presets:**
+    * **Classic Fantasy RPG** (`STR/DEX/CON/INT/WIS/CHA`, `HP`, `Skill Cost`, 6 armor slots).
+    * **Drama & Mystery (Inventory & Clues Only)** (`builtin-drama-inventory`): 0 Resource Bars (no HP/SP), 3 narrative stats (`Reputation / Clout`, `Composure`, `Subterfuge`), 4 gear/item slots (`Attire / Disguise`, `Pockets`, `Bag / Briefcase`, `Keepsake / Badge`), social/investigative conditions (`Normal`, `Suspected`, `Favored`, `Blackmailed`, `Compromised`, `Exiled`).
+    * **Romance / Slice of Life** (`Charm/Empathy/Wit/Style/Luck/Courage`, `Heart`, `Stress`, `Crush`, `Relationships`, outfit/accessory/keepsake slots).
+    * **Horror Investigation** (`STR/DEX/CON/INT/Willpower/Perception`, `HP`, `Sanity`, `Luck`, firearm/clothing/pocket slots).
+  * **Visual Template Builder & 0-Resource Freedom:** Customize template metadata, delete all resource bars or stats down to 0 for pure item/narrative play, add/remove custom Resource Bars (with 8 color themes and default max values), Stats/Attributes (with optional min/max clamping and default scores), Text & Bio Fields, Equipment Slots, Status Conditions, and toggle Skills/Inventory sections.
+  * **Preset-to-Custom Auto-Forking:** Modifying any built-in template (e.g. `Classic Fantasy RPG`) seamlessly forks it into a standalone custom template (`[Name] (Custom)` with a unique `tpl-xxxx` ID), preserving the original preset while granting full structural freedom without schema conflicts.
+  * **Blank Canvas Creation (`createEmptyTemplate`):** Start entirely from scratch with 0 resources, 0 stats, 0 equipment slots, and 0 narrative fields in Campaign Studio and Template Modal via instant "สร้างชีท Custom ว่างเปล่า" or "ล้างเป็นชีทว่าง (Start from Blank)" actions.
   * **Shareable Template Keys (`CST1.` / `CST0.`):** Export any template into a compact `deflate-raw` compressed base64url share key (`CST1....`) or plain key (`CST0....`) and import keys or raw JSON with live structure preview.
 * **Combat & Resource Tracking:**
   * **HP, Skill Cost & Custom Resource Pools:** Track `Current HP / Max HP`, `Current Skill Cost / Max Skill Cost`, and any template-defined custom resource bars (`Stress`, `Luck`, etc.).
@@ -37,6 +44,18 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 * **Server-Synced Ready Barrier:** When every party member clicks **Ready**, a server-clock-calibrated 5-second countdown begins (`getServerTime` offset sync). If anyone un-readies, the countdown cancels immediately. Optimistic ready claims with 6-second TTL prevent badge flicker from stale realtime reloads.
 * **Hybrid Realtime Architecture:** Powered by Supabase PostgreSQL Changes + low-latency Broadcast channels (`member_ready`, `table_sync`, `party_chat`) + optimistic ready claims and polling fallback.
 * **Table Codes & Direct Invite Links:** Join active sessions from the Hub using a 6-character Table Code (e.g., `7K4X9B`) or a one-click copyable Invite Link (`/table/<code>`).
+* **Enforced Character Sheet Compatibility & Polite Mismatch Dialog:**
+  * **Table & Campaign Requirement Banners & 1-Click Character Sheet Creation:**
+    * **Campaign Details (`/campaigns/[id]`):** Features an interactive Required Template card displaying resources, stats, equipment, and a direct 1-click **"สร้างตัวละครตามเทมเพลตนี้ (Create Character)"** button.
+    * **Table & Character Inspector (`CharacterInspectorPanel.tsx`):** If a player enters a table without a compatible character sheet or has existing sheets that don't match, a dedicated notice banner surfaces alongside a 1-click **"สร้างตัวละครใหม่ตามเทมเพลตโต๊ะนี้"** button.
+    * **Dynamic Campaign Template Auto-Loader (`getCampaignRequiredTemplate`):** Clicking these buttons navigates to `/characters?campaignId=...` or `?tableCode=...` (with `returnTo`), asynchronously fetching the campaign's exact template (built-in preset or bespoke custom template) and automatically initializing a compliant character sheet draft ready for immediate play.
+  * **Polite Bilingual Mismatch Modal:** When attempting to select an incompatible character, a structured warning modal (`AlertModal` with side-by-side comparison) clearly details why the sheet cannot join, showing both the character's format vs the campaign's required template, alongside a 1-click **"สร้างตัวละครใหม่สำหรับแคมเปญนี้"** action button.
+  * **Dual-Layer Compatibility Guardrails:** Mismatched sheets are visibly flagged and blocked in the UI (`⚠️ Mismatched Sheet`) with server-side validation in `linkCharacterToTable` strictly rejecting incompatible templates with localized, polite error messages.
+* **Comprehensive App-Wide Input Validation:**
+  * **Campaign Studio:** Validates title length (2-100 characters), world setting, core narrative, custom genre names, and attached lorebook drafts before submission.
+  * **Character Codex:** Enforces non-empty character names, name length limits (max 60 characters), bounded HP/SP values, and custom stats range clamping with localized confirmation dialogs for deletion.
+  * **Tabletop Gameplay:** Guards against readying up without selecting a character, restricts turn action drafts exceeding 2,500 characters, and protects table state updates.
+  * **Hub & Auth:** Validates 6-character table codes and URLs with polite error feedback, plus user-friendly Thai & English auth messages for login/signup credentials.
 * **Floating Party Chat Widget:** Real-time in-table chat supporting **In-Character (`IC`)** roleplay dialogue and **Out-of-Character (`OOC`)** coordination, unread counters, host badges, and Web Audio API ping notifications (80-message rolling buffer).
 * **Auto-Scroll to Latest Turn & Minimal Quick-Return Symbol:** Automatically scrolls to the newest turn narration upon entering the table and when turns resolve. When scrolling up to read historical chronicle turns, a sleek floating symbol button (`CircleDot`, non-textual, without arrows) appears to quickly jump back to the bottom.
 
@@ -240,15 +259,15 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │       └── PartyChatWidget.tsx         # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
     │   ├── character/                    # Character Codex & Shared Character Domain
     │   │   ├── domain.ts                 # Shared stat/skill/equipment/inventory constants, sanitizers & HP color helpers
-    │   │   ├── template.ts               # Built-in presets (Classic, Romance, Horror), template sanitizers & CST1./CST0. key codec
-    │   │   ├── actions.ts                # Create, update & delete character sheets
+    │   │   ├── template.ts               # Built-in presets (Classic, Drama, Romance, Horror), sanitizers, blank canvas & CST1./CST0. codec
+    │   │   ├── actions.ts                # Create, update, delete character sheets & getCampaignRequiredTemplate resolver
     │   │   └── components/
-    │   │       ├── CharacterEditor.tsx   # Template-driven sheet editor (resources, stats, bio fields, equipment, inventory & skills)
-    │   │       └── TemplateModal.tsx     # Visual template customizer, CST1. share key exporter & key/JSON importer
+    │   │       ├── CharacterEditor.tsx   # Template-driven sheet editor (auto-forking presets, async campaign loader, dynamic stats & equipment)
+    │   │       └── TemplateModal.tsx     # Visual template customizer, preset-to-custom forking, blank reset, CST1. exporter & importer
     │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
-    │   │   ├── actions.ts                # Create & update campaigns and lorebook entries
+    │   │   ├── actions.ts                # Create & update campaigns (with strict template binding validation) and lorebook entries
     │   │   └── components/
-    │   │       └── CampaignForm.tsx      # Shared campaign & dynamic lorebook authoring form
+    │   │       └── CampaignForm.tsx      # Shared campaign authoring form (preset customization, blank canvas & lorebook registry)
     │   ├── hub/                          # Campaign Hub & Session Management
     │   │   ├── actions.ts                # Launch table (with AI opening scene), join, leave, delete, sign out
     │   │   └── components/

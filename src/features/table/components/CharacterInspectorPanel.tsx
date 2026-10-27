@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   Check,
   Edit3,
@@ -13,12 +15,14 @@ import {
   RotateCcw,
   Save,
   Shield,
+  Sliders,
   Sparkles,
   Trash2,
   User,
   X,
   Zap,
 } from "lucide-react";
+import { useAlert } from "@/components/ui/AlertModal";
 import {
   EMPTY_EQUIPMENT,
   extractCharacterSkillCost,
@@ -28,6 +32,7 @@ import {
   type CharacterInventoryItem,
 } from "@/features/character/domain";
 import {
+  CLASSIC_TEMPLATE,
   COLUMN_EQUIPMENT_SLOT_INDEX,
   COLUMN_RESOURCE_IDS,
   clampStatValue,
@@ -35,6 +40,7 @@ import {
   isColumnTextFieldId,
   readCharacterTemplate,
   readCustomValues,
+  type CharacterTemplate,
   type ResourceColor,
 } from "@/features/character/template";
 import { abilityModifier, formatModifier } from "@/components/dice/dice";
@@ -67,6 +73,7 @@ const CUSTOM_RESOURCE_BAR_COLOR: Record<
 type CharacterInspectorPanelProps = {
   activeChar: Character | null | undefined;
   userCharacters: Character[];
+  campaignTemplate?: CharacterTemplate;
   isEditingChar: boolean;
   isSavingChar: boolean;
   isSwitchingChar: boolean;
@@ -85,6 +92,7 @@ type CharacterInspectorPanelProps = {
 export default function CharacterInspectorPanel({
   activeChar,
   userCharacters,
+  campaignTemplate = CLASSIC_TEMPLATE,
   isEditingChar,
   isSavingChar,
   isSwitchingChar,
@@ -99,6 +107,8 @@ export default function CharacterInspectorPanel({
   onSaveCharEdits,
   onCancelEdit,
 }: CharacterInspectorPanelProps) {
+  const { showAlert } = useAlert();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [scalePercent, setScalePercent] = useState<number>(() => {
@@ -414,7 +424,7 @@ export default function CharacterInspectorPanel({
                 <div className="flex justify-between items-center">
                   <label className="text-xs text-zinc-300 font-medium flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Select a character for this session:</span>
+                    <span>Select character for this session:</span>
                   </label>
                   {isSwitchingChar && (
                     <button
@@ -426,29 +436,215 @@ export default function CharacterInspectorPanel({
                     </button>
                   )}
                 </div>
-                {userCharacters.map((char) => {
-                  const cost = extractCharacterSkillCost(char);
-                  return (
-                    <button
-                      key={char.id}
-                      type="button"
-                      onClick={() => onSelectCharacter(char.id)}
-                      className="w-full text-left p-3 rounded bg-zinc-900/80 border border-white/15 hover:border-amber-400 hover:bg-amber-950/20 text-xs transition cursor-pointer"
-                    >
-                      <p className="font-bold text-white">{char.name}</p>
-                      <p className="text-zinc-400 font-mono text-[11px] mt-0.5">
-                        {char.class_archetype || "Adventurer"} · HP{" "}
-                        {char.current_hp}/{char.max_hp} · SP{" "}
-                        {cost.currentSkillCost}/{cost.maxSkillCost}
-                      </p>
-                    </button>
-                  );
-                })}
-                {userCharacters.length === 0 && (
-                  <p className="text-xs text-zinc-500 italic">
-                    No character sheets found. Create one in the Character Codex
-                    first.
+
+                {/* Campaign Requirement Banner */}
+                <div className="p-3 bg-amber-950/30 border border-amber-800/50 rounded-lg space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5" />
+                      Required: {campaignTemplate.name}
+                    </span>
+                    <span className="text-[10px] font-medium bg-amber-900/70 text-amber-200 px-2 py-0.5 rounded border border-amber-700/60">
+                      Enforced
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-snug">
+                    {campaignTemplate.description}
                   </p>
+                  <div className="flex flex-wrap gap-1 text-[10px] pt-0.5">
+                    {campaignTemplate.resources.length > 0 ? (
+                      campaignTemplate.resources.map((r) => (
+                        <span key={r.id} className="bg-zinc-900/90 border border-zinc-700/60 text-zinc-300 px-1.5 py-0.5 rounded">
+                          {r.label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="bg-amber-950/80 border border-amber-800 text-amber-300 px-1.5 py-0.5 rounded font-medium">
+                        0 Resource Bars (Item & Clues Only)
+                      </span>
+                    )}
+                    <span className="bg-zinc-900/90 border border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                      {campaignTemplate.stats.length} Stats
+                    </span>
+                    <span className="bg-zinc-900/90 border border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                      {campaignTemplate.equipmentSlots.length} Gear Slots
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1-Click Create Character for Campaign */}
+                <Link
+                  href={`/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`}
+                  className="w-full py-2.5 px-3 bg-linear-to-r from-amber-600/90 to-amber-500/90 hover:from-amber-600 hover:to-amber-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> สร้างตัวละครจากเทมเพลตที่แคมเปญกำหนด
+                </Link>
+
+                {/* Character List with Compatibility Checking */}
+                <div className="space-y-2 pt-1">
+                  {userCharacters.map((char) => {
+                    const charTemplate = readCharacterTemplate(char);
+                    const isCompatible = charTemplate.id === campaignTemplate.id;
+                    const cost = extractCharacterSkillCost(char);
+
+                    const handleMismatchedCharClick = () => {
+                      showAlert({
+                        title: "รูปแบบชีทไม่ตรงกับข้อกำหนดของแคมเปญ",
+                        status: "warning",
+                        badge: "Sheet Mismatch",
+                        maxWidth: "md",
+                        buttonText: "เลือกตัวละครอื่น",
+                        action: {
+                          label: "สร้างตัวละครใหม่สำหรับแคมเปญนี้",
+                          variant: "accent",
+                          onClick: () => {
+                            router.push(
+                              `/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`
+                            );
+                          },
+                        },
+                        message: (
+                          <div className="space-y-3 text-xs">
+                            <p className="text-zinc-300 leading-relaxed">
+                              ไม่สามารถนำตัวละคร <strong className="text-white font-semibold">&ldquo;{char.name}&rdquo;</strong> เข้าร่วมเล่นได้ เนื่องจากแคมเปญนี้กำหนดโครงสร้างแผ่นตัวละครเฉพาะ
+                            </p>
+
+                            <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3.5 space-y-3 text-left">
+                              {/* Character's Template */}
+                              <div className="border-b border-zinc-800/80 pb-2.5">
+                                <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold">
+                                  รูปแบบของตัวละครนี้ ({char.name})
+                                </span>
+                                <span className="text-amber-400 font-bold text-sm block mt-0.5">
+                                  {charTemplate.name}
+                                </span>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                    {charTemplate.resources.length > 0
+                                      ? `${charTemplate.resources.length} หลอดพลัง (${charTemplate.resources.map((r) => r.label).join(', ')})`
+                                      : '0 หลอดพลัง (เน้นไอเทม & เบาะแส)'}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                    {charTemplate.stats.length} สเตตัส
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                    {charTemplate.equipmentSlots.length} ช่องอุปกรณ์
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Campaign's Required Template */}
+                              <div className="pt-0.5">
+                                <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold flex items-center gap-1">
+                                  <Check className="w-3 h-3" /> แคมเปญนี้กำหนดให้ใช้ (Required Format)
+                                </span>
+                                <span className="text-emerald-300 font-bold text-sm block mt-0.5">
+                                  {campaignTemplate.name}
+                                </span>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80">
+                                    {campaignTemplate.resources.length > 0
+                                      ? `${campaignTemplate.resources.length} หลอดพลัง (${campaignTemplate.resources.map((r) => r.label).join(', ')})`
+                                      : '0 หลอดพลัง (เน้นไอเทม & เบาะแส)'}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80">
+                                    {campaignTemplate.stats.length} สเตตัส
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80">
+                                    {campaignTemplate.equipmentSlots.length} ช่องอุปกรณ์
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-2.5 bg-amber-950/30 border border-amber-800/50 rounded-lg text-amber-200/90 text-[11px] leading-relaxed flex items-start gap-2">
+                              <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                              <span>
+                                <strong>คำแนะนำ:</strong> คุณสามารถกดปุ่ม <span className="text-amber-300 underline font-semibold">&ldquo;สร้างตัวละครใหม่สำหรับแคมเปญนี้&rdquo;</span> ด้านล่าง เพื่อเข้าสู่หน้าสร้างตัวละครด้วยเทมเพลตที่ตรงกับแคมเปญได้ทันที
+                              </span>
+                            </div>
+                          </div>
+                        ),
+                      });
+                    };
+
+                    return (
+                      <button
+                        key={char.id}
+                        type="button"
+                        onClick={() => {
+                          if (!isCompatible) {
+                            handleMismatchedCharClick();
+                            return;
+                          }
+                          onSelectCharacter(char.id);
+                        }}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition cursor-pointer ${
+                          isCompatible
+                            ? 'bg-zinc-900/80 border-emerald-500/40 hover:border-emerald-400 hover:bg-emerald-950/20 ring-1 ring-emerald-500/20'
+                            : 'bg-zinc-950/60 border-zinc-800/80 opacity-60 hover:opacity-90 hover:border-red-500/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-white flex items-center gap-1.5">
+                            {char.name}
+                            {isCompatible ? (
+                              <span className="text-[10px] font-normal bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Compatible
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-normal bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded">
+                                {charTemplate.name}
+                              </span>
+                            )}
+                          </p>
+                          {!isCompatible && (
+                            <span className="text-[10px] text-red-400 flex items-center gap-1 font-mono">
+                              <AlertCircle className="w-3 h-3" /> Mismatched
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-zinc-400 font-mono text-[11px] mt-1">
+                          {char.class_archetype || 'Adventurer'}
+                          {charTemplate.resources.length > 0
+                            ? ` · HP ${char.current_hp ?? 0}/${char.max_hp ?? 0} · SP ${cost.currentSkillCost}/${cost.maxSkillCost}`
+                            : ' · 0 Resources (Item/Clue only)'}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {userCharacters.length > 0 && !userCharacters.some((c) => readCharacterTemplate(c).id === campaignTemplate.id) && (
+                  <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs space-y-2 text-amber-200">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>ยังไม่มีตัวละครที่ตรงตามเงื่อนไขของแคมเปญนี้</span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                      แคมเปญนี้กำหนดให้ใช้รูปแบบชีท <strong className="text-white font-medium">&ldquo;{campaignTemplate.name}&rdquo;</strong> คุณสามารถกดปุ่มด้านล่างเพื่อสร้างตัวละครที่ตรงตามเงื่อนไขได้ทันที
+                    </p>
+                    <Link
+                      href={`/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`}
+                      className="inline-flex items-center justify-center gap-1.5 w-full py-2 bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-xs font-semibold shadow transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> สร้างตัวละครจากเทมเพลตของแคมเปญนี้
+                    </Link>
+                  </div>
+                )}
+
+                {userCharacters.length === 0 && (
+                  <div className="p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-xl text-center space-y-2.5">
+                    <p className="text-xs text-zinc-400">
+                      ยังไม่พบแผ่นตัวละครในคลังของคุณ
+                    </p>
+                    <Link
+                      href={`/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`}
+                      className="inline-flex items-center justify-center gap-1.5 w-full py-2 bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-xs font-semibold shadow transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> สร้างตัวละครสำหรับแคมเปญนี้ทันที
+                    </Link>
+                  </div>
                 )}
               </div>
             ) : isEditingChar ? (

@@ -16,6 +16,7 @@ import {
 } from '@/features/character/domain'
 import {
   readCharacterTemplate,
+  extractCampaignTemplate,
   readCustomValues,
   templateStatsPayload,
   type CharacterTemplate,
@@ -38,6 +39,39 @@ async function assertHeadTable(supabase: SessionClient, tableId: string, userId:
 
 export async function linkCharacterToTable(tableId: string, characterId: string) {
   const { supabase, user } = await requireAuthenticatedUser()
+
+  // 1. Fetch table and its campaign to get the campaign's required template
+  const { data: table, error: tableErr } = await supabase
+    .from('tables')
+    .select('id, campaigns(*)')
+    .eq('id', tableId)
+    .single()
+
+  if (tableErr || !table) throw new Error('Table not found')
+
+  const campaignData = Array.isArray(table.campaigns)
+    ? (table.campaigns[0] as unknown)
+    : (table.campaigns as unknown)
+  const requiredTemplate = extractCampaignTemplate(campaignData as Parameters<typeof extractCampaignTemplate>[0])
+
+  // 2. Fetch the selected character
+  const { data: character, error: charErr } = await supabase
+    .from('characters')
+    .select('id, name, stats')
+    .eq('id', characterId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (charErr || !character) throw new Error('Character not found or not owned by you')
+
+  const charTemplate = readCharacterTemplate(character)
+
+  // 3. Strictly validate template compatibility
+  if (charTemplate.id !== requiredTemplate.id) {
+    throw new Error(
+      `ไม่สามารถนำตัวละคร "${character.name}" เข้าร่วมเล่นได้: แคมเปญนี้กำหนดให้ใช้รูปแบบชีท "${requiredTemplate.name}" กรุณาสร้างหรือเลือกตัวละครที่ตรงตามเงื่อนไข (Template mismatch: campaign requires "${requiredTemplate.name}")`
+    )
+  }
 
   const { error } = await supabase
     .from('table_members')
@@ -179,6 +213,10 @@ async function saveActionDraft(
 
   if (!member) throw new Error('Member not found')
   if (!turn) throw new Error('Current turn not found')
+
+  if (actionText && actionText.length > 2500) {
+    throw new Error('ข้อความการกระทำมีความยาวเกินกำหนด (สูงสุด 2,500 ตัวอักษร) / Action draft exceeds 2,500 characters limit')
+  }
 
   // Record action draft.
   // member.id above always belongs to the signed-in user, so writing through the service-role

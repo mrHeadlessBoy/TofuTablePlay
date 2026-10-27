@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { BookOpen, Lock, Play} from 'lucide-react'
+import { BookOpen, Lock, Play, Sliders, Plus } from 'lucide-react'
+import { extractCampaignTemplate, stripCampaignTemplateFromRules } from '@/features/character/template'
 import { launchTable } from '@/features/hub/actions'
 
 type LoreEntry = {
@@ -71,6 +72,11 @@ async function CampaignDetails({
       ? campaign.custom_category
       : campaign.category;
 
+
+
+  const campaignTemplate = extractCampaignTemplate(campaign);
+  const cleanRuleMechanics = stripCampaignTemplateFromRules(campaign.rule_mechanics);
+
   return (
     <>
       <div className="flex justify-between items-start gap-4 border-b border-zinc-800 pb-4">
@@ -89,6 +95,59 @@ async function CampaignDetails({
           &larr; Back to Hub
         </Link>
       </div>
+      {/* Required Character Sheet Template Card */}
+      <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-amber-500" />
+            <h2 className="text-base font-semibold text-white">Required Character Sheet Template</h2>
+          </div>
+          <span className="text-[11px] font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 px-2.5 py-0.5 rounded-full">
+            Mandatory Table Format
+          </span>
+        </div>
+        <p className="text-xs text-zinc-400">
+          All adventurers joining this campaign table must play using this character sheet format:
+        </p>
+        <div className="p-3.5 bg-zinc-950 border border-zinc-800 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold text-sm text-white">{campaignTemplate.name}</div>
+            <p className="text-xs text-zinc-400 mt-0.5">{campaignTemplate.description}</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[10px] shrink-0">
+            {campaignTemplate.resources.length > 0 ? (
+              campaignTemplate.resources.map((r) => (
+                <span key={r.id} className="bg-zinc-900 border border-zinc-700/60 text-zinc-300 px-2 py-0.5 rounded">
+                  {r.label}
+                </span>
+              ))
+            ) : (
+              <span className="bg-amber-950/60 border border-amber-800/80 text-amber-300 px-2 py-0.5 rounded font-medium">
+                0 Resource Bars (Item & Clues Only)
+              </span>
+            )}
+            <span className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+              {campaignTemplate.stats.length} Stats
+            </span>
+            <span className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+              {campaignTemplate.equipmentSlots.length} Gear Slots
+            </span>
+          </div>
+        </div>
+
+        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-zinc-800/80">
+          <span className="text-[11px] text-zinc-400">
+            ยังไม่มีตัวละครสำหรับแคมเปญนี้ใช่หรือไม่?
+          </span>
+          <Link
+            href={`/characters?campaignId=${encodeURIComponent(String(campaign.id))}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/campaigns/${campaign.id}`)}`}
+            className="px-3.5 py-1.5 bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow transition cursor-pointer self-start sm:self-auto"
+          >
+            <Plus className="w-3.5 h-3.5" /> สร้างตัวละครตามเทมเพลตนี้ (Create Character)
+          </Link>
+        </div>
+      </section>
+
       <form action={launchTable.bind(null, String(campaign.id))}>
                 <button 
             type="submit"
@@ -148,7 +207,7 @@ async function CampaignDetails({
             Rule Mechanics & Custom Systems
           </label>
             <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none">
-              {campaign.rule_mechanics}
+              {cleanRuleMechanics || 'Standard tabletop RPG rules apply.'}
             </div>
         </div>
       </section>

@@ -2,6 +2,10 @@ import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import CampaignForm from '@/features/campaign/components/CampaignForm'
+import {
+  extractCampaignTemplate,
+  stripCampaignTemplateFromRules,
+} from '@/features/character/template'
 import type { LoreEntryInput } from '@/features/campaign/actions'
 
 export default function EditCampaignPage({ params }: { params: Promise<{ id: string }> }) {
@@ -56,7 +60,8 @@ async function EditCampaignContent({ params }: { params: Promise<{ id: string }>
         custom_category: campaign.custom_category ?? '',
         world_setting: campaign.world_setting ?? '',
         core_description: campaign.core_description ?? '',
-        rule_mechanics: campaign.rule_mechanics ?? '',
+        rule_mechanics: stripCampaignTemplateFromRules(campaign.rule_mechanics),
+        sheet_template: extractCampaignTemplate(campaign),
         loreEntries,
       }}
     />

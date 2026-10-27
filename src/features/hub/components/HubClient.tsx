@@ -271,14 +271,23 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleDeleteTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
-    const confirmed = await showConfirm(`Delete table "${name}" (${tbl.table_code})? All turns and members will be removed. This cannot be undone.`)
+    const confirmed = await showConfirm({
+      title: 'ยืนยันการลบโต๊ะเล่น',
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบโต๊ะ "${name}" (${tbl.table_code})? เทิร์นการเล่นและสมาชิกทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้ (This cannot be undone)`,
+      confirmText: 'ลบโต๊ะ',
+      cancelText: 'ยกเลิก',
+    })
     if (!confirmed) return
     setDeletingId(`table:${tbl.id}`)
     try {
       await deleteTable(String(tbl.id))
       router.refresh()
     } catch (err: unknown) {
-      showAlert(err instanceof Error ? err.message : 'Failed to delete table.')
+      showAlert({
+        title: 'ไม่สามารถลบโต๊ะได้',
+        status: 'error',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบโต๊ะ (Failed to delete table)',
+      })
     } finally {
       setDeletingId(null)
     }
@@ -286,14 +295,23 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleLeaveTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
-    const confirmed = await showConfirm(`Leave table "${name}" (${tbl.table_code})?`)
+    const confirmed = await showConfirm({
+      title: 'ยืนยันการออกจากโต๊ะ',
+      message: `คุณต้องการออกจากโต๊ะ "${name}" (${tbl.table_code}) ใช่หรือไม่?`,
+      confirmText: 'ออกจากโต๊ะ',
+      cancelText: 'ยกเลิก',
+    })
     if (!confirmed) return
     setDeletingId(`leave:${tbl.id}`)
     try {
       await leaveTable(String(tbl.id))
       router.refresh()
     } catch (err: unknown) {
-      showAlert(err instanceof Error ? err.message : 'Failed to leave table.')
+      showAlert({
+        title: 'ไม่สามารถออกจากโต๊ะได้',
+        status: 'error',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการออกจากโต๊ะ (Failed to leave table)',
+      })
     } finally {
       setDeletingId(null)
     }
@@ -301,14 +319,23 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
   const handleDeleteCampaign = async (camp: PublicCampaign) => {
     const title = camp.title || 'Untitled Campaign'
-    const confirmed = await showConfirm(`Delete campaign "${title}"? Its lorebook and every table running it will be removed. This cannot be undone.`)
+    const confirmed = await showConfirm({
+      title: 'ยืนยันการลบแคมเปญ',
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบแคมเปญ "${title}"? ลอว์บุ๊กและโต๊ะทั้งหมดที่สร้างจากแคมเปญนี้จะถูกลบถาวร ไม่สามารถกู้คืนได้ (This cannot be undone)`,
+      confirmText: 'ลบแคมเปญ',
+      cancelText: 'ยกเลิก',
+    })
     if (!confirmed) return
     setDeletingId(`campaign:${camp.id}`)
     try {
       await deleteCampaign(String(camp.id))
       router.refresh()
     } catch (err: unknown) {
-      showAlert(err instanceof Error ? err.message : 'Failed to delete campaign.')
+      showAlert({
+        title: 'ไม่สามารถลบแคมเปญได้',
+        status: 'error',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบแคมเปญ (Failed to delete campaign)',
+      })
     } finally {
       setDeletingId(null)
     }
@@ -317,7 +344,15 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
   const handleJoin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const rawInput = tableCode.trim()
-    if (!rawInput) return
+    if (!rawInput) {
+      showAlert({
+        title: 'กรุณากรอกรหัสโต๊ะ',
+        status: 'warning',
+        badge: 'Table Code Required',
+        message: 'กรุณากรอก Table Code 6 หลัก หรือวาง Invite Link ก่อนกดเข้าร่วมโต๊ะ (Please enter a table code or invite link)',
+      })
+      return
+    }
 
     const displayBadge =
       rawInput.match(/\/table\/([^/?#\s]+)/i)?.[1]?.toUpperCase() ||
