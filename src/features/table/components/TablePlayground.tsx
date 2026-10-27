@@ -73,6 +73,7 @@ export default function TablePlayground({
   const [memberLoadError, setMemberLoadError] = useState<string | null>(null)
   const [turns, setTurns] = useState(initialTurns)
   const [draftAction, setDraftAction] = useState('')
+  const [attachedRolls, setAttachedRolls] = useState<DiceRoll[]>([])
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
   const [diceOpen, setDiceOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([])
@@ -93,6 +94,7 @@ export default function TablePlayground({
   if (table.current_turn !== draftTurn) {
     setDraftTurn(table.current_turn)
     setDraftAction('')
+    setAttachedRolls([])
   }
 
   // Host override and AI generation states
@@ -203,15 +205,18 @@ export default function TablePlayground({
       })()
     : []
 
-  // Write the roll into the draft so the Dungeon Master reads the number when the turn resolves
+  // Attach the roll as a read-only badge instead of appending text into the draft input.
+  // The badges are combined with the typed action when the player clicks Ready.
   const handleDiceRoll = (roll: DiceRoll) => {
     if (draftLocked) return
     playDiceRollSound(roll.total)
-    const result = describeRoll(roll)
-    const text = result.startsWith(roll.label)
-      ? `[ทอยเต๋า ${result}]`
-      : `[ทอยเต๋า ${roll.label}: ${result}]`
-    setDraftAction((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+    setAttachedRolls((prev) => [...prev, roll])
+  }
+
+  // Remove a specific attached roll by its unique id
+  const handleRemoveRoll = (rollId: string) => {
+    if (draftLocked) return
+    setAttachedRolls((prev) => prev.filter((r) => r.id !== rollId))
   }
 
   const handleOpenEdit = () => {
@@ -453,6 +458,7 @@ export default function TablePlayground({
     try {
       const result = await resolveTurn(table.id)
       setDraftAction('')
+      setAttachedRolls([])
       tableSetAtRef.current = Date.now()
       if (result.resolved && typeof result.turnNumber === 'number') {
         const nextTurn = result.turnNumber
@@ -544,7 +550,15 @@ export default function TablePlayground({
     if (typeof table.current_turn !== 'number') return
 
     const nextState = !activeMember.is_ready
-    const submittedAction = nextState ? draftAction.trim() : null
+    // Combine typed action text with attached dice roll badges into a single submission string
+    const rollTexts = attachedRolls.map((roll) => {
+      const result = describeRoll(roll)
+      return result.startsWith(roll.label)
+        ? `[ทอยเต๋า ${result}]`
+        : `[ทอยเต๋า ${roll.label}: ${result}]`
+    })
+    const combinedAction = [draftAction.trim(), ...rollTexts].filter(Boolean).join(' ')
+    const submittedAction = nextState ? (combinedAction || null) : null
     const setOwnReady = (ready: boolean, actionText?: string | null) =>
       setMembers((prev) =>
         prev.map((m) =>
@@ -573,7 +587,7 @@ export default function TablePlayground({
       const phase = await toggleReadyStatus(
         table.id,
         nextState,
-        nextState ? { turnNumber: table.current_turn, text: draftAction } : undefined
+        nextState ? { turnNumber: table.current_turn, text: combinedAction } : undefined
       )
       if (phase) {
         tableSetAtRef.current = Date.now()
@@ -788,6 +802,8 @@ export default function TablePlayground({
         draftLocked={draftLocked}
         diceOpen={diceOpen}
         diceActors={diceActors}
+        attachedRolls={attachedRolls}
+        onRemoveRoll={handleRemoveRoll}
         onStartEditTurn={(turn) => {
           setEditingTurnId(turn.id)
           setEditText(turn.narrative_output)
