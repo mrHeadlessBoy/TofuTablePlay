@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { extractTriggeredLore, type LoreEntry } from './lorebook'
 import { ABILITY_KEYS, type AbilityKey, type DmTokenInput, type DmTurnInput, type DmTurnResult, type SceneSummary } from '@/features/board/lib/types'
-import { stripCampaignTemplateFromRules } from '@/features/character/template'
+
 import { formatRuleMechanicsForPrompt } from '@/features/campaign/rules'
 
 const ai = new GoogleGenAI()

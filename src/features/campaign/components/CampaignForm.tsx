@@ -273,6 +273,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
         status: 'error',
         message,
       })
+    } finally {
       setLoading(false)
     }
   }

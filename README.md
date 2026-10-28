@@ -8,6 +8,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 
 ### 1. 📜 Campaign Studio & Dynamic Lorebook (`/campaigns`)
 * **World, Rule & Sheet Template Authoring:** Create, view, and edit campaigns with custom genres, world settings, overarching story briefs, specialized tabletop mechanics, and **Mandatory Character Sheet Requirements** (`/campaigns/new`, `/campaigns/[id]`, `/campaigns/[id]/edit`). Every campaign strictly binds either a built-in genre preset or a custom-designed template enforced across all tables.
+* **Structured Rule Mechanics & Custom Systems Builder (`src/features/campaign/rules.ts`):** Define custom campaign rules via an interactive card-based builder (`Rule Name`, `Category / Tag`, and `Description` with dynamic add/remove controls). Rules are serialized as structured JSON with automatic backward-compatible parsing for legacy markdown/bullet lists and plain text, rendered as categorized cards on `/campaigns/[id]`, and formatted into clean Markdown bullet points (`formatRuleMechanicsForPrompt`) for the AI DM.
 * **Preset Customization & Blank Sheet Canvas in Campaigns:** Preset cards offer both direct 1-click selection ("เลือกพรีเซ็ตนี้") and immediate customization ("ปรับแต่งจากพรีเซ็ต") that forks into a custom template. The Custom Template card allows generating a completely blank template canvas ("สร้างชีท Custom ว่างเปล่า") or resetting to blank ("ล้างเป็นชีทว่างใหม่").
 * **Smart Lorebook Engine:** Automatically injects relevant world lore into AI DM prompts without bloating context tokens:
   * `Always Active`: Injected into every turn and opening scene.
@@ -89,7 +90,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * The system instruction decomposes into isolated rule modules (`CORE`, `COMBAT`, `SOCIAL`, `HORROR`, `NARRATIVE_ITEMS`).
   * `[ Overview ]` dynamically swaps middle lines: `สถานะศัตรู` (Combat), `บรรยากาศและความรู้สึก` (Social), `ระดับความตึงเครียดและสิ่งคุกคาม` (Horror), or `สิ่งของสำคัญและเบาะแส` (Narrative).
   * `[ Decision ]` dynamically crafts next-turn prompts adhering strictly to each individual character's dice system and available stats.
-* **Clean Prompt Sanitization & Token Economy:** Automatically strips embedded `<!-- CAMPAIGN_TEMPLATE: {...} -->` metadata comments from campaign rule mechanics (`stripCampaignTemplateFromRules`) before prompting Gemini across turn generation, opening scene creation, and battle board turns, keeping context windows lightweight and preventing model confusion.
+* **Clean Prompt Sanitization & Structured Rule Formatting:** Automatically strips embedded `<!-- CAMPAIGN_TEMPLATE: {...} -->` metadata comments (`stripCampaignTemplateFromRules`) and formats structured JSON/legacy campaign rules into clean bulleted Markdown (`formatRuleMechanicsForPrompt`) before prompting Gemini across turn generation, opening scene creation, and battle board turns, keeping context windows lightweight and preventing model confusion.
 * **Immersion-First Dice Invisibility:** Translates player dice rolls (SUCCESS, FAIL, NATURAL 20, NATURAL 1) strictly into dramatic in-world narrative events, forbidding the AI from breaking immersion by reciting raw roll numbers, dice types, or phrases like "ทอยได้ 18" in prose.
 * **Template-Aware Character Context:** Dynamically builds system instructions, `[ Decision ]` stat prompts, and `[ Overview ]` status schemas from the party's active templates—formatting all template stats, resource bars (`HP`, `Heart`, `Skill Cost`, `Sanity`, `Stress`, `Luck`, etc.), equipment slots, allowed conditions, and text/bio fields.
 * **Automatic State Extraction:** Parses AI narrative output for named inline resource changes (`(Shacco — HP: 100/100 -> 80/100 [-20 HP])`, `(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])`, `(Shacco — Sanity: 50/50 -> 42/50 [-8])`, etc.) and authoritative single-line/multi-line `[ Overview ]` `สถานะปาร์ตี้` blocks using longest-name-first matching and resource alias resolution so all built-in and custom template resources auto-sync to Supabase without mixing up players. Also supports custom template conditions, Thai→English condition mapping, and guards low-vitality condition thresholds (`Bloodied`, `Unconscious`) from misfiring on 0-resource characters.
@@ -145,6 +146,14 @@ Ensure your Supabase `public` schema includes the following tables:
 | `turns` | `id`, `table_id`, `turn_number`, `narrative_output`, `edited_by_host` | Turn-by-turn AI DM narrative |
 | `turn_actions` | `turn_id`, `member_id`, `action_text` (unique on `turn_id`, `member_id`) | Player action drafts per turn |
 
+**Notable structured campaign rule mechanics JSON structure (stored in `campaigns.rule_mechanics` with legacy markdown/plain-text fallback):**
+```json
+[
+  { "id": "rule-1", "title": "Sanity Meter", "category": "Horror", "description": "Failing a panic check reduces Sanity by 1d6." },
+  { "id": "rule-2", "title": "Clue Deduction", "category": "Investigation", "description": "Combining 3 clues reveals the culprit's motive." }
+]
+```
+
 **Notable structured inventory JSON structure (stored in `characters.inventory` with plain-text fallback):**
 ```json
 [
@@ -160,7 +169,13 @@ Ensure your Supabase `public` schema includes the following tables:
   "current_skill_cost": 7,
   "max_skill_cost": 10,
   "skills": [{ "name": "Fireball", "cost": 3, "description": "Area damage" }],
-  "sheet_template": { "v": 1, "id": "builtin-romance", "name": "Romance / Slice of Life", "..." : "..." },
+  "sheet_template": {
+    "v": 2,
+    "id": "builtin-romance",
+    "name": "Romance / Slice of Life",
+    "mechanics": { "mode": "social", "vitalityResourceId": "hp", "dice": "d20", "statModifier": "raw" },
+    "...": "..."
+  },
   "sheet_custom": {
     "stats": { "charm": 14, "wit": 12 },
     "resources": { "stress": { "current": 2, "max": 10 } },
@@ -275,8 +290,9 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │       └── TemplateModal.tsx     # Visual template customizer, preset-to-custom forking, blank reset, CST1. exporter & importer
     │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
     │   │   ├── actions.ts                # Create & update campaigns (with strict template binding validation) and lorebook entries
+    │   │   ├── rules.ts                  # Structured rule mechanics parser, JSON serializer & AI prompt formatter
     │   │   └── components/
-    │   │       └── CampaignForm.tsx      # Shared campaign authoring form (preset customization, blank canvas & lorebook registry)
+    │   │       └── CampaignForm.tsx      # Shared campaign authoring form (structured rule builder, preset customization & lorebook registry)
     │   ├── hub/                          # Campaign Hub & Session Management
     │   │   ├── actions.ts                # Launch table (with AI opening scene), join, leave, delete, sign out
     │   │   └── components/

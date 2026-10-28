@@ -14,7 +14,7 @@ import {
   extractCampaignTemplate,
   isColumnStatId,
   isColumnTextFieldId,
-  stripCampaignTemplateFromRules,
+
   type CharacterTemplate,
   type SheetCustomValues,
   type TemplateDice,
