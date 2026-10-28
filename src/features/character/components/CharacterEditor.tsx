@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { saveCharacter, deleteCharacter, getCampaignRequiredTemplate, CharacterFormData } from '../actions'
@@ -61,6 +61,51 @@ const RESOURCE_COLOR_TEXT: Record<ResourceColor, string> = {
   zinc: 'text-zinc-400',
 }
 
+function createBlankCharacterForTemplate(tpl: CharacterTemplate): CharacterRecord {
+  const initialCustomStats: Record<string, number> = {}
+  for (const s of tpl.stats) {
+    initialCustomStats[s.id] = s.default
+  }
+  const hpDef = tpl.resources.find((r) => r.id === 'hp')
+  const spDef = tpl.resources.find((r) => r.id === 'skill_cost')
+  const hpVal = hpDef ? hpDef.defaultMax : (tpl.resources.length === 0 ? 0 : 10)
+  const spVal = spDef ? spDef.defaultMax : 0
+
+  return {
+    name: '',
+    class_archetype: '',
+    current_hp: hpVal,
+    max_hp: hpVal,
+    armor_class: spVal,
+    current_skill_cost: spVal,
+    max_skill_cost: spVal,
+    stats: {
+      ...initialCustomStats,
+      sheet_template: tpl,
+    },
+    appearance: '',
+    backstory: '',
+    strengths: '',
+    weaknesses: '',
+    inventory: [],
+    status_condition: tpl.conditions[0] || 'Normal',
+    equipment: [...EMPTY_EQUIPMENT],
+    skills: [],
+  }
+}
+
+function createInitialCustomValues(tpl: CharacterTemplate): SheetCustomValues {
+  const initialStats: Record<string, number> = {}
+  for (const s of tpl.stats) {
+    initialStats[s.id] = s.default
+  }
+  const initialRes: Record<string, { current: number; max: number }> = {}
+  for (const r of tpl.resources) {
+    initialRes[r.id] = { current: r.defaultMax, max: r.defaultMax }
+  }
+  return { stats: initialStats, resources: initialRes, fields: {}, equipment: {} }
+}
+
 export default function CharacterEditor({
   characters,
   currentUserId,
@@ -80,46 +125,20 @@ export default function CharacterEditor({
     return builtinInitial ?? CLASSIC_TEMPLATE
   })
   const [customValues, setCustomValues] = useState<SheetCustomValues>(() => {
-    if (!builtinInitial) return { stats: {}, resources: {}, fields: {}, equipment: {} }
-    const initialStats: Record<string, number> = {}
-    for (const s of builtinInitial.stats) initialStats[s.id] = s.default
-    const initialRes: Record<string, { current: number; max: number }> = {}
-    for (const r of builtinInitial.resources) initialRes[r.id] = { current: r.defaultMax, max: r.defaultMax }
-    return { stats: initialStats, resources: initialRes, fields: {}, equipment: {} }
+    return builtinInitial
+      ? createInitialCustomValues(builtinInitial)
+      : { stats: {}, resources: {}, fields: {}, equipment: {} }
   })
   const [selectedChar, setSelectedChar] = useState<CharacterRecord | null>(() => {
     if (!builtinInitial || !returnToParam) return null
-    const initialStats: Record<string, number> = {}
-    for (const s of builtinInitial.stats) initialStats[s.id] = s.default
-    const hpDef = builtinInitial.resources.find((r) => r.id === 'hp')
-    const spDef = builtinInitial.resources.find((r) => r.id === 'skill_cost')
-    const hpVal = hpDef ? hpDef.defaultMax : (builtinInitial.resources.length === 0 ? 0 : 10)
-    const spVal = spDef ? spDef.defaultMax : 0
-    return {
-      name: '',
-      class_archetype: '',
-      current_hp: hpVal,
-      max_hp: hpVal,
-      armor_class: spVal,
-      current_skill_cost: spVal,
-      max_skill_cost: spVal,
-      stats: {
-        ...initialStats,
-        sheet_template: builtinInitial,
-      },
-      appearance: '',
-      backstory: '',
-      strengths: '',
-      weaknesses: '',
-      inventory: [],
-      status_condition: builtinInitial.conditions[0] || 'Normal',
-      equipment: [...EMPTY_EQUIPMENT],
-      skills: [],
-    }
+    return createBlankCharacterForTemplate(builtinInitial)
   })
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Track whether the campaign's required template has already been loaded for this session
+  const hasInitializedCampaignTemplateRef = useRef(Boolean(builtinInitial && returnToParam))
 
 
 
@@ -178,60 +197,28 @@ export default function CharacterEditor({
   }
 
   const handleNew = useCallback((targetTpl?: unknown) => {
-    const tpl = (targetTpl && typeof targetTpl === 'object' && 'v' in targetTpl)
-      ? (targetTpl as CharacterTemplate)
-      : activeTemplate
-    setActiveTemplate(tpl)
-    const initialCustomStats: Record<string, number> = {}
-    for (const s of tpl.stats) {
-      initialCustomStats[s.id] = s.default
-    }
-    const initialResources: Record<string, { current: number; max: number }> = {}
-    for (const r of tpl.resources) {
-      initialResources[r.id] = { current: r.defaultMax, max: r.defaultMax }
-    }
-    setCustomValues({
-      stats: initialCustomStats,
-      resources: initialResources,
-      fields: {},
-      equipment: {},
+    setActiveTemplate((currentActive) => {
+      const tpl = (targetTpl && typeof targetTpl === 'object' && 'v' in targetTpl)
+        ? (targetTpl as CharacterTemplate)
+        : currentActive
+      setCustomValues(createInitialCustomValues(tpl))
+      setSelectedChar(createBlankCharacterForTemplate(tpl))
+      return tpl
     })
-
-    const hpDef = tpl.resources.find((r) => r.id === 'hp')
-    const spDef = tpl.resources.find((r) => r.id === 'skill_cost')
-    const hpVal = hpDef ? hpDef.defaultMax : (tpl.resources.length === 0 ? 0 : 10)
-    const spVal = spDef ? spDef.defaultMax : 0
-
-    setSelectedChar({
-      name: '',
-      class_archetype: '',
-      current_hp: hpVal,
-      max_hp: hpVal,
-      armor_class: spVal,
-      current_skill_cost: spVal,
-      max_skill_cost: spVal,
-      stats: {
-        ...initialCustomStats,
-        sheet_template: tpl,
-      },
-      appearance: '',
-      backstory: '',
-      strengths: '',
-      weaknesses: '',
-      inventory: [],
-      status_condition: tpl.conditions[0] || 'Normal',
-      equipment: [...EMPTY_EQUIPMENT],
-      skills: [],
-    })
-  }, [activeTemplate])
+  }, [])
 
   // Automatically fetch campaign's required template (including custom templates) if directed from a campaign/table
   useEffect(() => {
     const targetParam = campaignIdParam || tableCodeParam || templateIdParam
     if (!targetParam) return
 
-    // If already initialized with a builtin template, no async fetch needed
+    // If already initialized with a builtin template or already fetched, no async fetch needed
+    if (hasInitializedCampaignTemplateRef.current) {
+      return
+    }
+
     if (templateIdParam && BUILTIN_TEMPLATES.some((t) => t.id === templateIdParam)) {
+      hasInitializedCampaignTemplateRef.current = true
       return
     }
 
@@ -239,7 +226,30 @@ export default function CharacterEditor({
     getCampaignRequiredTemplate(targetParam)
       .then((tpl) => {
         if (!isCancelled && tpl) {
-          handleNew(tpl)
+          hasInitializedCampaignTemplateRef.current = true
+          setActiveTemplate(tpl)
+          setCustomValues((prev) => {
+            const initial = createInitialCustomValues(tpl)
+            return {
+              stats: { ...initial.stats, ...prev.stats },
+              resources: { ...initial.resources, ...prev.resources },
+              fields: { ...prev.fields },
+              equipment: { ...prev.equipment },
+            }
+          })
+          setSelectedChar((prev) => {
+            // If user has already begun typing, preserve their entered values
+            if (prev && (prev.name || prev.class_archetype || prev.id)) {
+              return {
+                ...prev,
+                stats: {
+                  ...prev.stats,
+                  sheet_template: tpl,
+                },
+              }
+            }
+            return createBlankCharacterForTemplate(tpl)
+          })
         }
       })
       .catch((err) => {
@@ -249,7 +259,7 @@ export default function CharacterEditor({
     return () => {
       isCancelled = true
     }
-  }, [campaignIdParam, tableCodeParam, templateIdParam, handleNew])
+  }, [campaignIdParam, tableCodeParam, templateIdParam])
 
   const handleSwitchTemplate = async (targetTemplateId: string) => {
     if (!selectedChar) return
