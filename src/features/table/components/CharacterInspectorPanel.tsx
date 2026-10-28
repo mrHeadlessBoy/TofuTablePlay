@@ -301,7 +301,7 @@ export default function CharacterInspectorPanel({
   return (
     <>
       {/* TOP-LEFT COMPACT NAVIGATION BAR (Always accessible when character panel is collapsed) */}
-      <div className="fixed top-3.5 left-4 z-30 flex items-center gap-2 rounded-full bg-zinc-950/90 border border-zinc-800/90 px-3 py-1.5 shadow-xl backdrop-blur-md">
+      <div className="fixed top-3.5 left-4 z-30 flex items-center gap-2 rounded-full bg-zinc-950/80 border border-zinc-800/70 px-3.5 py-1.5 shadow-xl backdrop-blur-xl">
         <Link
           href="/hub"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-amber-400 transition pr-2 border-r border-zinc-800"
@@ -354,15 +354,15 @@ export default function CharacterInspectorPanel({
         <aside
           aria-label="Character Inspector Window"
           style={windowStyle}
-          className="fixed z-40 w-[calc(100vw-1.5rem)] sm:w-104 flex flex-col rounded-sm bg-zinc-950/94 border border-white/25 shadow-[0_16px_50px_rgba(0,0,0,0.92),0_0_28px_rgba(245,158,11,0.2)] backdrop-blur-2xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-left-3 duration-200"
+          className="fixed z-40 w-[calc(100vw-1.5rem)] sm:w-104 flex flex-col rounded-2xl bg-zinc-950/95 border border-zinc-800/80 shadow-2xl backdrop-blur-2xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-left-3 duration-200"
         >
           {/* SAO Top Glowing Accent Line */}
-          <div className="h-1 w-full bg-linear-to-r from-amber-500 via-amber-300 to-white/70 shrink-0" />
+          <div className="h-0.5 w-full bg-amber-600/60 shrink-0" />
 
           {/* SAO Window Header */}
-          <div className="flex items-center justify-between gap-2 px-4 py-3 bg-linear-to-r from-zinc-900/95 via-zinc-900/80 to-zinc-950/90 border-b border-white/15 shrink-0">
+          <div className="flex items-center justify-between gap-2 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800/40 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-1.5 h-8 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)] shrink-0" />
+              <div className="w-1 h-6 bg-amber-500/80 rounded-full shrink-0" />
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[9px] font-mono uppercase tracking-[0.22em] text-amber-400">

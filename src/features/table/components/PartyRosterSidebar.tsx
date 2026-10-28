@@ -68,7 +68,7 @@ export default function PartyRosterSidebar({
       className="fixed top-3.5 right-4 z-30 w-72 sm:w-80 pointer-events-none flex flex-col gap-2.5 max-h-[calc(100vh-6rem)]"
     >
       {/* 1. FLOATING PARTY ROSTER HUD BLOCK */}
-      <div className="pointer-events-auto rounded-xl border border-white/15 bg-transparent p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+      <div className="pointer-events-auto rounded-2xl border border-zinc-800/70 bg-zinc-950/80 backdrop-blur-xl p-3.5 flex flex-col gap-2.5 shadow-2xl">
         {/* Header Toggle */}
         <button
           type="button"
@@ -77,7 +77,7 @@ export default function PartyRosterSidebar({
           title={isPartyOpen ? (language === 'en' ? 'Click to collapse Party Roster' : 'คลิกเพื่อพับเก็บ Party Roster') : (language === 'en' ? 'Click to expand Party Roster' : 'คลิกเพื่อเปิดดู Party Roster')}
         >
           <div className="flex items-center gap-2">
-            <div className="w-1 h-3.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            <div className="w-1 h-3.5 bg-amber-500/80 rounded-full" />
             <Users className="w-3.5 h-3.5 text-amber-400" />
             <h3 className="text-xs font-mono font-bold tracking-wider text-amber-400 uppercase drop-shadow-sm">
               {t('table.partyRoster')}
@@ -115,7 +115,7 @@ export default function PartyRosterSidebar({
               return (
                 <div
                   key={m.id}
-                  className="p-2.5 rounded-lg border border-white/10 bg-transparent flex flex-col gap-1.5 text-xs transition hover:border-amber-400/40 select-text"
+                  className="p-2.5 rounded-xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/40 flex flex-col gap-1.5 text-xs transition-all duration-200 select-text"
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0">
@@ -231,7 +231,7 @@ export default function PartyRosterSidebar({
       </div>
 
       {/* 2. FLOATING CAMPAIGN LOREBOOK HUD BLOCK */}
-      <div className="pointer-events-auto rounded-xl border border-white/15 bg-transparent p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+      <div className="pointer-events-auto rounded-2xl border border-zinc-800/70 bg-zinc-950/80 backdrop-blur-xl p-3.5 flex flex-col gap-2.5 shadow-2xl">
         {/* Header Toggle */}
         <button
           type="button"

@@ -806,8 +806,8 @@ export default function SaoCharacterOrb({
           }
           className={`group relative rounded-full p-1 transition-transform duration-300 cursor-pointer focus:outline-none ${
             isOpen
-              ? 'scale-[1.02] drop-shadow-[0_0_32px_rgba(245,158,11,0.6)]'
-              : 'hover:scale-[1.03] drop-shadow-[0_12px_36px_rgba(0,0,0,0.9)] hover:drop-shadow-[0_0_24px_rgba(245,158,11,0.4)]'
+              ? 'scale-[1.02] drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)]'
+              : 'hover:scale-[1.02] drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)] hover:brightness-105'
           }`}
         >
           {/* Ambient SAO Ring Pulse when no character is bound */}
@@ -828,7 +828,7 @@ export default function SaoCharacterOrb({
         {isOpen && (
           <span
             aria-hidden="true"
-            className="hidden lg:block absolute top-1/2 -right-3.5 -translate-y-1/2 w-0 h-0 border-y-[9px] border-y-transparent border-l-13 border-l-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.95)]"
+            className="hidden lg:block absolute top-1/2 -right-3.5 -translate-y-1/2 w-0 h-0 border-y-[9px] border-y-transparent border-l-13 border-l-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
           />
         )}
       </div>
@@ -837,7 +837,7 @@ export default function SaoCharacterOrb({
       <div
         role="group"
         aria-label="Character Orb Size Controls"
-        className="inline-flex items-center gap-0.5 rounded-full bg-zinc-950/90 border border-white/20 px-1.5 py-0.5 shadow-lg backdrop-blur-md"
+        className="inline-flex items-center gap-0.5 rounded-full bg-zinc-950/80 border border-zinc-800/80 px-2 py-0.5 shadow-lg backdrop-blur-md"
       >
         <button
           type="button"

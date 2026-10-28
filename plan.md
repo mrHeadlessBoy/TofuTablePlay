@@ -100,28 +100,36 @@ flowchart TD
 ---
 
 ### Phase 4: Character Codex & Template Studio
-- [ ] **4.1 Codex Header & Character Roster** (`src/features/character/...`):
-  - Redesign character card list with matte archetype tags, stat summary pills, and delete/edit buttons with smooth fade opacity.
-- [ ] **4.2 Character Sheet Editor** (`CharacterEditor.tsx`):
-  - Clean tabbed interface for Stats, Inventory, Spells/Skills, and Background.
-  - Matte resource counters (HP/SP) with subtle level indicators.
-- [ ] **4.3 Template Studio Modal** (`TemplateModal.tsx`):
-  - Sleek modal backdrop (`bg-black/60 backdrop-blur-sm`).
-  - Refined template cards with subtle hover opacity borders.
+- [x] **4.1 Codex Header & Character Roster** (`src/features/character/...`):
+  - Redesigned `CharacterCodexHeader.tsx` with translucent border, brand icon, and return navigation link.
+  - Character roster sidebar redesigned with `.surface-panel .surface-panel-hover` cards, subtle status summary pills, and smooth delete buttons.
+- [x] **4.2 Character Sheet Editor** (`CharacterEditor.tsx`):
+  - Form container updated to `.surface-panel rounded-2xl` with subtle inner borders.
+  - Modernized template selector pill and customizer action button with micro-elevation.
+  - Recessed dark input fields (`bg-black/40 border-zinc-800/80 focus:border-zinc-600`), matte resource gauges (HP, SP, Stress, Sanity), and tactile stat blocks.
+  - Refactored Skills & Inventory cards with low-contrast recessed containers (`bg-black/30 border-zinc-800/70`).
+- [x] **4.3 Template Studio Modal** (`TemplateModal.tsx`):
+  - Sleek modal backdrop with `bg-black/60 backdrop-blur-md` and frosted modal window (`bg-zinc-950/95 backdrop-blur-xl border-zinc-800/80`).
+  - Refined tab bar and sub-panels with recessed styling and matte amber apply button.
+  - Verified with 0 TypeScript errors and 0 ESLint warnings.
 
 ---
 
 ### Phase 5: Virtual Tabletop (VTT) & In-Table HUD
-- [ ] **5.1 Table Top Layout & Header** (`src/features/table/components/TablePlayground.tsx`):
-  - Minimalist top bar with campaign title, turn phase pill, and countdown timer.
-- [ ] **5.2 Narrative Chronicle** (`NarrativeFeedPanel.tsx`):
-  - Smooth scroll with top/bottom fade mask so text gently emerges and recedes.
-  - Clean turn divider bars and DM narration blocks with high typography legibility.
-- [ ] **5.3 SAO Character Orb & Party Roster** (`SaoCharacterOrb.tsx`, `PartyRosterSidebar.tsx`):
-  - Refine dial arcs into modern matte status gauges without glare.
-  - Floating action drawer with smooth slide and fade transitions.
-- [ ] **5.4 3D Dice Tray & Chat Widget** (`DiceRoller.tsx`, `PartyChatWidget.tsx`):
+- [x] **5.1 Table Top Layout & Header** (`src/features/table/components/TablePlayground.tsx`):
+  - Compact top-left navigation pill (`bg-zinc-950/80 border-zinc-800/70`) with copy invite link and `LanguageToggle`.
+- [x] **5.2 Narrative Chronicle** (`NarrativeFeedPanel.tsx`):
+  - Turn cards upgraded to `.surface-panel .surface-panel-hover rounded-2xl p-6` with subtle dividers.
+  - Matte overview and decision boxes; eliminated neon glowing drop-shadows on scroll button and dice badges.
+  - Private drafting bar upgraded with recessed dark input (`bg-black/40 border-zinc-800/80`) and tactile ready toggle.
+- [x] **5.3 SAO Character Orb & Party Roster** (`SaoCharacterOrb.tsx`, `PartyRosterSidebar.tsx`, `CharacterInspectorPanel.tsx`):
+  - Removed glowing bloom shadows (`rgba(245,158,11,0.6)` / `rgba(251,191,36,0.8)`) in favor of smooth dark ambient drop shadows (`drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)]`).
+  - Character inspector drawer updated to rounded-2xl with clean matte amber header accent.
+  - Party roster sidebar styled with frosted glass containers (`bg-zinc-950/80 backdrop-blur-xl border-zinc-800/70`).
+- [x] **5.4 3D Dice Tray & Chat Widget** (`DiceRoller.tsx`, `PartyChatWidget.tsx`):
   - Frosted translucent chat bubble and dice roller modal with smooth fade backdrop.
+  - Tactile matte action buttons with micro-elevation and zero neon glare.
+  - Verified with 0 TypeScript errors and 0 ESLint warnings.
 
 ---
 

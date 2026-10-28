@@ -104,6 +104,20 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 - **Campaign Cards Carousel**: 3-column card deck with category badges, author chips, sheet template tags, and smooth slide navigation with indicator dots.
 - **Campaign Studio (`CampaignForm.tsx` & `CampaignDetailsClient.tsx`)**: Refined layered opacity sections, recessed form inputs, structured rule builder tiles, and lorebook keyword tags without harsh glare.
 
+### 4.4 Character Codex & Template Studio (`src/features/character/...`)
+- **Codex Header (`CharacterCodexHeader.tsx`)**: Minimalist top navigation bar with return link and `LanguageToggle`.
+- **Character Roster Sidebar**: Frosted list items using `.surface-panel .surface-panel-hover` with smooth delete icon transitions and concise status badges.
+- **Sheet Editor Container (`CharacterEditor.tsx`)**: Translucent `.surface-panel rounded-2xl` workspace with recessed inputs (`bg-black/40 border-zinc-800/80`), tactile stat dials, and modular skill/inventory cards.
+- **Template Studio Modal (`TemplateModal.tsx`)**: Frosted modal dialog (`bg-zinc-950/95 backdrop-blur-xl`) with smooth fade-in overlay, recessed sub-panels, and matte amber action buttons.
+
+### 4.5 Virtual Tabletop (VTT) & In-Table HUD (`src/features/table/...`, `src/components/dice/...`)
+- **Top-Left Navigation Pill**: Low-profile floating capsule (`bg-zinc-950/80 backdrop-blur-xl border-zinc-800/70`) with instant table code copy and `LanguageToggle`.
+- **Narrative Chronicle (`NarrativeFeedPanel.tsx`)**: Turn cards upgraded to `.surface-panel .surface-panel-hover rounded-2xl p-6` with subtle dividers and high-legibility typography. Overview and decision blocks styled with matte translucent backgrounds, eliminating glowing bloom shadows.
+- **Private Drafting Input Bar**: Recessed dark input field (`bg-black/40 border-zinc-800/80`), frosted dice launcher button, and tactile ready toggle with micro-elevation.
+- **SAO Character Orb & Inspector (`SaoCharacterOrb.tsx`, `CharacterInspectorPanel.tsx`)**: Dual semicircle status dials with deep ambient drop shadows (no neon amber glow/blur). Drawer window styled as modern `rounded-2xl` frosted container with a refined matte header line.
+- **Party Roster Sidebar (`PartyRosterSidebar.tsx`)**: Frosted floating HUD (`bg-zinc-950/80 backdrop-blur-xl`) with sleek member cards and lorebook overview.
+- **Party Chat & 3D Dice Tray (`PartyChatWidget.tsx`, `DiceRoller.tsx`)**: Floating translucent chat bubble and dice roller modal with smooth fade backdrop and tactile matte controls.
+
 ---
 
 ## 5. Implementation Status by Phase
@@ -111,6 +125,6 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 - [x] **Phase 1: Global Theme & Base Tokens** — *Completed*
 - [x] **Phase 2: Landing Page & Authentication** — *Completed*
 - [x] **Phase 3: Hub & Campaign Management** — *Completed*
-- [ ] **Phase 4: Character Codex & Template Studio** — *Pending*
-- [ ] **Phase 5: Virtual Tabletop (VTT) & In-Table HUD** — *Pending*
+- [x] **Phase 4: Character Codex & Template Studio** — *Completed*
+- [x] **Phase 5: Virtual Tabletop (VTT) & In-Table HUD** — *Completed*
 - [ ] **Phase 6: Verification & QA** — *Pending*

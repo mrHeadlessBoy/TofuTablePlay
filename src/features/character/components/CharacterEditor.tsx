@@ -682,10 +682,10 @@ export default function CharacterEditor({
         {selectedChar ? (
           <form
             onSubmit={onSubmit}
-            className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-6 shadow-xl"
+            className="surface-panel rounded-2xl p-6 sm:p-7 space-y-6 shadow-xl"
           >
             {/* Header: Replaced static 'Draft' badge with interactive Template Selector & Customizer bar */}
-            <div className="flex flex-wrap justify-between items-center gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex flex-wrap justify-between items-center gap-3 border-b border-zinc-800/40 pb-4">
               <div>
                 <h2 className="text-lg font-semibold text-white">
                   {selectedChar.id ? t('character.editTitle') : t('character.newTitle')}
@@ -697,7 +697,7 @@ export default function CharacterEditor({
 
               {/* Template Controls Replacing 'Draft' Badge */}
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs">
+                <div className="flex items-center gap-1.5 bg-black/40 border border-zinc-800/80 rounded-xl px-3 py-1.5 text-xs">
                   <span className="text-[10px] uppercase font-mono text-zinc-500">{t('character.template')}:</span>
                   <select
                     value={activeTemplate.id}
@@ -721,7 +721,7 @@ export default function CharacterEditor({
                   type="button"
                   onClick={() => setIsTemplateModalOpen(true)}
                   title="ปรับแต่งโครงสร้างชีต หรือแชร์/นำเข้า Template Key"
-                  className="flex items-center gap-1.5 px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 hover:text-white text-zinc-200 border border-zinc-700 rounded-lg transition cursor-pointer shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-zinc-900/60 hover:bg-zinc-800/80 hover:text-white text-zinc-200 border border-zinc-800/80 rounded-xl transition-all duration-200 hover:-translate-y-0.5 cursor-pointer shadow-sm"
                 >
                   <Sliders className="w-3.5 h-3.5 text-amber-400" />
                   <span>{isBuiltinTemplateId(activeTemplate.id) ? t('character.templateCustomizer') : (language === 'en' ? 'Edit Structure / Key' : 'แก้ไขโครงสร้าง / Key')}</span>
@@ -739,7 +739,7 @@ export default function CharacterEditor({
                   placeholder="e.g. Roland of Gilead"
                   value={selectedChar.name}
                   onChange={(e) => setSelectedChar({ ...selectedChar, name: e.target.value })}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                  className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
                 />
               </div>
               <div>
@@ -752,7 +752,7 @@ export default function CharacterEditor({
                   onChange={(e) =>
                     setSelectedChar({ ...selectedChar, class_archetype: e.target.value })
                   }
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                  className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
                 />
               </div>
             </div>
@@ -772,7 +772,7 @@ export default function CharacterEditor({
                     return (
                       <div
                         key={res.id}
-                        className={`p-3 bg-zinc-950/70 border rounded-xl space-y-2 ${colorBorder}`}
+                        className={`p-3.5 bg-black/30 border rounded-xl space-y-2 ${colorBorder}`}
                       >
                         <div className="flex justify-between items-center text-xs">
                           <span className={`font-semibold ${colorText}`}>{res.label}</span>
@@ -795,7 +795,7 @@ export default function CharacterEditor({
                                   : Math.max(0, Math.min(selectedChar.max_hp, nextVal))
                                 setSelectedChar({ ...selectedChar, current_hp: clamped })
                               }}
-                              className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded-lg p-1.5 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                           <div>
@@ -809,7 +809,7 @@ export default function CharacterEditor({
                                 const nextCur = Math.min(nextMax, selectedChar.current_hp)
                                 setSelectedChar({ ...selectedChar, max_hp: nextMax, current_hp: nextCur })
                               }}
-                              className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded-lg p-1.5 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                         </div>
@@ -823,7 +823,7 @@ export default function CharacterEditor({
                     return (
                       <div
                         key={res.id}
-                        className={`p-3 bg-zinc-950/70 border rounded-xl space-y-2 ${colorBorder}`}
+                        className={`p-3.5 bg-black/30 border rounded-xl space-y-2 ${colorBorder}`}
                       >
                         <div className="flex justify-between items-center text-xs">
                           <span className={`font-semibold ${colorText}`}>{res.label}</span>
@@ -848,7 +848,7 @@ export default function CharacterEditor({
                                   armor_class: clamped,
                                 })
                               }}
-                              className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded-lg p-1.5 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                           <div>
@@ -867,7 +867,7 @@ export default function CharacterEditor({
                                   armor_class: nextCur,
                                 })
                               }}
-                              className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded-lg p-1.5 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                         </div>
@@ -883,7 +883,7 @@ export default function CharacterEditor({
                   return (
                     <div
                       key={res.id}
-                      className={`p-3 bg-zinc-950/70 border rounded-xl space-y-2 ${colorBorder}`}
+                      className={`p-3.5 bg-black/30 border rounded-xl space-y-2 ${colorBorder}`}
                     >
                       <div className="flex justify-between items-center text-xs">
                         <span className={`font-semibold ${colorText}`}>{res.label}</span>
@@ -902,7 +902,7 @@ export default function CharacterEditor({
                             onChange={(e) =>
                               handleCustomResourceChange(res.id, 'current', Number(e.target.value) || 0)
                             }
-                            className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded-lg p-1.5 text-xs text-white"
+                            className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                           />
                         </div>
                         <div>
@@ -914,7 +914,7 @@ export default function CharacterEditor({
                             onChange={(e) =>
                               handleCustomResourceChange(res.id, 'max', Number(e.target.value) || 0)
                             }
-                            className="w-full mt-0.5 bg-zinc-900 border border-zinc-700 rounded-lg p-1.5 text-xs text-white"
+                            className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                           />
                         </div>
                       </div>
@@ -932,7 +932,7 @@ export default function CharacterEditor({
                 onChange={(e) =>
                   setSelectedChar({ ...selectedChar, status_condition: e.target.value })
                 }
-                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white cursor-pointer"
+                className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all cursor-pointer"
               >
                 {activeTemplate.conditions.map((cond) => (
                   <option key={cond} value={cond}>
@@ -967,7 +967,7 @@ export default function CharacterEditor({
                     return (
                       <div
                         key={stat.id}
-                        className="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-center"
+                        className="bg-black/30 border border-zinc-800/70 rounded-xl p-2.5 text-center"
                       >
                         <span
                           className="text-[10px] text-zinc-400 font-mono block truncate"
@@ -1007,7 +1007,7 @@ export default function CharacterEditor({
                       placeholder={field.placeholder}
                       value={val}
                       onChange={(e) => handleTextFieldChange(field.id, e.target.value)}
-                      className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                      className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
                     />
                   </div>
                 )
@@ -1038,7 +1038,7 @@ export default function CharacterEditor({
                           placeholder={`${slot.label} slot...`}
                           value={val}
                           onChange={(e) => handleEquipmentChange(slot.id, e.target.value)}
-                          className="w-full mt-0.5 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                          className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                         />
                       </div>
                     )
@@ -1063,7 +1063,7 @@ export default function CharacterEditor({
                   {(selectedChar.skills ?? extractCharacterSkills(selectedChar)).map((skill, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                      className="p-3.5 bg-black/30 border border-zinc-800/70 rounded-xl space-y-2"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] text-amber-500 font-mono uppercase">
@@ -1088,7 +1088,7 @@ export default function CharacterEditor({
                             placeholder="e.g., Fireball, Shadow Step..."
                             value={skill.name}
                             onChange={(e) => handleSkillChange(idx, 'name', e.target.value)}
-                            className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                            className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                           />
                         </div>
                         <div className="md:col-span-1">
@@ -1104,7 +1104,7 @@ export default function CharacterEditor({
                               const val = Number(e.target.value)
                               handleSkillChange(idx, 'cost', Number.isNaN(val) ? 0 : Math.max(0, val))
                             }}
-                            className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                            className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                           />
                         </div>
                         <div className="md:col-span-2">
@@ -1116,7 +1116,7 @@ export default function CharacterEditor({
                             placeholder="Describe what this skill does..."
                             value={skill.description}
                             onChange={(e) => handleSkillChange(idx, 'description', e.target.value)}
-                            className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                            className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                           />
                         </div>
                       </div>
@@ -1158,7 +1158,7 @@ export default function CharacterEditor({
                     {inventoryItems.map((item, idx) => (
                       <div
                         key={idx}
-                        className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                        className="p-3.5 bg-black/30 border border-zinc-800/70 rounded-xl space-y-2"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] text-amber-500 font-mono uppercase">
@@ -1183,7 +1183,7 @@ export default function CharacterEditor({
                               placeholder="e.g., Health Potion, Rope..."
                               value={item.name}
                               onChange={(e) => handleInventoryItemChange(idx, 'name', e.target.value)}
-                              className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                           <div className="md:col-span-1">
@@ -1203,7 +1203,7 @@ export default function CharacterEditor({
                                   Number.isNaN(val) ? 1 : Math.max(1, Math.round(val))
                                 )
                               }}
-                              className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                           <div className="md:col-span-2">
@@ -1217,7 +1217,7 @@ export default function CharacterEditor({
                               onChange={(e) =>
                                 handleInventoryItemChange(idx, 'description', e.target.value)
                               }
-                              className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                              className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                             />
                           </div>
                         </div>
@@ -1271,7 +1271,7 @@ export default function CharacterEditor({
                 <button
                   type="submit"
                   disabled={isSaving || deletingId !== null}
-                  className="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium cursor-pointer disabled:opacity-50 shadow-md"
+                  className="px-5 py-2.5 text-xs bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 text-zinc-100 rounded-xl font-semibold cursor-pointer disabled:opacity-50 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 shadow-sm"
                 >
                   {isSaving ? t('character.savingChar') : t('character.saveChar')}
                 </button>
@@ -1279,7 +1279,7 @@ export default function CharacterEditor({
             </div>
           </form>
         ) : (
-          <div className="h-full border border-dashed border-zinc-800 rounded-xl flex items-center justify-center p-12 text-zinc-500 text-sm">
+          <div className="h-full border border-dashed border-zinc-800/80 rounded-2xl flex items-center justify-center p-12 text-zinc-500 text-sm">
             Select a character to view or edit, or create a new one.
           </div>
         )}

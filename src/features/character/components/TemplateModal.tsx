@@ -340,10 +340,10 @@ export default function TemplateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="flex flex-col w-full max-w-3xl max-h-[90vh] bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="flex flex-col w-full max-w-3xl max-h-[90vh] bg-zinc-950/95 backdrop-blur-xl border border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden text-zinc-100">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/40 bg-zinc-900/40">
           <div className="flex items-center gap-2">
             <Sliders className="w-5 h-5 text-amber-500" />
             <h2 className="text-base font-semibold text-white">Character Sheet Template</h2>
@@ -357,7 +357,7 @@ export default function TemplateModal({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-zinc-800/80 bg-zinc-900/30 px-6 gap-2 pt-2">
+        <div className="flex border-b border-zinc-800/40 bg-zinc-900/20 px-6 gap-2 pt-2">
           <button
             onClick={() => setTab('customize')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition cursor-pointer ${
@@ -438,7 +438,7 @@ export default function TemplateModal({
               )}
 
               {/* Template Meta */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800/80">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-black/30 p-4 rounded-xl border border-zinc-800/70">
                 <div>
                   <label className="text-[11px] font-mono uppercase text-zinc-400">Template Name</label>
                   <input
@@ -446,7 +446,7 @@ export default function TemplateModal({
                     value={workingTemplate.name}
                     onChange={(e) => setWorkingTemplate({ ...workingTemplate, name: e.target.value })}
                     placeholder="e.g., Romance / Slice of Life"
-                    className="w-full mt-1 bg-zinc-950 border border-zinc-700/80 rounded-lg p-2 text-xs text-white"
+                    className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 focus:border-zinc-600 outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -456,7 +456,7 @@ export default function TemplateModal({
                     value={workingTemplate.author}
                     onChange={(e) => setWorkingTemplate({ ...workingTemplate, author: e.target.value })}
                     placeholder="Author name"
-                    className="w-full mt-1 bg-zinc-950 border border-zinc-700/80 rounded-lg p-2 text-xs text-white"
+                    className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 focus:border-zinc-600 outline-none transition-all"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -468,13 +468,13 @@ export default function TemplateModal({
                       setWorkingTemplate({ ...workingTemplate, description: e.target.value })
                     }
                     placeholder="Brief description of this template's theme and rules..."
-                    className="w-full mt-1 bg-zinc-950 border border-zinc-700/80 rounded-lg p-2 text-xs text-white"
+                    className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 focus:border-zinc-600 outline-none transition-all"
                   />
                 </div>
               </div>
 
               {/* Rules & Mechanics (AI DM Profile) */}
-              <div className="space-y-3 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+              <div className="space-y-3 p-4 bg-black/30 border border-zinc-800/70 rounded-xl">
                 <div className="flex items-center gap-1.5">
                   <Sliders className="w-4 h-4 text-amber-500" />
                   <h3 className="text-xs font-semibold uppercase text-zinc-300">
@@ -494,7 +494,7 @@ export default function TemplateModal({
                     <select
                       value={currentMechanics.mode}
                       onChange={(e) => handleUpdateMechanics({ mode: e.target.value as TemplateMode })}
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                      className="w-full bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 cursor-pointer transition-all"
                     >
                       <option value="combat">Combat RPG (ต่อสู้ / แอ็กชันแฟนตาซี)</option>
                       <option value="narrative">Narrative / Mystery (เน้นเนื้อเรื่อง / สืบสวน / ไอเทม)</option>
@@ -515,7 +515,7 @@ export default function TemplateModal({
                           vitalityResourceId: e.target.value ? e.target.value : null,
                         })
                       }
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                      className="w-full bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 cursor-pointer transition-all"
                     >
                       <option value="">ไม่มีหลอดเลือด (No Damage System)</option>
                       {workingTemplate.resources.map((res) => (
@@ -534,7 +534,7 @@ export default function TemplateModal({
                     <select
                       value={currentMechanics.dice}
                       onChange={(e) => handleUpdateMechanics({ dice: e.target.value as TemplateDice })}
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                      className="w-full bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 cursor-pointer transition-all"
                     >
                       <option value="d20">d20 System (D&D / Standard d20)</option>
                       <option value="2d6">2d6 System (PbtA / City of Mist)</option>
@@ -553,7 +553,7 @@ export default function TemplateModal({
                       onChange={(e) =>
                         handleUpdateMechanics({ statModifier: e.target.value as TemplateStatModifier })
                       }
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                      className="w-full bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 cursor-pointer transition-all"
                     >
                       <option value="dnd">D&D 5e Formula: (Score - 10) / 2</option>
                       <option value="raw">Direct Score: +Score (สำหรับสเกล 1-5 หรือ ±3)</option>
@@ -1043,7 +1043,7 @@ export default function TemplateModal({
                   <button
                     type="button"
                     onClick={handleConfirmImport}
-                    className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold cursor-pointer transition shadow"
+                    className="px-5 py-2 bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 text-zinc-100 rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 shadow-sm"
                   >
                     นำมาใช้กับตัวละครนี้ (Apply)
                   </button>
@@ -1055,7 +1055,7 @@ export default function TemplateModal({
 
         {/* Footer */}
         {tab === 'customize' && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-800/80 bg-zinc-900/60">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-800/40 bg-zinc-900/40">
             <span className="text-[11px] text-zinc-500 font-mono">
               {workingTemplate.stats.length} Stats, {workingTemplate.resources.length} Bars
             </span>

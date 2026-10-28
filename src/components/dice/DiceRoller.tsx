@@ -173,12 +173,12 @@ export default function DiceRoller({
   }
 
   const fieldClass =
-    'rounded border border-white/15 bg-black/60 py-1 text-xs text-white outline-none focus:border-amber-400 disabled:opacity-35'
+    'rounded-xl border border-zinc-800/80 bg-black/40 py-1.5 px-2 text-xs text-zinc-100 outline-none focus:border-zinc-600 disabled:opacity-35 transition-all'
 
   return (
     <div
       className={twMerge(
-        'w-80 rounded-xl border border-white/10 bg-black/60 p-4 text-white shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-md',
+        'w-80 rounded-2xl border border-zinc-800/80 bg-zinc-950/95 p-4 text-zinc-100 shadow-2xl backdrop-blur-xl',
         className
       )}
     >

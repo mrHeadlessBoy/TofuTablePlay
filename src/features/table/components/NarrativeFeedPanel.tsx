@@ -254,7 +254,7 @@ function FormattedNarrativeOutput({
           return (
             <div
               key={sIdx}
-              className="bg-amber-950/20 border border-amber-800/50 rounded-xl p-4 space-y-2.5"
+              className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 space-y-2.5"
             >
               <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-amber-400 border-b border-amber-900/50 pb-2">
                 <ShieldAlert className="w-3.5 h-3.5" />
@@ -476,9 +476,9 @@ export default function NarrativeFeedPanel({
           {turns.map((turn) => (
             <div
               key={turn.id}
-              className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-5 shadow-lg space-y-3"
+              className="surface-panel surface-panel-hover rounded-2xl p-6 shadow-xl space-y-4"
             >
-              <div className="flex justify-between items-center border-b border-zinc-800/60 pb-2">
+              <div className="flex justify-between items-center border-b border-zinc-800/40 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider">
                     {/* The opening narration is not a played turn, so play is numbered from the row after it */}
@@ -556,14 +556,14 @@ export default function NarrativeFeedPanel({
           onClick={() => scrollToBottom('smooth')}
           aria-label="Scroll to latest turn"
           title={language === 'en' ? 'Scroll to latest' : 'ไปยังข้อความล่าสุด'}
-          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-zinc-950/90 hover:bg-zinc-900 border border-amber-500/60 hover:border-amber-400 text-amber-400 hover:text-amber-300 shadow-[0_4px_20px_rgba(245,158,11,0.35)] backdrop-blur-md transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer group"
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-zinc-950/90 hover:bg-zinc-900 border border-amber-500/60 hover:border-amber-400 text-amber-400 hover:text-amber-300 shadow-lg backdrop-blur-md transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer group"
         >
           <CircleDot className="w-4 h-4 animate-pulse group-hover:scale-110 transition-transform" />
         </button>
       )}
 
       {/* Bottom Private Drafting Input & Ready Barrier */}
-      <div className="border-t border-zinc-800 bg-zinc-900/80 py-4 px-4 sm:px-6 backdrop-blur-md">
+      <div className="border-t border-zinc-800/50 bg-zinc-950/80 py-4 px-4 sm:px-6 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto space-y-3">
           {turnPhase === 'countdown' && !turnResolving && (
             <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-600/50 flex items-center justify-center gap-2 text-amber-300 font-mono text-sm animate-pulse">
@@ -581,7 +581,7 @@ export default function NarrativeFeedPanel({
               {attachedRolls.map((roll) => (
                 <div
                   key={roll.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-500/50 text-amber-300 text-xs font-mono select-none shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-500/50 text-amber-300 text-xs font-mono select-none shadow-none"
                 >
                   <Dices className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span className="font-semibold text-amber-200">
@@ -630,7 +630,7 @@ export default function NarrativeFeedPanel({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onReadyToggle()
               }}
-              className="flex-1 bg-zinc-950 border border-zinc-750 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-amber-500 outline-none disabled:opacity-50"
+              className="flex-1 bg-black/40 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all disabled:opacity-50"
             />
             {/* Dice tray: opens above the input, and every roll is added to the draft */}
             <div className="relative">

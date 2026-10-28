@@ -292,7 +292,7 @@ export default function PartyChatWidget({
         <button
           type="button"
           onClick={handleOpen}
-          className="group relative flex items-center gap-2.5 rounded-full bg-zinc-900/95 hover:bg-zinc-800/95 border border-zinc-700/80 hover:border-amber-500/60 px-4 py-2.5 text-xs font-semibold text-zinc-100 shadow-2xl backdrop-blur-md transition cursor-pointer"
+          className="group relative flex items-center gap-2.5 rounded-full bg-zinc-950/80 hover:bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 px-4 py-2.5 text-xs font-medium text-zinc-200 shadow-xl backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
         >
           <div className="relative">
             <MessageSquare className="w-4 h-4 text-amber-400 transition-transform group-hover:scale-110" />
@@ -428,7 +428,7 @@ export default function PartyChatWidget({
         <button
           type="button"
           onClick={() => scrollToBottom('smooth')}
-          className="absolute bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-[10px] font-bold text-black shadow-lg cursor-pointer"
+          className="absolute bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-zinc-900/90 hover:bg-zinc-800/90 border border-zinc-700/80 text-amber-400 px-3 py-1 text-[10px] font-medium shadow-lg cursor-pointer"
         >
           <ArrowDown className="w-3 h-3" />
           <span>ข้อความล่าสุด</span>
@@ -451,7 +451,7 @@ export default function PartyChatWidget({
               ? `พูดในฐานะ ${activeCharacterName || 'ตัวละคร'}... (พิมพ์ // เพื่อ OOC)`
               : 'พิมพ์ข้อความคุยกับปาร์ตี้ (OOC)...'
           }
-          className={`flex-1 rounded-xl bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 border focus:outline-none transition ${
+          className={`flex-1 rounded-xl bg-black/40 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 border focus:outline-none transition-all ${
             mode === 'ic'
               ? 'border-amber-500/30 focus:border-amber-500'
               : 'border-cyan-500/30 focus:border-cyan-500'
@@ -461,7 +461,7 @@ export default function PartyChatWidget({
           type="submit"
           disabled={!draft.trim()}
           aria-label="Send message"
-          className={`p-2 rounded-xl text-white transition disabled:opacity-40 cursor-pointer ${
+          className={`p-2 rounded-xl text-zinc-100 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-40 cursor-pointer ${
             mode === 'ic'
               ? 'bg-amber-600 hover:bg-amber-500'
               : 'bg-cyan-600 hover:bg-cyan-500'
