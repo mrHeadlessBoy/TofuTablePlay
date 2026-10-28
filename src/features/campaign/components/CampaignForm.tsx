@@ -14,6 +14,11 @@ import {
   newTemplateId,
   type CharacterTemplate,
 } from '@/features/character/template'
+import {
+  parseRuleMechanics,
+  serializeRuleMechanics,
+  type CampaignRuleMechanic,
+} from '@/features/campaign/rules'
 import TemplateModal from '@/features/character/components/TemplateModal'
 import Link from 'next/link'
 import { useAlert } from '@/components/ui/AlertModal'
@@ -62,9 +67,35 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
   const [customCategory, setCustomCategory] = useState(initial?.custom_category ?? '')
   const [worldSetting, setWorldSetting] = useState(initial?.world_setting ?? '')
   const [coreDescription, setCoreDescription] = useState(initial?.core_description ?? '')
-  const [ruleMechanics, setRuleMechanics] = useState(
-    stripCampaignTemplateFromRules(initial?.rule_mechanics) ?? ''
-  )
+  const [ruleMechanicsList, setRuleMechanicsList] = useState<CampaignRuleMechanic[]>(() => {
+    return parseRuleMechanics(stripCampaignTemplateFromRules(initial?.rule_mechanics))
+  })
+
+  const handleAddRule = () => {
+    setRuleMechanicsList((prev) => [
+      ...prev,
+      { id: `rule-${Date.now()}`, title: '', category: '', description: '' },
+    ])
+  }
+
+  const handleRuleChange = (
+    index: number,
+    field: keyof CampaignRuleMechanic,
+    value: string
+  ) => {
+    setRuleMechanicsList((prev) => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      }
+      return updated
+    })
+  }
+
+  const handleRemoveRule = (index: number) => {
+    setRuleMechanicsList((prev) => prev.filter((_, i) => i !== index))
+  }
   const initialTpl =
     initial?.sheet_template ??
     extractCampaignTemplate({
@@ -220,7 +251,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
         custom_category: customCategory,
         world_setting: worldSetting,
         core_description: coreDescription,
-        rule_mechanics: ruleMechanics,
+        rule_mechanics: serializeRuleMechanics(ruleMechanicsList),
         sheet_template: selectedTemplate,
         loreEntries: finalEntries,
       }
@@ -339,15 +370,91 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
               />
             </div>
 
-            <div>
-              <label className="text-xs text-zinc-400 uppercase font-medium">Rule Mechanics & Custom Systems</label>
-              <textarea
-                rows={2}
-                placeholder="e.g. Sanity meters, scarcity-based inventory, non-standard magic rules..."
-                value={ruleMechanics}
-                onChange={(e) => setRuleMechanics(e.target.value)}
-                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
-              />
+            {/* Rule Mechanics & Custom Systems (Structured like Skills & Inventory) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Rule Mechanics & Custom Systems
+                </label>
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  {ruleMechanicsList.length} rule(s)
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {ruleMechanicsList.map((rule, idx) => (
+                  <div
+                    key={rule.id || idx}
+                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-amber-500 font-mono uppercase">
+                        Rule #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRule(idx)}
+                        title="Remove rule"
+                        className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-zinc-900 transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Rule Name :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Sanity Meter, Perma-death..."
+                          value={rule.title}
+                          onChange={(e) => handleRuleChange(idx, 'title', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Category / Tag :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Survival, Combat..."
+                          value={rule.category || ''}
+                          onChange={(e) => handleRuleChange(idx, 'category', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                          Description :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Describe how this rule works..."
+                          value={rule.description}
+                          onChange={(e) => handleRuleChange(idx, 'description', e.target.value)}
+                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {ruleMechanicsList.length === 0 && (
+                  <p className="text-xs text-zinc-500 italic">
+                    No custom rule mechanics added yet. Standard tabletop RPG rules apply. Click &quot;Add Rule Mechanic&quot; below to add custom rules.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddRule}
+                className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Rule Mechanic
+              </button>
             </div>
           </div>
 

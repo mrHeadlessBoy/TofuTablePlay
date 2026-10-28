@@ -20,6 +20,7 @@ import {
   type TemplateDice,
   type TemplateMode,
 } from '@/features/character/template'
+import { formatRuleMechanicsForPrompt } from '@/features/campaign/rules'
 import { abilityModifier, formatModifier } from '@/components/dice/dice'
 
 const ai = new GoogleGenAI()
@@ -714,7 +715,7 @@ ${campaign.world_setting}
 ${campaign.core_description}
 
 [ACTIVE MECHANICS / RULES]
-${stripCampaignTemplateFromRules(campaign.rule_mechanics) || 'Standard tabletop RPG rules apply.'}
+${formatRuleMechanicsForPrompt(campaign.rule_mechanics)}
 
 [CORE DIRECTIVES & RESOLUTION RULES]
 ${ruleModules.join('\n\n')}
@@ -1259,7 +1260,7 @@ ${campaign.world_setting}
 ${campaign.core_description}
 
 [ACTIVE MECHANICS / RULES]
-${stripCampaignTemplateFromRules(campaign.rule_mechanics) || 'Standard tabletop rules apply.'}
+${formatRuleMechanicsForPrompt(campaign.rule_mechanics)}
 
 [OPENING SCENE DIRECTIVES]
 1. นี่คือคำบรรยายเปิดเรื่องก่อนเริ่มเทิร์นแรก ยังไม่มีผู้เล่นคนใดส่งแอ็กชัน จงเปิดฉากแรกของการผจญภัยจากข้อมูลแคมเปญข้างต้น ให้ผู้เล่นเข้าใจว่าโลกนี้เป็นอย่างไรและตอนนี้กำลังเกิดอะไรขึ้น

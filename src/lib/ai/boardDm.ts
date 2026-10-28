@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai'
 import { extractTriggeredLore, type LoreEntry } from './lorebook'
 import { ABILITY_KEYS, type AbilityKey, type DmTokenInput, type DmTurnInput, type DmTurnResult, type SceneSummary } from '@/features/board/lib/types'
 import { stripCampaignTemplateFromRules } from '@/features/character/template'
+import { formatRuleMechanicsForPrompt } from '@/features/campaign/rules'
 
 const ai = new GoogleGenAI()
 
@@ -62,7 +63,7 @@ OVERARCHING STORY (เนื้อเรื่องหลัก):
 ${campaign.core_description}
 
 ACTIVE MECHANICS / RULES (กลไกและกฎที่ใช้งาน):
-${stripCampaignTemplateFromRules(campaign.rule_mechanics) || 'Standard tabletop rules apply.'}
+${formatRuleMechanicsForPrompt(campaign.rule_mechanics)}
 
 DYNAMIC LORE INJECTION (ข้อมูล Lore เพิ่มเติม):
 ${loreContext || 'No specific lore triggered this turn.'}`
