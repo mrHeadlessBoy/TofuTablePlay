@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BookOpen, Lock, Play, Sliders, Plus } from 'lucide-react'
 import { extractCampaignTemplate, stripCampaignTemplateFromRules } from '@/features/character/template'
+import { parseRuleMechanics } from '@/features/campaign/rules'
 import { launchTable } from '@/features/hub/actions'
 
 type LoreEntry = {
@@ -76,6 +77,7 @@ async function CampaignDetails({
 
   const campaignTemplate = extractCampaignTemplate(campaign);
   const cleanRuleMechanics = stripCampaignTemplateFromRules(campaign.rule_mechanics);
+  const parsedRules = parseRuleMechanics(cleanRuleMechanics);
 
   return (
     <>
@@ -203,12 +205,30 @@ async function CampaignDetails({
         </div>
 
         <div>
-          <label className="text-xs text-zinc-400 uppercase font-medium">
-            Rule Mechanics & Custom Systems
+          <label className="text-xs text-zinc-400 uppercase font-medium block mb-2">
+            Rule Mechanics & Custom Systems ({parsedRules.length})
           </label>
-            <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none">
-              {cleanRuleMechanics || 'Standard tabletop RPG rules apply.'}
+          {parsedRules.length > 0 ? (
+            <div className="space-y-2">
+              {parsedRules.map((rule, idx) => (
+                <div key={rule.id || idx} className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-white">{rule.title}</span>
+                    {rule.category && (
+                      <span className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">
+                        {rule.category}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1 whitespace-pre-wrap">{rule.description}</p>
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className="w-full border border-zinc-800/80 rounded-lg p-2.5 text-xs text-zinc-400 bg-zinc-950/60">
+              Standard tabletop RPG rules apply.
+            </div>
+          )}
         </div>
       </section>
       <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-4">
