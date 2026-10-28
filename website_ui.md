@@ -81,10 +81,28 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 
 ---
 
-## 4. Implementation Status by Phase
+## 4. Implemented Screens & Components
+
+### 4.1 Landing Page (`src/app/page.tsx`)
+- **Translucent Top Bar**: Frosted glass sticky header with Shield emblem, language toggle (`LanguageToggle`), and direct navigation links.
+- **Hero & Typography**: Focused typography without colored glow blobs, utilizing clean leading and tracking.
+- **Live Story Preview Card**: Interactive visual mockup of an active VTT session (Turn #12) complete with pulsing status indicator, DM narration, and party member HP/SP/Clue chips.
+- **Pillar Feature Grid**: 3-column card grid explaining Synchronized Action Drafting, Dynamic Lorebooks, and Host Authority using `.surface-panel .surface-panel-hover`.
+- **Bilingual Support**: Dynamic Thai/English switching seamlessly applied to all landing page copy.
+
+### 4.2 Login & Authentication Screen (`src/app/login/page.tsx`)
+- **Floating Glass Container**: Layered `.surface-panel` card with deep shadow (`shadow-2xl`) and backdrop blur.
+- **Navigation**: Integrated header with return link (`/`) and `LanguageToggle`.
+- **Recessed Dark Inputs**: Low-contrast, distraction-free text inputs with subtle focus states (`focus:border-zinc-600 focus:bg-black/60`).
+- **Tactile Matte Button**: Amber action button with micro-lift on hover and built-in loading spinner (`Loader2`).
+- **Localized Feedback**: Bilingual authentication error messaging and switchable login/register modes.
+
+---
+
+## 5. Implementation Status by Phase
 
 - [x] **Phase 1: Global Theme & Base Tokens** — *Completed*
-- [ ] **Phase 2: Landing Page & Authentication** — *Pending*
+- [x] **Phase 2: Landing Page & Authentication** — *Completed*
 - [ ] **Phase 3: Hub & Campaign Management** — *Pending*
 - [ ] **Phase 4: Character Codex & Template Studio** — *Pending*
 - [ ] **Phase 5: Virtual Tabletop (VTT) & In-Table HUD** — *Pending*

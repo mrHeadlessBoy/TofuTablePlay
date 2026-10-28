@@ -69,15 +69,18 @@ flowchart TD
 ---
 
 ### Phase 2: Landing Page & Authentication
-- [ ] **2.1 Landing Page Redesign** (`src/app/page.tsx`):
+- [x] **2.1 Landing Page Redesign** (`src/app/page.tsx`):
   - Replace stark black layout with a sleek layered opacity hero.
   - Add `LanguageToggle` directly to Landing header.
-  - Refactor feature cards into clean `bg-zinc-900/40` frosted panels with smooth hover transitions.
-  - Create a realistic interactive "Live Story Preview" mock card showing an excerpt of DM narration and party status with smooth opacity badges.
-- [ ] **2.2 Login & Registration Screen** (`src/app/login/page.tsx`):
-  - Redesign into a modern floating glass card (`bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/60`).
+  - Refactor feature cards into clean `.surface-panel` frosted panels with smooth hover transitions.
+  - Created interactive "Live Story Preview" mock card showing an excerpt of DM narration and party status with smooth opacity badges.
+  - Added bilingual EN/TH support across the landing page.
+- [x] **2.2 Login & Registration Screen** (`src/app/login/page.tsx`):
+  - Redesigned into a modern floating glass card (`surface-panel` with `backdrop-blur-xl`).
+  - Added header with `LanguageToggle` and return link.
+  - Recessed inputs (`bg-black/40 border-zinc-800/80`) and matte amber button.
   - Smooth opacity transitions for form fields, error badges, and toggle links.
-  - Add `LanguageToggle` or bilingual support to the auth screen.
+  - Verified with 0 TypeScript errors and 0 ESLint warnings.
 
 ---
 
