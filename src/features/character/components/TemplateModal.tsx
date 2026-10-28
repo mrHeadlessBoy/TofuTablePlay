@@ -26,12 +26,17 @@ import {
   isBuiltinTemplateId,
   newTemplateId,
   BUILTIN_TEMPLATES,
+  DEFAULT_MECHANICS,
   type CharacterTemplate,
   type ResourceColor,
   type TemplateStat,
   type TemplateResource,
   type TemplateTextField,
   type TemplateEquipmentSlot,
+  type TemplateMechanics,
+  type TemplateMode,
+  type TemplateDice,
+  type TemplateStatModifier,
 } from '../template'
 
 type TemplateModalTab = 'customize' | 'export' | 'import'
@@ -66,6 +71,9 @@ export default function TemplateModal({
   const [workingTemplate, setWorkingTemplate] = useState<CharacterTemplate>(() =>
     JSON.parse(JSON.stringify(currentTemplate))
   )
+
+  // Working mechanics fallback
+  const currentMechanics = workingTemplate.mechanics ?? DEFAULT_MECHANICS
 
   // Export State
   const [exportKey, setExportKey] = useState<string>('')
@@ -170,10 +178,32 @@ export default function TemplateModal({
     setWorkingTemplate({ ...workingTemplate, resources: next })
   }
 
-  const handleRemoveResource = (index: number) => {
+  const handleUpdateMechanics = (updates: Partial<TemplateMechanics>) => {
     setWorkingTemplate({
       ...workingTemplate,
-      resources: workingTemplate.resources.filter((_, i) => i !== index),
+      mechanics: {
+        ...(workingTemplate.mechanics ?? DEFAULT_MECHANICS),
+        ...updates,
+      },
+    })
+  }
+
+  const handleRemoveResource = (index: number) => {
+    const removed = workingTemplate.resources[index]
+    const nextResources = workingTemplate.resources.filter((_, i) => i !== index)
+    const currentVitality = workingTemplate.mechanics?.vitalityResourceId
+    const nextVitalityId =
+      currentVitality === removed?.id
+        ? nextResources.find((r) => r.id === 'hp')?.id ?? nextResources[0]?.id ?? null
+        : currentVitality ?? null
+
+    setWorkingTemplate({
+      ...workingTemplate,
+      resources: nextResources,
+      mechanics: {
+        ...(workingTemplate.mechanics ?? DEFAULT_MECHANICS),
+        vitalityResourceId: nextVitalityId,
+      },
     })
   }
 
@@ -438,6 +468,96 @@ export default function TemplateModal({
                     placeholder="Brief description of this template's theme and rules..."
                     className="w-full mt-1 bg-zinc-950 border border-zinc-700/80 rounded-lg p-2 text-xs text-white"
                   />
+                </div>
+              </div>
+
+              {/* Rules & Mechanics (AI DM Profile) */}
+              <div className="space-y-3 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+                <div className="flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-xs font-semibold uppercase text-zinc-300">
+                    Rules & Mechanics / กติกาและกลไก (AI DM Profile)
+                  </h3>
+                </div>
+                <p className="text-[11px] text-zinc-400">
+                  กำหนดรูปแบบการตัดสินและกลไกของ AI ให้เข้ากับแนวของแคมเปญ (เช่น ต่อสู้, โรแมนติก, เนื้อเรื่อง/สืบสวน หรือสยองขวัญ)
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  {/* Mode */}
+                  <div>
+                    <label className="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+                      Gameplay Mode (โหมดการเล่น)
+                    </label>
+                    <select
+                      value={currentMechanics.mode}
+                      onChange={(e) => handleUpdateMechanics({ mode: e.target.value as TemplateMode })}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="combat">Combat RPG (ต่อสู้ / แอ็กชันแฟนตาซี)</option>
+                      <option value="narrative">Narrative / Mystery (เน้นเนื้อเรื่อง / สืบสวน / ไอเทม)</option>
+                      <option value="social">Social / Romance (โรแมนติก / บทสนทนา / ความรู้สึก)</option>
+                      <option value="horror">Horror / Survival (สยองขวัญ / สติสัมปชัญญะ / เอาชีวิตรอด)</option>
+                    </select>
+                  </div>
+
+                  {/* Vitality Resource Picker */}
+                  <div>
+                    <label className="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+                      Vitality Resource (หลอดพลังชีวิตหลัก)
+                    </label>
+                    <select
+                      value={currentMechanics.vitalityResourceId ?? ''}
+                      onChange={(e) =>
+                        handleUpdateMechanics({
+                          vitalityResourceId: e.target.value ? e.target.value : null,
+                        })
+                      }
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="">ไม่มีหลอดเลือด (No Damage System)</option>
+                      {workingTemplate.resources.map((res) => (
+                        <option key={res.id} value={res.id}>
+                          {res.label || res.id} (ID: {res.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Dice System */}
+                  <div>
+                    <label className="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+                      Dice System (ระบบลูกเต๋า)
+                    </label>
+                    <select
+                      value={currentMechanics.dice}
+                      onChange={(e) => handleUpdateMechanics({ dice: e.target.value as TemplateDice })}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="d20">d20 System (D&D / Standard d20)</option>
+                      <option value="2d6">2d6 System (PbtA / City of Mist)</option>
+                      <option value="d100">d100 System (Call of Cthulhu)</option>
+                      <option value="none">No Dice (บทบาทสมมติล้วน / ไม่ใช้เต๋า)</option>
+                    </select>
+                  </div>
+
+                  {/* Stat Modifier Formula */}
+                  <div>
+                    <label className="text-[11px] font-mono uppercase text-zinc-400 block mb-1">
+                      Stat Modifier (สูตรโบนัสสเตตัส)
+                    </label>
+                    <select
+                      value={currentMechanics.statModifier}
+                      onChange={(e) =>
+                        handleUpdateMechanics({ statModifier: e.target.value as TemplateStatModifier })
+                      }
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="dnd">D&D 5e Formula: (Score - 10) / 2</option>
+                      <option value="raw">Direct Score: +Score (สำหรับสเกล 1-5 หรือ ±3)</option>
+                      <option value="none">No Modifier: +0 (ทอยเพียว / d100 roll under)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 

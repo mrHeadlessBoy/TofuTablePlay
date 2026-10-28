@@ -34,7 +34,7 @@ import {
   templateStatsPayload,
   extractCampaignTemplate,
 } from '@/features/character/template'
-import { abilityModifier, describeRoll, type DiceRoll } from '@/components/dice/dice'
+import { abilityModifier, describeRoll, type DiceRoll, type DieSides } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
 import { playDiceRollSound, playSystemSound } from '@/lib/sound'
 import CharacterInspectorPanel from './CharacterInspectorPanel'
@@ -193,13 +193,13 @@ export default function TablePlayground({
                     ? (activeChar.stats?.[stat.id] ?? stat.default)
                     : (custom.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
                   const bonusKey = isColumnStatId(stat.id) ? stat.id : stat.label || stat.id
-                  return [bonusKey, abilityModifier(raw)]
+                  return [bonusKey, abilityModifier(raw, tpl.mechanics.statModifier)]
                 })
               )
             : Object.fromEntries(
                 ABILITY_SCORE_KEYS.map((key) => [
                   key,
-                  abilityModifier(activeChar.stats?.[key]),
+                  abilityModifier(activeChar.stats?.[key], tpl.mechanics.statModifier),
                 ])
               )
         return [
@@ -207,6 +207,8 @@ export default function TablePlayground({
             id: activeChar.id,
             name: activeChar.name,
             modifiers,
+            defaultSides: (tpl.mechanics.dice === '2d6' ? 6 : tpl.mechanics.dice === 'd100' ? 100 : 20) as DieSides,
+            defaultCount: tpl.mechanics.dice === '2d6' ? 2 : 1,
           },
         ]
       })()

@@ -76,14 +76,23 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **System Events:** Player entering table (`player_enter_table.wav`), new AI DM turn narration (`Ai_reply.wav`), and error alerts (`error.wav`).
 
 ### 7. 🤖 AI Dungeon Master Engine (`src/lib/ai/dm.ts`)
-* **Flat Damage Benchmark System:** Computes party-wide damage tiers from the average Max HP of all active characters:
-  * **Graze:** 5–10% of avg Max HP
-  * **Normal:** 15–25% of avg Max HP
-  * **Heavy:** 30–45% of avg Max HP
-* **Per-Character Defense Mitigation:** Dynamically locates `CON` or an equivalent resilience stat in the character's template alongside equipped gear across the template's equipment slots (max 15% of avg Max HP cap), without penalizing templates that omit `CON`.
+* **Genre-Driven Rules Profiles (Template Mechanics Schema v2):** Character sheet templates now include first-class `mechanics: { mode, vitalityResourceId, dice, statModifier }`, allowing campaigns and tables to natively support four distinct genres:
+  * **Combat RPG (`combat`):** Full tabletop combat engine with the **Flat Damage Benchmark System** (Graze: 5–10%, Normal: 15–25%, Heavy: 30–45% of average party Max HP), defense mitigation (resilience stat + armor pieces), anti-one-shot monster pacing, and enemy HP% tracking in `[ Overview ]`.
+  * **Social & Romance (`social`):** Focuses on emotional dynamics, personal chemistry, conversational tension, and social hierarchy. Replaces physical HP damage with emotional resource adjustments (`(Name — Heart: 8/10 -> 6/10 [-2 Heart])`, `(Name — Stress: 2/5 -> 4/5 [+2 Stress])`) and social conditions (`Flustered`, `Captivated`, `Heartbroken`, `Distrusted`).
+  * **Horror & Survival (`horror`):** Atmosphere of dread, claustrophobic pacing, and enigmatic cosmic threats. Resolves psychological tension via panic checks, mental stability adjustments (`(Name — Sanity: 45/50 -> 36/50 [-9 Sanity])`), and psychological conditions (`Panicked`, `Catatonic`, `Hallucinating`, `Shaken`).
+  * **Narrative & Mystery (`narrative`):** For investigative or 0-resource sheets (e.g. `Drama & Mystery`), combat HP and monster HP% are turned off completely. The AI DM resolves challenges through **Item Depletion & Gain** (`[-1 Flashlight]`, `[+1 Old Key]`), clues, and investigative conditions (`Suspected`, `Compromised`, `Exhausted`).
+* **Multi-Dice & Custom Modifier Engine:**
+  * **Dice Systems (`dice`):** Supports `d20` (standard DC checks: 8–10 easy, 12–14 medium, 15–17 hard), `2d6` (PbtA style: 7–9 partial success, 10+ full success), `d100` (Call of Cthulhu roll-under), and `none` (pure narrative choices without dice).
+  * **Stat Modifier Formulas (`statModifier`):** Supports `dnd` (standard D&D 5e: `(score - 10) / 2`), `raw` (direct stat bonus: `+score` for 1–5 or ±3 scales), and `none` (no roll bonus: `+0`).
+  * **Dice Tray Integration:** The 3D Dice Tray automatically initializes with the player's character sheet dice type (e.g. 2d6 or d100) and ability modifiers calculated using their template's formula.
+* **Modular AI DM Prompting & Dynamic `[ Overview ]` / `[ Decision ]`:**
+  * The system instruction decomposes into isolated rule modules (`CORE`, `COMBAT`, `SOCIAL`, `HORROR`, `NARRATIVE_ITEMS`).
+  * `[ Overview ]` dynamically swaps middle lines: `สถานะศัตรู` (Combat), `บรรยากาศและความรู้สึก` (Social), `ระดับความตึงเครียดและสิ่งคุกคาม` (Horror), or `สิ่งของสำคัญและเบาะแส` (Narrative).
+  * `[ Decision ]` dynamically crafts next-turn prompts adhering strictly to each individual character's dice system and available stats.
+* **Clean Prompt Sanitization & Token Economy:** Automatically strips embedded `<!-- CAMPAIGN_TEMPLATE: {...} -->` metadata comments from campaign rule mechanics (`stripCampaignTemplateFromRules`) before prompting Gemini across turn generation, opening scene creation, and battle board turns, keeping context windows lightweight and preventing model confusion.
+* **Immersion-First Dice Invisibility:** Translates player dice rolls (SUCCESS, FAIL, NATURAL 20, NATURAL 1) strictly into dramatic in-world narrative events, forbidding the AI from breaking immersion by reciting raw roll numbers, dice types, or phrases like "ทอยได้ 18" in prose.
 * **Template-Aware Character Context:** Dynamically builds system instructions, `[ Decision ]` stat prompts, and `[ Overview ]` status schemas from the party's active templates—formatting all template stats, resource bars (`HP`, `Heart`, `Skill Cost`, `Sanity`, `Stress`, `Luck`, etc.), equipment slots, allowed conditions, and text/bio fields.
-* **Balanced Combat & Enemy HP% Scaling:** Enforces anti-one-shot damage scaling, tracks enemy health percentages in `[ Overview ]`, and outputs conditional `[ Decision ]` DC prompts only when meaningful obstacles or risks are present.
-* **Automatic State Extraction:** Parses AI narrative output for named inline resource changes (`(Shacco — HP: 100/100 -> 80/100 [-20 HP])`, `(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])`, `(Shacco — Sanity: 50/50 -> 42/50 [-8])`, etc.) and authoritative single-line/multi-line `[ Overview ]` `สถานะปาร์ตี้` blocks using longest-name-first matching and resource alias resolution so all built-in and custom template resources auto-sync to Supabase without mixing up players. Also supports custom template conditions, Thai→English condition mapping, and template-aware low-vitality condition thresholds.
+* **Automatic State Extraction:** Parses AI narrative output for named inline resource changes (`(Shacco — HP: 100/100 -> 80/100 [-20 HP])`, `(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])`, `(Shacco — Sanity: 50/50 -> 42/50 [-8])`, etc.) and authoritative single-line/multi-line `[ Overview ]` `สถานะปาร์ตี้` blocks using longest-name-first matching and resource alias resolution so all built-in and custom template resources auto-sync to Supabase without mixing up players. Also supports custom template conditions, Thai→English condition mapping, and guards low-vitality condition thresholds (`Bloodied`, `Unconscious`) from misfiring on 0-resource characters.
 * **Bounded Sliding-Window History & Anti-Repetition:** Maintains the last 4 turns as multi-turn conversation history for token efficiency while preventing repeated phrasing or overriding unsubmitted player agency.
 * **Host Narrative Override & Atomic Locking:** Head Table hosts can edit any turn's narrative output in place, while atomic database phase transitions (`turn_phase: 'resolving'`) prevent duplicate AI executions.
 
@@ -205,8 +214,8 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 │  │     • Triggered lorebook entries                        │  │
 │  │     • Last 4 turns as conversation history              │  │
 │  │  7. generateDmNarrative() calls Gemini                  │  │
-│  │     • Full party stats + template fields + benchmarks   │  │
-│  │     • Per-character defense mitigation                  │  │
+│  │     • Full party stats, template fields & active mode   │  │
+│  │       (Combat damage benchmarks or 0-resource narrative)│  │
 │  │  8. extractPartyStateUpdates() auto-applies:            │  │
 │  │     • HP/SP changes parsed from narrative               │  │
 │  │     • Condition mapping (Template & Thai → English)     │  │
@@ -290,7 +299,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
         ├── sound.ts                      # Autoplay-resilient dice & system sound notification player
         ├── turns.ts                      # Opening narration turn index constant (OPENING_TURN_NUMBER = 1)
         ├── ai/
-        │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, damage benchmarks, defense mitigation & parser
+        │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, dynamic combat/zero-resource modes & parser
         │   ├── boardDm.ts                # Battle Board JSON AI DM: prompt builder & safe reply parser
         │   └── lorebook.ts               # Multilingual keyword/title scanner & DM-only lore filter
         └── supabase/

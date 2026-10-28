@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, type ReactNode } fro
 import dynamic from 'next/dynamic'
 import { Check, CheckCircle2, CircleDot, Clock, Compass, Dices, Edit3, Loader2, ShieldAlert, X } from 'lucide-react'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
-import { describeRoll, type DiceRoll } from '@/components/dice/dice'
+import { type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
 import { buildPlayerColorMap, getPlayerNameColor, type Turn } from '../types'
 

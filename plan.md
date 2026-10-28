@@ -344,10 +344,10 @@ Result: a Romance or Drama campaign is still instructed to run combat and comput
 
 | Step | Phase | Action | Size |
 | :-: | :-: | :--- | :-: |
-| **4** | A | Fix 0-resource Classic fallback; strip template JSON from AI rules | S |
-| **5** | B | Add `mechanics` to template schema + presets + sanitizer inference | M |
-| **6** | B | Modular system instruction, dynamic `[ Overview ]` / `[ Decision ]`, modifier formula | M |
-| **7** | B | Rules section in `TemplateModal` | S |
+| **4** ✅ | A | Fix 0-resource Classic fallback; strip template JSON from AI rules | S |
+| **5** ✅ | B | Add `mechanics` to template schema + presets + sanitizer inference | M |
+| **6** ✅ | B | Modular system instruction, dynamic `[ Overview ]` / `[ Decision ]`, modifier formula | M |
+| **7** ✅ | B | Rules section in `TemplateModal` | S |
 | **8** | C | Structured JSON output + server validation + `turns.structured_output` | L |
 | **9** | C | Render Overview/Decision from JSON; regex fallback then removal | M |
 | **10** | Part 1 Ph. 6 | HUD: Orb & Roster for 0-resource sheets | M |
@@ -359,9 +359,9 @@ Result: a Romance or Drama campaign is still instructed to run combat and comput
 
 ## 11. Verification Checklist (Part 2)
 
-- [ ] **Phase A**: Drama table prompt contains no HP, no damage benchmark, no `<!-- CAMPAIGN_TEMPLATE` JSON.
-- [ ] **Phase B**: Romance campaign turn has no enemy HP% / combat rules; Classic campaign unchanged; custom 1–5 scale stats produce sensible modifiers.
-- [ ] **Phase B**: Mixed party (Classic + Drama) — combat rules apply only to Classic member.
+- [x] **Phase A**: Drama table prompt contains no HP, no damage benchmark, no `<!-- CAMPAIGN_TEMPLATE` JSON.
+- [x] **Phase B**: Romance campaign turn has no enemy HP% / combat rules; Classic campaign unchanged; custom 1–5 scale stats produce sensible modifiers.
+- [x] **Phase B**: Mixed party (Classic + Drama) — combat rules apply only to Classic member.
 - [ ] **Phase C**: 20 consecutive turns sync resources/conditions/inventory with zero missed updates; invalid AI values are clamped/rejected.
 - [ ] **Phase D**: Migration is idempotent; all existing characters/campaigns load identically; compatibility check uses `template_id` + version.
 - [ ] **Tests**: Vitest suite passes in CI.

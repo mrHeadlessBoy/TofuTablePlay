@@ -4,7 +4,30 @@
 
 import { ABILITY_SCORE_KEYS, CHARACTER_CONDITIONS, type AbilityScoreKey } from './domain'
 
-export const TEMPLATE_SCHEMA_VERSION = 1
+export const TEMPLATE_SCHEMA_VERSION = 2
+
+export const TEMPLATE_MODES = ['combat', 'narrative', 'social', 'horror'] as const
+export type TemplateMode = (typeof TEMPLATE_MODES)[number]
+
+export const TEMPLATE_DICE = ['d20', '2d6', 'd100', 'none'] as const
+export type TemplateDice = (typeof TEMPLATE_DICE)[number]
+
+export const TEMPLATE_STAT_MODIFIERS = ['dnd', 'raw', 'none'] as const
+export type TemplateStatModifier = (typeof TEMPLATE_STAT_MODIFIERS)[number]
+
+export type TemplateMechanics = {
+  mode: TemplateMode
+  vitalityResourceId: string | null
+  dice: TemplateDice
+  statModifier: TemplateStatModifier
+}
+
+export const DEFAULT_MECHANICS: TemplateMechanics = {
+  mode: 'combat',
+  vitalityResourceId: 'hp',
+  dice: 'd20',
+  statModifier: 'dnd',
+}
 
 export const RESOURCE_COLORS = ['red', 'amber', 'cyan', 'emerald', 'violet', 'rose', 'sky', 'zinc'] as const
 export type ResourceColor = (typeof RESOURCE_COLORS)[number]
@@ -37,7 +60,7 @@ export type TemplateEquipmentSlot = {
 }
 
 export type CharacterTemplate = {
-  v: typeof TEMPLATE_SCHEMA_VERSION
+  v: number
   id: string
   name: string
   description: string
@@ -48,6 +71,7 @@ export type CharacterTemplate = {
   equipmentSlots: TemplateEquipmentSlot[]
   conditions: string[]
   sections: { skills: boolean; inventory: boolean }
+  mechanics: TemplateMechanics
 }
 
 /** Values of template fields that have no database column of their own. */
@@ -119,6 +143,12 @@ export const CLASSIC_TEMPLATE: CharacterTemplate = {
   ],
   conditions: [...CHARACTER_CONDITIONS],
   sections: { skills: true, inventory: true },
+  mechanics: {
+    mode: 'combat',
+    vitalityResourceId: 'hp',
+    dice: 'd20',
+    statModifier: 'dnd',
+  },
 }
 
 export const ROMANCE_TEMPLATE: CharacterTemplate = {
@@ -153,6 +183,12 @@ export const ROMANCE_TEMPLATE: CharacterTemplate = {
   ],
   conditions: ['Normal', 'Flustered', 'Confident', 'Jealous', 'Heartbroken', 'Exhausted'],
   sections: { skills: false, inventory: true },
+  mechanics: {
+    mode: 'social',
+    vitalityResourceId: 'hp',
+    dice: 'd20',
+    statModifier: 'raw',
+  },
 }
 
 export const HORROR_TEMPLATE: CharacterTemplate = {
@@ -188,6 +224,12 @@ export const HORROR_TEMPLATE: CharacterTemplate = {
   ],
   conditions: ['Normal', 'Shaken', 'Terrified', 'Wounded', 'Bout of Madness', 'Unconscious'],
   sections: { skills: true, inventory: true },
+  mechanics: {
+    mode: 'horror',
+    vitalityResourceId: 'hp',
+    dice: 'd20',
+    statModifier: 'dnd',
+  },
 }
 
 export const DRAMA_INVENTORY_TEMPLATE_ID = 'builtin-drama-inventory'
@@ -246,6 +288,12 @@ export const DRAMA_INVENTORY_TEMPLATE: CharacterTemplate = {
     'Exiled (ถูกขับไล่)',
   ],
   sections: { skills: false, inventory: true },
+  mechanics: {
+    mode: 'narrative',
+    vitalityResourceId: null,
+    dice: 'd20',
+    statModifier: 'raw',
+  },
 }
 
 export const BUILTIN_TEMPLATES: readonly CharacterTemplate[] = [
@@ -268,6 +316,12 @@ export function createEmptyTemplate(name = 'Custom Campaign Sheet'): CharacterTe
     equipmentSlots: [],
     conditions: ['Normal'],
     sections: { skills: true, inventory: true },
+    mechanics: {
+      mode: 'combat',
+      vitalityResourceId: null,
+      dice: 'd20',
+      statModifier: 'dnd',
+    },
   }
 }
 
@@ -372,6 +426,82 @@ export function newTemplateId(): string {
   return `tpl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+
+export function sanitizeMechanics(
+  rawMech: unknown,
+  resources: TemplateResource[],
+  name: string
+): TemplateMechanics {
+  const m = asRecord(rawMech)
+  const normName = name.toLowerCase()
+
+  let mode: TemplateMode
+  if ((TEMPLATE_MODES as readonly string[]).includes(m.mode as string)) {
+    mode = m.mode as TemplateMode
+  } else if (
+    resources.length === 0 ||
+    normName.includes('drama') ||
+    normName.includes('mystery') ||
+    normName.includes('ดราม่า') ||
+    normName.includes('สืบสวน')
+  ) {
+    mode = 'narrative'
+  } else if (
+    normName.includes('romance') ||
+    normName.includes('slice of life') ||
+    normName.includes('cozy') ||
+    normName.includes('love') ||
+    normName.includes('รัก')
+  ) {
+    mode = 'social'
+  } else if (normName.includes('horror') || normName.includes('สยองขวัญ') || normName.includes('เอาชีวิตรอด')) {
+    mode = 'horror'
+  } else {
+    mode = 'combat'
+  }
+
+  let vitalityResourceId: string | null = null
+  if (typeof m.vitalityResourceId === 'string' && isValidFieldId(m.vitalityResourceId)) {
+    vitalityResourceId = m.vitalityResourceId
+  } else if (m.vitalityResourceId === null) {
+    vitalityResourceId = null
+  } else {
+    const hasHp = resources.find((r) => r.id === 'hp')
+    if (hasHp) {
+      vitalityResourceId = 'hp'
+    } else if (mode === 'narrative' || resources.length === 0) {
+      vitalityResourceId = null
+    } else {
+      vitalityResourceId = resources[0]?.id ?? null
+    }
+  }
+
+  if (vitalityResourceId && !resources.some((r) => r.id === vitalityResourceId)) {
+    vitalityResourceId = null
+  }
+
+  let dice: TemplateDice = 'd20'
+  if ((TEMPLATE_DICE as readonly string[]).includes(m.dice as string)) {
+    dice = m.dice as TemplateDice
+  }
+
+  let statModifier: TemplateStatModifier
+  if ((TEMPLATE_STAT_MODIFIERS as readonly string[]).includes(m.statModifier as string)) {
+    statModifier = m.statModifier as TemplateStatModifier
+  } else if (mode === 'social' || mode === 'narrative') {
+    statModifier = 'raw'
+  } else {
+    statModifier = 'dnd'
+  }
+
+  return {
+    mode,
+    vitalityResourceId,
+    dice,
+    statModifier,
+  }
+}
+
 export function sanitizeTemplate(raw: unknown): CharacterTemplate | null {
   const input = asRecord(raw)
   if (Object.keys(input).length === 0) return null
@@ -419,10 +549,13 @@ export function sanitizeTemplate(raw: unknown): CharacterTemplate | null {
 
   const sections = asRecord(input.sections)
 
+  const cleanName = cleanText(input.name, LIMITS.name) || 'Untitled Template'
+  const mechanics = sanitizeMechanics(input.mechanics, resources, cleanName)
+
   return {
     v: TEMPLATE_SCHEMA_VERSION,
     id: typeof input.id === 'string' && /^[A-Za-z0-9_-]{1,48}$/.test(input.id) ? input.id : newTemplateId(),
-    name: cleanText(input.name, LIMITS.name) || 'Untitled Template',
+    name: cleanName,
     description: cleanText(input.description, LIMITS.description),
     author: cleanText(input.author, LIMITS.author),
     stats,
@@ -434,6 +567,7 @@ export function sanitizeTemplate(raw: unknown): CharacterTemplate | null {
       skills: sections.skills === undefined ? true : Boolean(sections.skills),
       inventory: sections.inventory === undefined ? true : Boolean(sections.inventory),
     },
+    mechanics,
   }
 }
 

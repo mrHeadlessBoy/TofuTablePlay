@@ -10,10 +10,15 @@ import {
 import {
   CLASSIC_TEMPLATE,
   COLUMN_EQUIPMENT_SLOT_INDEX,
+  DEFAULT_MECHANICS,
+  extractCampaignTemplate,
   isColumnStatId,
   isColumnTextFieldId,
+  stripCampaignTemplateFromRules,
   type CharacterTemplate,
   type SheetCustomValues,
+  type TemplateDice,
+  type TemplateMode,
 } from '@/features/character/template'
 import { abilityModifier, formatModifier } from '@/components/dice/dice'
 
@@ -102,7 +107,7 @@ function getMemberResourceDescriptors(member: PartyMemberAction): MemberResource
   const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
   const custom = member.sheetCustom
   const sourceResources =
-    tpl.resources.length > 0 ? tpl.resources : CLASSIC_TEMPLATE.resources
+    tpl.resources
 
   return sourceResources.map((res) => {
     if (res.id === 'hp') {
@@ -182,14 +187,21 @@ interface PartyDamageBenchmark {
   heavyMax: number
 }
 
-function computePartyDamageBenchmark(partyActions: PartyMemberAction[]): PartyDamageBenchmark {
+function computePartyDamageBenchmark(partyActions: PartyMemberAction[]): PartyDamageBenchmark | null {
   const validMaxHps = partyActions
     .map((m) => {
+      const tpl = m.sheetTemplate ?? CLASSIC_TEMPLATE
+      const vitId = tpl.mechanics?.vitalityResourceId ?? 'hp'
+      if (!vitId) return null
       const descriptors = getMemberResourceDescriptors(m)
-      const hpDesc = descriptors.find((d) => d.id === 'hp') ?? descriptors[0]
-      return Number(hpDesc?.max ?? m.maxHp)
+      const hpDesc = descriptors.find((d) => d.id === vitId) ?? (vitId === 'hp' ? descriptors[0] : null)
+      return hpDesc ? Number(hpDesc.max) : null
     })
-    .filter((hp) => Number.isFinite(hp) && hp > 0)
+    .filter((hp): hp is number => typeof hp === 'number' && Number.isFinite(hp) && hp > 0)
+
+  if (validMaxHps.length === 0) {
+    return null
+  }
 
   const avgPartyMaxHp =
     validMaxHps.length > 0
@@ -237,7 +249,7 @@ function computeCharacterDefenseInfo(
     const rawScore = isColumnStatId(resilienceStat.id)
       ? (member.stats?.[resilienceStat.id] ?? resilienceStat.default)
       : (custom?.stats[resilienceStat.id] ?? resilienceStat.default)
-    conModifier = abilityModifier(rawScore)
+    conModifier = abilityModifier(rawScore, tpl.mechanics?.statModifier ?? 'dnd')
     resilienceStatLabel =
       resilienceStat.label.split(/[（(]/)[0].trim() || resilienceStat.id
   }
@@ -311,7 +323,7 @@ function formatPartyMemberForPrompt(
   member: PartyMemberAction,
   index: number,
   isFirstPlayerTurn: boolean,
-  benchmark: PartyDamageBenchmark
+  benchmark: PartyDamageBenchmark | null
 ): string {
   const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
   const custom = member.sheetCustom
@@ -339,13 +351,19 @@ function formatPartyMemberForPrompt(
             const score = isColumnStatId(stat.id)
               ? (member.stats?.[stat.id] ?? stat.default)
               : (custom?.stats[stat.id] ?? stat.default)
-            const mod = formatModifier(abilityModifier(score))
-            return `${stat.label}: ${score} (${mod})`
+            const modStyle = tpl.mechanics?.statModifier ?? 'dnd'
+            const mod = abilityModifier(score, modStyle)
+            return modStyle === 'none'
+              ? `${stat.label}: ${score}`
+              : `${stat.label}: ${score} (${formatModifier(mod)})`
           })
           .join(', ')
       : '(ชีทนี้ไม่มีค่า Stat แยกย่อย)'
 
-  const defenseInfo = computeCharacterDefenseInfo(member, benchmark.avgPartyMaxHp)
+  const defenseInfo =
+    benchmark && resourceDescriptors.length > 0
+      ? computeCharacterDefenseInfo(member, benchmark.avgPartyMaxHp)
+      : null
 
   const equipList =
     tpl.equipmentSlots.length > 0
@@ -418,13 +436,15 @@ function formatPartyMemberForPrompt(
     .filter(Boolean)
     .join(' / ')
 
-  const statusJoined = [resourcesPromptText, condText].filter(Boolean).join(' | ')
+  const statusLine = resourcesPromptText
+    ? `   - [สเตตัสและทรัพยากรปัจจุบัน (Resources & Condition)]: ${resourcesPromptText} | ${condText}`
+    : `   - [สถานะปัจจุบัน (Condition)]: ${condText}`
 
   const lines = [
-    `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType} | รูปแบบชีท: ${tpl.name}]`,
-    `   - [สเตตัสและทรัพยากรปัจจุบัน (Resources & Condition)]: ${statusJoined}`,
+    `${index + 1}. ชื่อ: ${member.characterName} [คลาสอ้างอิง: ${member.classType} | รูปแบบชีท: ${tpl.name} | โหมด: ${tpl.mechanics?.mode ?? 'combat'} | ระบบเต๋า: ${tpl.mechanics?.dice ?? 'd20'}]`,
+    statusLine,
     `   - [ค่าสถานะประจำตัวละคร (Stats & Dice Bonus)]: ${statsText}`,
-    `   - [ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]: ${defenseInfo.summaryText}`,
+    ...(defenseInfo ? [`   - [ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]: ${defenseInfo.summaryText}`] : []),
   ]
 
   if (appearancePreview) {
@@ -498,22 +518,37 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const partyEquipLabelsSet = new Set<string>()
   const partyResourceTagsSet = new Set<string>()
   const partyConditionSet = new Set<string>()
+  const partyModes = new Set<TemplateMode>()
+  const partyDice = new Set<TemplateDice>()
 
-  for (const member of partyActions) {
-    const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
-    for (const st of tpl.stats) {
-      partyStatLabelsSet.add(st.label.split(/[（(]/)[0].trim() || st.id)
+  for (const action of partyActions) {
+    const tpl = action.sheetTemplate ?? CLASSIC_TEMPLATE
+    const mech = tpl.mechanics ?? DEFAULT_MECHANICS
+    partyModes.add(mech.mode)
+    partyDice.add(mech.dice)
+
+    for (const stat of tpl.stats) {
+      if (stat.label) partyStatLabelsSet.add(stat.label)
     }
-    for (const eq of tpl.equipmentSlots) {
-      partyEquipLabelsSet.add(eq.label)
+    for (const slot of tpl.equipmentSlots) {
+      if (slot.label) partyEquipLabelsSet.add(slot.label)
     }
-    for (const res of getMemberResourceDescriptors(member)) {
-      partyResourceTagsSet.add(res.shortTag)
+    for (const res of tpl.resources) {
+      const tag = res.label.split(/[（(]/)[0].trim() || res.label || res.id
+      partyResourceTagsSet.add(tag)
     }
     for (const cond of tpl.conditions) {
       partyConditionSet.add(cond)
     }
   }
+
+  if (partyModes.size === 0) partyModes.add('combat')
+  if (partyDice.size === 0) partyDice.add('d20')
+
+  const hasCombat = damageBenchmark !== null && partyModes.has('combat')
+  const hasSocial = partyModes.has('social')
+  const hasHorror = partyModes.has('horror')
+  const hasNarrative = partyModes.has('narrative') || (!hasCombat && !hasSocial && !hasHorror)
 
   const dynamicStatsSummary =
     partyStatLabelsSet.size > 0
@@ -526,7 +561,7 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const dynamicResourcesSummary =
     partyResourceTagsSet.size > 0
       ? Array.from(partyResourceTagsSet).join(', ')
-      : 'HP, Skill Cost'
+      : 'ไม่มีทรัพยากรตัวเลข (Zero-Resource Mode)'
   const dynamicConditionsSummary =
     partyConditionSet.size > 0
       ? Array.from(partyConditionSet).join(', ')
@@ -542,41 +577,72 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
               .map((r) => `${r.shortTag} ${r.current}/${r.max}`)
               .join(' | ')
             const cond = m.condition || m.sheetTemplate?.conditions[0] || 'Normal'
-            return `${m.characterName}: ${resParts} | สถานะ: ${cond}`
+            return resParts ? `${m.characterName}: ${resParts} | สถานะ: ${cond}` : `${m.characterName}: สถานะ: ${cond}`
           })
           .join(' ; ')
       : 'Shacco: HP 80/100 | Skill Cost 7/10 | สถานะ: Normal'
 
-  const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
+  // Dynamic middle line of [ Overview ]
+  let overviewMiddleSection = ''
+  if (hasCombat) {
+    overviewMiddleSection = 'สถานะศัตรู : (ระบุชื่อศัตรูทุกตัวในฉากพร้อม HP% คงเหลือล่าสุด เช่น "หมาป่าทมิฬ A: 55%, หมาป่าทมิฬ B: 100%" / หากศัตรูตายให้ระบุว่า "0% (ตายแล้ว)" / หากไม่มีศัตรูในฉากให้เขียนว่า "ไม่มี")'
+  } else if (hasSocial && !hasHorror && !hasNarrative) {
+    overviewMiddleSection = 'บรรยากาศและความรู้สึก : (ระบุระดับความสัมพันธ์ ความรู้สึกของบุคคลในฉาก หรือบรรยากาศทางอารมณ์)'
+  } else if (hasHorror && !hasSocial && !hasNarrative) {
+    overviewMiddleSection = 'ระดับความตึงเครียดและสิ่งคุกคาม : (ระดับความสะพรึงกลัว สิ่งผิดปกติ หรือภัยคุกคามที่กำลังคืบคลาน)'
+  } else if (hasNarrative && !hasSocial && !hasHorror) {
+    overviewMiddleSection = 'สิ่งของสำคัญและเบาะแส : (ระบุเบาะแส วัตถุพยาน หรือไอเทมสำคัญที่ค้นพบในฉาก)'
+  } else {
+    overviewMiddleSection = 'สถานะอุปสรรคหรือความตึงเครียด : (ระบุอุปสรรค บุคคลต้องสงสัย หรือความกดดันในฉาก เช่น "ยามหน้าคฤหาสน์กำลังตรวจค้น" หรือ "ความตึงเครียดระดับสูง")'
+  }
 
-[WORLD SETTING & TONE]
-${campaign.world_setting}
+  // Dynamic instructions for [ Decision ]
+  const decisionDiceInstructions: string[] = []
+  if (partyDice.has('d20')) {
+    decisionDiceInstructions.push('- ตัวละครที่ใช้เต๋า d20: [ชื่อตัวละคร]: สิ่งที่ต้องทำ/รับมือ: (สิ่งที่กำลังเผชิญ) | [d20 + <ชื่อ Stat ในชีท> vs DC XX] (DC มาตรฐาน: ง่าย 8-10, ปานกลาง 12-14, ยาก 15-17, วิกฤต 18+)')
+  }
+  if (partyDice.has('2d6')) {
+    decisionDiceInstructions.push('- ตัวละครที่ใช้เต๋า 2d6: [ชื่อตัวละคร]: สิ่งที่ต้องทำ/รับมือ: (สิ่งที่กำลังเผชิญ) | [2d6 + <ชื่อ Stat ในชีท> vs DC XX] (DC มาตรฐาน: สำเร็จบางส่วน 7-9, สำเร็จสมบูรณ์ 10+)')
+  }
+  if (partyDice.has('d100')) {
+    decisionDiceInstructions.push('- ตัวละครที่ใช้เต๋า d100: [ชื่อตัวละคร]: สิ่งที่ต้องทำ/รับมือ: (สิ่งที่กำลังเผชิญ) | [d100 vs <ชื่อ Stat ในชีท> (Roll under เพื่อสำเร็จ)]')
+  }
+  if (partyDice.has('none')) {
+    decisionDiceInstructions.push('- ตัวละครที่ไม่มีเต๋า (none): [ชื่อตัวละคร]: ทางเลือก/การตัดสินใจ: (คำถามหรือทางเลือกเชิงบทบาทสมมติ โดยไม่ต้องทอยเต๋า)')
+  }
 
-[OVERARCHING STORY]
-${campaign.core_description}
+  let requiredOutputDescription = ''
+  if (hasCombat) {
+    requiredOutputDescription = '(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรตามชีทจริง เช่น (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-Z]) หรือ (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Z]) หรือทรัพยากรอื่นๆ ในชีทของตัวละครนั้นเมื่อมีการเปลี่ยนแปลง)'
+  } else if (hasSocial) {
+    requiredOutputDescription = '(เนื้อหาบรรยายเรื่องราว บทสนทนา มิติความสัมพันธ์ ผลลัพธ์การกระทำของทุกคน พร้อมวงเล็บระบุการเปลี่ยนแปลงค่าอารมณ์/ความสัมพันธ์ เช่น (ชื่อตัวละคร — Heart: เดิม/Max -> ใหม่/Max [-Z]) หรือการเปลี่ยนสถานะ Condition โดยห้ามกล่าวถึงการลด HP หรือเลือดมอนสเตอร์เด็ดขาด)'
+  } else if (hasHorror) {
+    requiredOutputDescription = '(เนื้อหาบรรยายเรื่องราว ความตึงเครียด ความหลอน ผลลัพธ์การกระทำของทุกคน พร้อมวงเล็บระบุการลดลงของ Sanity หรือค่าจิตใจ เช่น (ชื่อตัวละคร — Sanity: เดิม/Max -> ใหม่/Max [-Z]) และสถานะทางจิตใจ โดยห้ามกล่าวถึงการลด HP หรือเลือดมอนสเตอร์เด็ดขาด)'
+  } else {
+    requiredOutputDescription = '(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน การใช้ไอเทม เบาะแส และการเปลี่ยนแปลงสถานะ Condition ของตัวละคร ห้ามกล่าวถึงการลด HP หรือเลือดมอนสเตอร์เด็ดขาด)'
+  }
 
-[ACTIVE MECHANICS / RULES]
-${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
-
-[CORE DIRECTIVES & RESOLUTION RULES]
-1. ความต่อเนื่องของเรื่องราว:
+  // Construct modular rules
+  const ruleModules: string[] = []
+  ruleModules.push(`1. ความต่อเนื่องของเรื่องราว:
    - ร้อยเรียงการกระทำของผู้เล่นเข้ากับเหตุการณ์ก่อนหน้าอย่างต่อเนื่อง ห้ามรีเซ็ตฉากหรือลืมเหตุการณ์ที่เพิ่งเกิดขึ้น
-   - ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในปาร์ตี้ให้ครบตามรายชื่อ
+   - ต้องกล่าวถึงผลลัพธ์ของตัวละครทุกคนในปาร์ตี้ให้ครบตามรายชื่อ`)
 
-2. การเคารพข้อมูลตัวละครตามรูปแบบชีทของแต่ละคน (Dynamic Character Sheet Templates, Resources, Stats, Equipment & Skills):
-   - ตัวละครแต่ละคนอาจใช้รูปแบบชีท (Character Template) ที่ปรับแต่งค่าต่างกัน ให้คำนึงถึงทรัพยากร (${dynamicResourcesSummary}), ค่าสถานะ (${dynamicStatsSummary}), สถานะผิดปกติ (${dynamicConditionsSummary}), ช่องอุปกรณ์สวมใส่ (${dynamicEquipSummary}) และไอเทมในกระเป๋าตามที่ระบุในบล็อกข้อมูลของตัวละครคนนั้นจริงในการตัดสินผลลัพธ์
-   - หากผู้เล่นประกาศใช้ "สกิล (Skill)" หรือทำแอ็กชันที่ใช้ทรัพยากรพิเศษ (เช่น Skill Cost / SP, Sanity, Stress, Luck ฯลฯ):
-     * หากมีสกิลและทรัพยากรเพียงพอ: ต้องหักหรือปรับค่าทรัพยากรนั้นทันที และเขียนวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรที่เปลี่ยนไปในเนื้อเรื่องเสมอ เช่น "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])" หรือ "(Shacco — Sanity: 50/50 -> 42/50 [-8])" หรือ "(Shacco — Stress: 2/10 -> 5/10 [+3])"
-     * หากไม่มีสกิลนั้น หรือทรัพยากรไม่พอ: ให้บรรยายว่าการกระทำนั้นล้มเหลวหรือเกิดผลเสียแทน
+  ruleModules.push(`2. การเคารพข้อมูลตัวละครตามรูปแบบชีทของแต่ละคน (Dynamic Character Sheet Templates, Resources, Stats, Equipment & Skills):
+   - ตัวละครแต่ละคนอาจใช้รูปแบบชีท (Character Template) และโหมดที่ต่างกัน ให้คำนึงถึงทรัพยากร (${dynamicResourcesSummary}), ค่าสถานะ (${dynamicStatsSummary}), สถานะผิดปกติ (${dynamicConditionsSummary}), ช่องอุปกรณ์สวมใส่ (${dynamicEquipSummary}) และไอเทมในกระเป๋าตามที่ระบุในบล็อกข้อมูลของตัวละครคนนั้นจริงในการตัดสินผลลัพธ์
+   - หากผู้เล่นประกาศใช้ "สกิล (Skill)" หรือทำแอ็กชันที่ใช้ทรัพยากรพิเศษ (เช่น Skill Cost / SP, Sanity, Stress, Heart, Luck ฯลฯ):
+     * หากมีสกิลและทรัพยากรเพียงพอ: ต้องหักหรือปรับค่าทรัพยากรนั้นทันที และเขียนวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรที่เปลี่ยนไปในเนื้อเรื่องเสมอ เช่น "(Shacco — Skill Cost: 10/10 -> 7/10 [-3 SP])" หรือ "(Shacco — Sanity: 50/50 -> 42/50 [-8])" หรือ "(Shacco — Heart: 8/10 -> 6/10 [-2])"
+     * หากไม่มีสกิลนั้น หรือทรัพยากรไม่พอ: ให้บรรยายว่าการกระทำนั้นล้มเหลวหรือเกิดผลเสียแทน`)
 
-3. กฎการตัดสินผลแอ็กชันและลูกเต๋า (Action & Dice Resolution):
+  ruleModules.push(`3. กฎการตัดสินผลแอ็กชันและลูกเต๋า (Action & Dice Resolution):
    - [กรณีไม่ส่งแอ็กชัน]: ให้บรรยายว่าตัวละครนั้น "ยืนนิ่ง ชะงัก หรือคุมเชิงดูสถานการณ์อยู่กับที่" ห้ามคิดการเคลื่อนไหวหรือสั่งโจมตีแทนผู้เล่นเด็ดขาด
    - [แอ็กชันทั่วไปที่ไม่เสี่ยงอันตราย]: เช่น เดินสำรวจ พูดคุยทั่วไป เปิดประตูที่ไม่ได้ล็อก หยิบของ ให้สำเร็จตามเนื้อผ้าได้โดยไม่ต้องมีผลเต๋า
-   - [แอ็กชันต่อสู้หรือมีความเสี่ยงสูง]:
-     * ยึดตามผลทอยเต๋าที่แนบมาในแอ็กชันอย่างเคร่งครัด (SUCCESS = สำเร็จ, FAIL = ล้มเหลว, NATURAL 20 = สำเร็จระดับคริติคอล, NATURAL 1 = พลาดท่าอย่างรุนแรง)
-     * หากผู้เล่นสั่งโจมตีศัตรูหรือทำเรื่องเสี่ยงตาย แต่ "ไม่ยอมทอยเต๋าแนบมา" ให้ตัดสินว่าจังหวะนั้นพลาดเป้า ถูกศัตรูปัดป้องได้ หรือล้มเหลวทันที และต้องถูกศัตรูโจมตีสวนกลับ!
+   - [แอ็กชันที่มีความเสี่ยงหรือท้าทาย]:
+     * ยึดตามผลทอยเต๋าที่แนบมาในแอ็กชันอย่างเคร่งครัด (SUCCESS = สำเร็จ, FAIL = ล้มเหลว, NATURAL 20 / CRITICAL = สำเร็จระดับยอดเยี่ยม, NATURAL 1 = พลาดท่าอย่างรุนแรง)
+     * หากผู้เล่นทำเรื่องเสี่ยงอันตรายหรือท้าทาย แต่ "ไม่ยอมทอยเต๋าแนบมา" (และชีทไม่ใช่โหมด none) ให้ตัดสินว่าจังหวะนั้นผิดพลาด เสียเปรียบ หรือล้มเหลว และต้องเผชิญผลกระทบตามความสมเหตุสมผล!`)
 
-4. กฎเหล็กด้านสมดุลการต่อสู้และหลอดเลือดมอนสเตอร์ (Enemy HP % & Damage Scaling) [สำคัญที่สุด]:
+  if (hasCombat) {
+    ruleModules.push(`4. กฎเหล็กด้านสมดุลการต่อสู้และหลอดเลือดมอนสเตอร์ (Enemy HP % & Damage Scaling) [สำคัญที่สุด]:
    - ห้ามให้มอนสเตอร์ตายในแอ็กชันเดียว (NO ONE-SHOT KILLS)! การต่อสู้ต้องมีความตึงเครียดและใช้เวลาหลายเทิร์น (ยกเว้นมอนสเตอร์ตัวนั้นเหลือเลือดต่ำมากอยู่แล้ว หรือเป็นศัตรูที่ไร้ทางสู้ เช่น ถูกลอบโจมตี หรือ เป็นศัตรูที่อ่อนแอมากพอให้สามารถตายได้ในเทิร์นเดียวได้)
    - มอนสเตอร์ทุกตัวเริ่มที่ HP 100% เสมอ และต้องคำนวณลด % เลือดตามความสมเหตุสมผลของอาวุธ สกิล และผลเต๋า ดังนี้:
      * โจมตีด้วยมือเปล่า / อาวุธที่ไม่ถนัด / ท่าก่อกวน / เฉี่ยวชน: ลด 5% - 10%
@@ -591,48 +657,82 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
    - มอนสเตอร์ที่ยังไม่ตาย (HP > 0%) ต้องมีการโจมตีสวนกลับ ใช้สกิล หรือคุกคามปาร์ตี้คืนในท้ายเทิร์นเสมอ!
 
 5. กฎความเด็ดขาดและการคำนวณดาเมจ/การเปลี่ยนแปลงทรัพยากรของผู้เล่น (High Stakes, Shared Flat Damage Benchmark & Defense Mitigation) [สำคัญที่สุด]:
-   - ห้ามมี Plot Armor ปกป้องผู้เล่นเด็ดขาด! (ไม่ว่าจะเล่นคนเดียว Solo หรือเล่นเป็นปาร์ตี้) หากทอยเต๋าล้มเหลว (FAIL หรือ NATURAL 1) ในจังหวะอันตราย, สั่งโจมตีโดยไม่ทอยเต๋า, ประมาท, หรือถูกมอนสเตอร์ที่ยังไม่ตายโจมตีสวนกลับ ให้บรรยายบาดแผลหรือผลกระทบ คำนวณความเสียหายเป็นจำนวนหน่วยที่ผู้เล่นเสียไปจริง และระบุสถานะผิดปกติ (${dynamicConditionsSummary}) ที่ผู้เล่นได้รับอย่างสมจริงเสมอ!
-   - [สำคัญมาก: ห้ามคิดดาเมจแยกตาม % เลือดของใครของมันเด็ดขาด เพราะจะทำให้คนที่มี Max HP สูงกับคนที่มี Max HP น้อยตายในจำนวนครั้งเท่ากัน!]
+   - ห้ามมี Plot Armor ปกป้องผู้เล่นเด็ดขาด! หากทอยเต๋าล้มเหลว (FAIL หรือ NATURAL 1) ในจังหวะอันตราย, สั่งโจมตีโดยไม่ทอยเต๋า, ประมาท, หรือถูกมอนสเตอร์ที่ยังไม่ตายโจมตีสวนกลับ ให้บรรยายบาดแผลหรือผลกระทบ คำนวณความเสียหายเป็นจำนวนหน่วยที่ผู้เล่นเสียไปจริง และระบุสถานะผิดปกติ (${dynamicConditionsSummary}) ที่ผู้เล่นได้รับอย่างสมจริงเสมอ!
    - ให้ใช้ "ตารางฐานดาเมจกลางของศัตรูประจำโต๊ะนี้" (คำนวณจากค่าเฉลี่ยพลังหลักของปาร์ตี้ = ${damageBenchmark.avgPartyMaxHp} หน่วย) เป็นตัวเลขคงที่เดียวกันสำหรับทุกคนในฉาก ดังนี้:
      * โดนโจมตีเฉี่ยวๆ / กับดักเล็กน้อย / ปัดป้องหรือหลบได้บางส่วน: ฐานดาเมจ ${damageBenchmark.grazeMin} - ${damageBenchmark.grazeMax} หน่วย
      * โดนศัตรูโจมตีปกติ / ศัตรูสวนกลับท้ายเทิร์น / ทอยเต๋าได้ FAIL ในจังหวะปะทะหรือหลบหลีก / สั่งโจมตีโดยไม่ทอยเต๋า: ฐานดาเมจ ${damageBenchmark.normalMin} - ${damageBenchmark.normalMax} หน่วย
      * โดนท่าไม้ตายศัตรู / ศัตรูระดับ Elite หรือ Boss โจมตีเต็มแรง / ทอยติด NATURAL 1 (Critical Fail) / ประมาทอย่างรุนแรง: ฐานดาเมจ ${damageBenchmark.heavyMin} - ${damageBenchmark.heavyMax} หน่วย
    - [การหักลบด้วยค่าความทนทานและอุปกรณ์ป้องกัน (Defense Mitigation)]:
-     * เมื่อได้ "ฐานดาเมจของศัตรู" ข้างต้นแล้ว ให้นำไปหักลบกับค่าในบรรทัด "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้นเสมอ!
+     * เมื่อได้ "ฐานดาเมจของศัตรู" ข้างต้นแล้ว ให้นำไปหักลบกับค่าในบรรทัด "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้นเสมอ
      * สูตรคำนวณ: ดาเมจสุทธิที่ผู้เล่นได้รับ = (ฐานดาเมจของศัตรู - ค่าลดทอนดาเมจของผู้เล่นคนนั้น) โดยต้องเสียขั้นต่ำอย่างน้อย 1 หน่วยเสมอ
      * หากได้รับผลกระทบทางร่างกายหรือจิตใจอย่างหนัก หรือพลังหลักเหลือน้อยกว่า 30% ให้เปลี่ยนสถานะ Condition ตามรายการสถานะของชีทตัวละครคนนั้น (เช่น ${dynamicConditionsSummary})
    - [บังคับระบุชื่อตัวละครและชื่อ Resource ในวงเล็บทุกครั้งที่มีการเปลี่ยนแปลงค่าในชีท]:
-     * ทุกครั้งที่ผู้เล่นเสียหรือฟื้นฟูค่าทรัพยากรใดๆ ในชีท (${dynamicResourcesSummary}) ต้องเขียนวงเล็บระบุ "ชื่อตัวละคร — ชื่อ Resource: ค่าเดิม/Max -> ค่าใหม่/Max [±จำนวน]" ในเนื้อเรื่องทันที เช่น "(Shacco — HP: 120/120 -> 108/120 [-12 HP])" หรือ "(ไมค์ — Sanity: 50/50 -> 42/50 [-8])" เพื่อไม่ให้สับสนเมื่อมีผู้เล่นหลายคนโดนผลกระทบพร้อมกัน (ส่วนมอนสเตอร์ให้เขียนเป็น % เช่น "(HP: 100% -> 80%)" ตามเดิม)
-     * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "เสียสติ" โดยไม่ระบุตัวเลขที่เปลี่ยนแปลงเด็ดขาด!
+     * ทุกครั้งที่ผู้เล่นเสียหรือฟื้นฟูค่าทรัพยากรใดๆ ในชีท (${dynamicResourcesSummary}) ต้องเขียนวงเล็บระบุ "ชื่อตัวละคร — ชื่อ Resource: ค่าเดิม/Max -> ค่าใหม่/Max [±จำนวน]" ในเนื้อเรื่องทันที เช่น "(Shacco — HP: 120/120 -> 108/120 [-12 HP])" เพื่อไม่ให้สับสนเมื่อมีผู้เล่นหลายคนโดนผลกระทบพร้อมกัน
+     * ห้ามบรรยายแค่ว่า "ได้รับบาดเจ็บ" หรือ "เสียสติ" โดยไม่ระบุตัวเลขที่เปลี่ยนแปลงเด็ดขาด!`)
+  }
 
-6. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
+  if (hasSocial) {
+    ruleModules.push(`4. กฎการเล่นแนวปฏิสัมพันธ์ทางสังคม/โรแมนติก/ดราม่าความรู้สึก (Social Dynamics, Emotion & Relationships):
+   - ให้เน้นมิติทางอารมณ์ บทสนทนา ภาษากาย ความสัมพันธ์ แรงกดดันทางสังคม และเคมีระหว่างตัวละคร
+   - หากเกิดผลกระทบทางความรู้สึก ความผูกพัน ความตึงเครียด หรือการหักอก ให้ปรับค่าทรัพยากรด้านอารมณ์ (เช่น Heart, Stress, Trust) ในวงเล็บระบุชัดเจน เช่น "(ชื่อตัวละคร — Heart: 8/10 -> 6/10 [-2 Heart])" หรือ "(ชื่อตัวละคร — Stress: 2/10 -> 4/10 [+2 Stress])"
+   - เปลี่ยนสถานะผิดปกติทางอารมณ์หรือสังคมตามชีทของตัวละคร (${dynamicConditionsSummary}) เช่น ขัดเขิน (Flustered), หวั่นไหว (Captivated), ใจสลาย (Heartbroken), หวาดระแวง (Suspicious)
+   - ห้ามคิดดาเมจเป็น HP หรือหลอดเลือดมอนสเตอร์เป็น % เว้นแต่ผู้เล่นจะตัดสินใจจับอาวุธต่อสู้จริง`)
+  }
+
+  if (hasHorror) {
+    ruleModules.push(`5. กฎการเล่นแนวสยองขวัญ/จิตวิทยา/เอาชีวิตรอด (Horror Pacing, Paranoia & Sanity Dread):
+   - บรรยายสร้างบรรยากาศบีบคั้น ความไม่น่าไว้วางใจ สภาพแวดล้อมที่ชวนขนลุก และความลึกลับของสิ่งคุกคามที่ไม่เปิดเผยตัวเต็มที่
+   - สิ่งคุกคามในแนวนี้มักลี้ลับหรือทรงพลังเหนือมนุษย์ ไม่ใช่เป้าหมายที่จะเอาชนะได้ด้วยการฟันแทงธรรมดา
+   - เมื่อเผชิญหน้ากับความสะพรึงกลัว ภาพหลอน หรือช็อก ให้คิดการลดทอนสติสัมปชัญญะ (Sanity / Mental) ในวงเล็บ เช่น "(ชื่อตัวละคร — Sanity: 45/50 -> 36/50 [-9 Sanity])"
+   - เปลี่ยนสถานะทางจิตใจตามชีท (${dynamicConditionsSummary}) เช่น ตื่นตระหนก (Panicked), สติแตก (Catatonic), ประสาทหลอน (Hallucinating), หวาดผวา (Shaken)`)
+  }
+
+  if (hasNarrative) {
+    ruleModules.push(`6. กฎการเล่นแนวสืบสวน/ไขปริศนา/การจัดการไอเทม (Narrative Investigation, Clues & Items):
+   - เน้นการค้นหาเบาะแส วัตถุพยาน การสังเกตสภาพแวดล้อม และการประยุกต์ใช้สิ่งของในกระเป๋า
+   - หากผู้เล่นใช้ไอเทม ให้บรรยายผลลัพธ์ว่าสำเร็จ หมดไป หรือเสียหาย และระบุการเปลี่ยนแปลงในเนื้อเรื่อง (เช่น "[-1 ไฟฉาย]" หรือ "[+1 กุญแจดอกเก่า]")
+   - หากทอยเต๋าล้มเหลวหรือเกิดข้อผิดพลาด ให้เปลี่ยนสถานะตัวละครตามชีท (${dynamicConditionsSummary}) เช่น ตกเป็นผู้ต้องสงสัย (Suspected), เสียเปรียบ (Compromised), หมดแรง (Exhausted)
+   - สำหรับชีทที่ไม่มีหลอดเลือด ห้ามคิดดาเมจเป็นตัวเลข HP และห้ามใส่หลอดเลือดมอนสเตอร์เป็น % เด็ดขาด`)
+  }
+
+  ruleModules.push(`7. กฎเหล็กห้ามบรรยายซ้ำซาก (STRICT ANTI-REPETITION & NO EPITHETS):
    - เรียกตัวละครด้วย "ชื่อ" เท่านั้น (เช่น "**Shacco**", "**ไมค์**", "**Pantheon**") ห้ามเขียนสร้อยฉายา อาชีพ หรือลักษณะชุดต่อท้ายชื่อซ้ำๆ เด็ดขาด
    - ห้ามนำนิสัยท่าทางเดิมๆ หรือจุดด้อยที่เคยบรรยายไปแล้วในเทิร์นก่อนหน้า มาเขียนซ้ำอีกในเทิร์นนี้ ยกเว้นผู้เล่นจะทอยเต๋าได้ FAIL หรือสั่งทำแอ็กชันที่กระตุ้นจุดด้อยนั้นโดยตรง
-   - โฟกัสเฉพาะ "แอ็กชันที่ผู้เล่นสั่งในเทิร์นนี้" และ "ผลลัพธ์ใหม่ที่เกิดขึ้น" เท่านั้น
+   - โฟกัสเฉพาะ "แอ็กชันที่ผู้เล่นสั่งในเทิร์นนี้" และ "ผลลัพธ์ใหม่ที่เกิดขึ้น" เท่านั้น`)
 
-7. กฎเหล็กห้ามกล่าวถึงผลการทอยลูกเต๋าในเนื้อเรื่อง (DICE RESULTS ARE INVISIBLE TO NARRATIVE):
-   - ห้ามพูดถึงตัวเลขผลทอยเต๋า ชื่อเต๋า (d20, d6 ฯลฯ) หรือวลีที่เกี่ยวกับการทอยเต๋า (เช่น "ทอยได้ 18", "ผลเต๋าออก...", "ลูกเต๋ากลิ้ง...", "กลิ้งลูกเต๋า", "roll a d20") ในคำบรรยายเด็ดขาด!
-   - ให้ใช้ผลทอยเต๋า (SUCCESS/FAIL/NATURAL 20/NATURAL 1) เป็นตัวตัดสินผลลัพธ์เบื้องหลังเท่านั้น แล้วบรรยายผลลัพธ์นั้นออกมาเป็นเหตุการณ์ในเรื่องแทน เช่น:
-     * ถ้าทอยได้ SUCCESS → บรรยายว่า "ดาบฟันเข้าเป้า" ห้ามเขียนว่า "ทอยได้ 18 สำเร็จ"
-     * ถ้าทอยได้ FAIL → บรรยายว่า "ดาบฟาดไปแต่พลาดเป้า" ห้ามเขียนว่า "ทอยได้ 5 ไม่ผ่าน DC"
-     * ถ้าทอยได้ NATURAL 20 → บรรยายเป็นจังหวะวิกฤตที่สำเร็จอย่างงดงาม โดยไม่ต้องบอกว่า "ติด NAT 20"
-     * ถ้าทอยได้ NATURAL 1 → บรรยายเป็นความผิดพลาดร้ายแรง โดยไม่ต้องบอกว่า "ติด NAT 1"
-   - ในหมวด [ Decision ] ให้ระบุเฉพาะ DC check ที่ตัวละครต้องทอยในเทิร์นถัดไปเท่านั้น ซึ่งเป็นคำสั่งไปข้างหน้า ไม่ใช่การรายงานผลเต๋าในเทิร์นนี้
-  
+  ruleModules.push(`8. กฎเหล็กห้ามกล่าวถึงผลการทอยลูกเต๋าในเนื้อเรื่อง (DICE RESULTS ARE INVISIBLE TO NARRATIVE):
+   - ห้ามพูดถึงตัวเลขผลทอยเต๋า ชื่อเต๋า (d20, d6 ฯลฯ) หรือวลีที่เกี่ยวกับการทอยเต๋าในคำบรรยายเด็ดขาด!
+   - ให้ใช้ผลทอยเต๋า (SUCCESS/FAIL/NAT 20/NAT 1) เป็นตัวตัดสินผลลัพธ์เบื้องหลัง แล้วบรรยายผลลัพธ์นั้นออกมาเป็นเหตุการณ์ในเรื่องแทน
+   - ในหมวด [ Decision ] ให้ระบุเฉพาะสิ่งที่ตัวละครต้องเผชิญและทอยในเทิร์นถัดไปเท่านั้น ซึ่งเป็นคำสั่งไปข้างหน้า ไม่ใช่การรายงานผลเต๋าในเทิร์นนี้`)
+
+  const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
+
+[WORLD SETTING & TONE]
+${campaign.world_setting}
+
+[OVERARCHING STORY]
+${campaign.core_description}
+
+[ACTIVE MECHANICS / RULES]
+${stripCampaignTemplateFromRules(campaign.rule_mechanics) || 'Standard tabletop RPG rules apply.'}
+
+[CORE DIRECTIVES & RESOLUTION RULES]
+${ruleModules.join('\n\n')}
+
 [REQUIRED OUTPUT FORMAT]
-(เนื้อหาบรรยายเรื่องราว ผลลัพธ์การกระทำของทุกคน ฉากการปะทะพร้อมวงเล็บ (HP: X% -> Y%) เมื่อศัตรูได้รับดาเมจ และวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรตามชีทจริง เช่น (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-Z]) หรือ (ชื่อตัวละคร — Skill Cost: เดิม/Max -> ใหม่/Max [-Z]) หรือทรัพยากรอื่นๆ ในชีทของตัวละครนั้นเมื่อมีการเปลี่ยนแปลง)
+${requiredOutputDescription}
 
 [ Overview ]
 สถานที่และเวลา : (ชื่อสถานที่ สภาพแวดล้อมโดยย่อ และเวลาปัจจุบัน เช่น 14:30 น.)
 สถานการณ์ปัจจุบัน : (สรุปสิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยย่อ)
-สถานะศัตรู : (ระบุชื่อศัตรูทุกตัวในฉากพร้อม HP% คงเหลือล่าสุด เช่น "หมาป่าทมิฬ A: 55%, หมาป่าทมิฬ B: 100%" / หากศัตรูตายให้ระบุว่า "0% (ตายแล้ว)" / หากไม่มีศัตรูในฉากให้เขียนว่า "ไม่มี")
+${overviewMiddleSection}
 สถานะปาร์ตี้ : (ระบุค่าทรัพยากรทุกตัวตามชีทของสมาชิกแต่ละคนและสถานะล่าสุดหลังจบเทิร์นให้ครบทุกคน คั่นแต่ละคนด้วย " ; " เช่น "${dynamicPartyStatusFormatExample}")
 
 [ Decision ]
-*(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องทอยเต๋าเพื่อโจมตี ป้องกัน หรือรับมือเหตุการณ์ในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ตัดหัวข้อ [ Decision ] ทิ้งทันที)*
-(ระบุ 1 บรรทัดต่อ 1 คน โดยเลือกใช้ชื่อค่าสถานะที่มีอยู่จริงในชีทของตัวละครคนนั้น เช่น ${dynamicStatsSummary} พร้อมกำหนดค่า DC มาตรฐาน: ง่าย DC 8-10, ปานกลาง DC 12-14, ยาก DC 15-17, วิกฤต DC 18+):
-- [ชื่อตัวละคร]: สิ่งที่ต้องทำ/รับมือ: (สิ่งที่กำลังเผชิญ) | [d20 + <ชื่อ Stat ในชีทของตัวละครนั้น> vs DC XX]`
-
+*(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องตัดสินใจหรือรับมือเหตุการณ์ในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ตัดหัวข้อ [ Decision ] ทิ้งทันที)*
+(ระบุ 1 บรรทัดต่อ 1 คน โดยเลือกใช้ชื่อค่าสถานะที่มีอยู่จริงในชีทของตัวละครคนนั้น เช่น ${dynamicStatsSummary}):
+${decisionDiceInstructions.join('\n')}`
+  
   // 4. CONSTRUCT MULTI-TURN CONTENTS (Sliding Window 4 เทิร์นล่าสุด)
   const turnsWindow = recentTurns.slice(-4)
   const contents: { role: 'user' | 'model'; parts: [{ text: string }] }[] = []
@@ -659,14 +759,15 @@ ${campaign.rule_mechanics || 'Standard tabletop RPG rules apply.'}
   // 5. CURRENT TURN PAYLOAD + AUTHOR'S NOTE REMINDER
   const currentTurnUserParts = [
     loreContext ? `[DYNAMIC LORE INJECTION FOR THIS TURN]\n${loreContext}\n` : '',
-    `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members | Party Avg Primary Max: ${damageBenchmark.avgPartyMaxHp})]\n${actionsSummary || 'The party surveys their surroundings.'}`,
+    `[CURRENT TURN: PARTY STATUS & SUBMITTED ACTIONS (${partyActions.length} Members${damageBenchmark ? ` | Party Avg Primary Max: ${damageBenchmark.avgPartyMaxHp}` : ' | Zero-Resource Mode'})]\n${actionsSummary || 'The party surveys their surroundings.'}`,
     `\n[SYSTEM REMINDER: AUTHOR'S NOTE - ต้องปฏิบัติตามอย่างเคร่งครัด]
 - กล่าวถึงผลลัพธ์ของสมาชิกทุกคนตามรายชื่อด้านบน โดยอ้างอิงค่าสถานะประจำชีทของแต่ละคน (${dynamicStatsSummary}), ทรัพยากร (${dynamicResourcesSummary}), อุปกรณ์สวมใส่ และสกิลที่มีจริง
 - [ห้ามพูดซ้ำเด็ดขาด]: เรียกตัวละครด้วยชื่อล้วนๆ ห้ามใส่ฉายา อาชีพ หรือคำบรรยายชุด/รูปลักษณ์ต่อท้ายชื่อซ้ำกับเทิร์นก่อนหน้า และห้ามใส่มุกเดิมซ้ำๆ ให้บรรยายเฉพาะแอ็กชันที่ทำในเทิร์นนี้เท่านั้น!
 - [ห้ามกล่าวถึงลูกเต๋าในเนื้อเรื่อง]: ห้ามพูดถึงตัวเลขผลทอย ชื่อเต๋า (d20 ฯลฯ) หรือวลีเกี่ยวกับการทอยเต๋าใดๆ ในคำบรรยาย ให้ใช้ผลทอย (SUCCESS/FAIL/NAT 20/NAT 1) เป็นตัวตัดสินผลลัพธ์เบื้องหลังเท่านั้น แล้วบรรยายเป็นเหตุการณ์ในเรื่องแทน!
-- หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจศัตรูเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
+${damageBenchmark ? `- หากมีการต่อสู้: ห้ามให้มอนสเตอร์ตายในทีเดียว! คำนวณดาเมจศัตรูเป็นเปอร์เซ็นต์ เช่น (HP: 100% -> 80%) โดยคิดต่อเนื่องจากค่า HP% ใน [ Overview ] ของเทิร์นก่อนหน้า
 - [ห้ามมี Plot Armor & ใช้ฐานดาเมจกลางของปาร์ตี้หักลบด้วยค่าลดทอนดาเมจ]: เมื่อผู้เล่นถูกศัตรูโจมตี/สวนกลับ ทอยเต๋าล้มเหลว (FAIL / NATURAL 1) หรือโจมตีโดยไม่ทอยเต๋า ให้ใช้ฐานดาเมจกลางของโต๊ะนี้ (เฉี่ยว ${damageBenchmark.grazeMin}-${damageBenchmark.grazeMax}, ปกติ/สวนกลับ/FAIL ${damageBenchmark.normalMin}-${damageBenchmark.normalMax}, รุนแรง/NAT 1/Boss ${damageBenchmark.heavyMin}-${damageBenchmark.heavyMax}) แล้วนำมาหักลบด้วยค่า "[ความทนทาน/การลดทอนดาเมจ (Defense Mitigation)]" ของผู้เล่นคนนั้น และต้องเขียนวงเล็บระบุชื่อตัวละครพร้อมชื่อทรัพยากรที่เปลี่ยนไป เช่น (ชื่อตัวละคร — HP: เดิม/Max -> ใหม่/Max [-X]) หรือทรัพยากรอื่นตามชีท (${dynamicResourcesSummary}) ในเนื้อเรื่องเสมอ!
-- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :" พร้อมทรัพยากรทุกตัวตามชีทของสมาชิกแต่ละคน) และ [ Decision ] (โดยอ้างอิงชื่อ Stat ที่มีอยู่ในชีทของตัวละครคนนั้นจริง) เท่านั้น`,
+- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะศัตรู :" และ "สถานะปาร์ตี้ :" พร้อมทรัพยากรทุกตัวตามชีทของสมาชิกแต่ละคน) และ [ Decision ] (โดยอ้างอิงชื่อ Stat ที่มีอยู่ในชีทของตัวละครคนนั้นจริง) เท่านั้น` : `- [โหมดเนื้อเรื่อง/ไม่มีหลอดเลือด (Zero-Resource Mode)]: ห้ามคิดดาเมจ HP และห้ามใส่เปอร์เซ็นต์เลือดมอนสเตอร์เด็ดขาด ให้ตัดสินเหตุการณ์ผ่านผลของไอเทม เบาะแส และการเปลี่ยนสถานะ Condition (${dynamicConditionsSummary}) ตามความสมเหตุสมผล
+- สรุปท้ายข้อความตามรูปแบบ [ Overview ] (ที่มีครบทั้งบรรทัด "สถานะอุปสรรคหรือความตึงเครียด :" และ "สถานะปาร์ตี้ :") และ [ Decision ] (โดยอ้างอิงชื่อ Stat ที่มีอยู่ในชีทของตัวละครคนนั้นจริง) เท่านั้น`}`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -1074,7 +1175,8 @@ export function extractPartyStateUpdates(
     if (!target) continue
 
     const tpl = member.sheetTemplate ?? CLASSIC_TEMPLATE
-    const hasHpResource = tpl.resources.length === 0 || tpl.resources.some((r) => r.id === 'hp')
+    const hasHpResource = tpl.resources.some((r) => r.id === 'hp')
+    const hasSpResource = tpl.resources.some((r) => r.id === 'skill_cost')
     const allowedConds = tpl.conditions.length > 0 ? tpl.conditions : CHARACTER_CONDITIONS
     const normalCond =
       allowedConds.find((c) => c.toLowerCase() === 'normal') ?? allowedConds[0] ?? 'Normal'
@@ -1117,12 +1219,10 @@ export function extractPartyStateUpdates(
       ([resId, val]) => (initialCustom[resId]?.current ?? val.max) !== val.current
     )
 
-    if (
-      target.currentHp !== origHp ||
-      target.currentSkillCost !== origSp ||
-      target.condition !== origCond ||
-      customChanged
-    ) {
+    const hpChanged = hasHpResource && target.currentHp !== origHp
+    const spChanged = hasSpResource && target.currentSkillCost !== origSp
+    const condChanged = target.condition !== origCond
+    if (hpChanged || spChanged || condChanged || customChanged) {
       updates.push(target)
     }
   }
@@ -1146,6 +1246,10 @@ export async function generateOpeningNarrative(input: {
       ? openingLore.map((l) => `[LORE: ${l.title} (${l.category})]: ${l.content}`).join('\n')
       : null
 
+  const campaignTpl = extractCampaignTemplate(campaign)
+  const isCombatCampaign =
+    campaignTpl.mechanics.mode === 'combat' && campaignTpl.mechanics.vitalityResourceId !== null
+
   const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
 [WORLD SETTING & TONE]
@@ -1155,7 +1259,7 @@ ${campaign.world_setting}
 ${campaign.core_description}
 
 [ACTIVE MECHANICS / RULES]
-${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
+${stripCampaignTemplateFromRules(campaign.rule_mechanics) || 'Standard tabletop rules apply.'}
 
 [OPENING SCENE DIRECTIVES]
 1. นี่คือคำบรรยายเปิดเรื่องก่อนเริ่มเทิร์นแรก ยังไม่มีผู้เล่นคนใดส่งแอ็กชัน จงเปิดฉากแรกของการผจญภัยจากข้อมูลแคมเปญข้างต้น ให้ผู้เล่นเข้าใจว่าโลกนี้เป็นอย่างไรและตอนนี้กำลังเกิดอะไรขึ้น
@@ -1170,7 +1274,7 @@ ${campaign.rule_mechanics || 'Standard tabletop rules apply.'}
 [ Overview ]
 สถานที่และเวลา : (ชื่อสถานที่และสภาพแวดล้อมโดยย่อและบอกเวลาอย่างชัดเจนว่ากี่นาฬิกา)
 สถานการณ์ปัจจุบัน : (สิ่งที่ปาร์ตี้กำลังเผชิญหน้าโดยสรุปให้เข้าใจ)
-สถานะศัตรู : (หากในฉากเปิดมีศัตรูปรากฏตัว ให้ระบุชื่อและ HP: 100% / หากยังไม่มีศัตรูให้เขียนว่า "ไม่มี")`
+${isCombatCampaign ? 'สถานะศัตรู : (หากในฉากเปิดมีศัตรูปรากฏตัว ให้ระบุชื่อและ HP: 100% / หากยังไม่มีศัตรูให้เขียนว่า "ไม่มี")' : 'สถานะอุปสรรคหรือความตึงเครียด : (หากในฉากเปิดมีอุปสรรค ปริศนา หรือความตึงเครียด ให้ระบุโดยย่อ / หากยังไม่มีให้เขียนว่า "ไม่มี")'}`
 
   const openingRequest = [
     loreContext ? `[LORE FOR THE OPENING SCENE]\n${loreContext}\n` : '',

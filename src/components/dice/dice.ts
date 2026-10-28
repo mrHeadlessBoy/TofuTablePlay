@@ -1,6 +1,8 @@
 // Dice rules and maths for the shared dice tray.
 // No React in this file, so pages, components and server code can all import it.
 
+import type { TemplateStatModifier } from '@/features/character/template'
+
 export type DieSides = 4 | 6 | 8 | 10 | 12 | 20 | 100
 export type RollMode = 'normal' | 'advantage' | 'disadvantage'
 
@@ -68,10 +70,15 @@ export function clampModifier(modifier: number): number {
 }
 
 /** D&D ability modifier: 10 -> +0, 14 -> +2, 8 -> -1, clamped between MIN_DICE_MODIFIER (-3) and MAX_DICE_MODIFIER (+3). */
-export function abilityModifier(score: number | string | undefined): number {
+export function abilityModifier(
+  score: number | string | undefined,
+  style: TemplateStatModifier = 'dnd'
+): number {
   const value = Number(score)
   if (!Number.isFinite(value)) return 0
-  return clampModifier(Math.floor((value) / 2))
+  if (style === 'none') return 0
+  if (style === 'raw') return clampModifier(Math.round(value))
+  return clampModifier(Math.floor((value - 10) / 2))
 }
 
 export function formatModifier(modifier: number): string {

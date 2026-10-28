@@ -1399,7 +1399,7 @@ export default function CharacterInspectorPanel({
                           typeof raw === "number" || typeof raw === "string"
                             ? raw
                             : stat.default;
-                        const mod = abilityModifier(numericRaw);
+                        const mod = abilityModifier(numericRaw, activeTemplate.mechanics.statModifier);
                         return (
                           <div
                             key={stat.id}
@@ -1415,7 +1415,7 @@ export default function CharacterInspectorPanel({
                               {String(raw)}
                             </span>
                             <span className="text-[9px] font-mono text-amber-400 block">
-                              {formatModifier(mod)}
+                              {activeTemplate.mechanics.statModifier === 'none' ? '—' : formatModifier(mod)}
                             </span>
                           </div>
                         );

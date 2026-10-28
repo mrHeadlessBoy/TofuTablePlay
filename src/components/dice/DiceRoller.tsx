@@ -27,6 +27,8 @@ export type DiceActor = {
   id: string
   name: string
   modifiers?: Record<string, number>
+  defaultSides?: DieSides
+  defaultCount?: number
 }
 
 export type DiceRollerProps = {
@@ -131,11 +133,11 @@ export default function DiceRoller({
   hint = 'เลือกลูกเต๋าแล้วกด ROLL',
   className,
 }: DiceRollerProps) {
-  const [sides, setSides] = useState<DieSides>(20)
-  const [count, setCount] = useState(1)
+  const [sides, setSides] = useState<DieSides>(() => actors[0]?.defaultSides ?? 20)
+  const [count, setCount] = useState<number>(() => actors[0]?.defaultCount ?? 1)
   const [modifier, setModifier] = useState(0)
   const [mode, setMode] = useState<RollMode>('normal')
-  const [actorId, setActorId] = useState('')
+  const [actorId, setActorId] = useState<string>(() => actors[0]?.id ?? '')
   const [bonusKey, setBonusKey] = useState('')
   const [dc, setDc] = useState('')
   const [ownRoll, setOwnRoll] = useState<DiceRoll | null>(null)
@@ -190,7 +192,7 @@ export default function DiceRoller({
       </div>
 
       <div className="mt-3 flex items-center gap-3">
-        <div className="relative grid h-[132px] w-[132px] shrink-0 place-items-center rounded-lg border border-white/10 bg-black/40">
+        <div className="relative grid h-33 w-33 shrink-0 place-items-center rounded-lg border border-white/10 bg-black/40">
           <div className="absolute inset-0">
             <Die3D sides={shownRoll?.sides ?? sides} rollId={shownRoll?.id ?? null} tone={edgeTone(shownRoll)} />
           </div>
@@ -207,7 +209,7 @@ export default function DiceRoller({
             <>
               <p className="truncate font-semibold text-white">{shownRoll.roller || 'Free roll'}</p>
               <p className="truncate text-white/60">{shownRoll.label}</p>
-              <p className="mt-1.5 break-words font-mono text-[11px] leading-relaxed text-white/80">{describeRoll(shownRoll)}</p>
+              <p className="mt-1.5 wrap-break-words font-mono text-[11px] leading-relaxed text-white/80">{describeRoll(shownRoll)}</p>
             </>
           ) : (
             <p className="text-white/50">{hint}</p>
@@ -257,7 +259,13 @@ export default function DiceRoller({
           <div className="grid grid-cols-[1fr_auto_auto] gap-1.5">
             <select
               value={actor ? actorId : ''}
-              onChange={(event) => setActorId(event.target.value)}
+              onChange={(event) => {
+                const nextId = event.target.value
+                setActorId(nextId)
+                const picked = actors.find((entry) => entry.id === nextId)
+                if (picked?.defaultSides) setSides(picked.defaultSides)
+                if (picked?.defaultCount) setCount(picked.defaultCount)
+              }}
               aria-label="Roll as"
               className={`min-w-0 px-2 ${fieldClass}`}
             >
