@@ -33,6 +33,17 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 - **Secondary Labels**: `text-zinc-400 text-xs`
 - **Metadata / Timestamps**: `text-zinc-500 text-xs font-mono`
 
+### 1.4 Brand Identity & Visual Assets
+- **Official Brand Logo (`public/assets/pictures/logo.png`)**:
+  - Horizontal lockup with character emblem + stylized typography on transparent alpha background.
+  - Rendered with Next.js `<Image>` component (`h-8` in Top Nav & Hub Header, `h-10` in Login Card, `w-auto`, `priority` on above-the-fold views).
+  - Replaces all legacy generic shield icons (`lucide-shield`) sitewide.
+- **Asset Directory Structure**:
+  - `public/assets/pictures/logo.png`: Active primary brand logo.
+  - `public/assets/pictures/unused/`: Archived concept graphics and exploratory logos.
+- **Active Table Geometric Indicator**:
+  - Replaces traditional blinking online/offline status dots with a minimalist rotating amber triangle (`animate-[spin_6s_linear_infinite]`), matching the tabletop polyhedral aesthetic.
+
 ---
 
 ## 2. Micro-Interactions & Motion
@@ -84,24 +95,25 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 ## 4. Implemented Screens & Components
 
 ### 4.1 Landing Page (`src/app/page.tsx`)
-- **Translucent Top Bar**: Frosted glass sticky header with Shield emblem, language toggle (`LanguageToggle`), and direct navigation links.
-- **Hero & Typography**: Focused typography without colored glow blobs, utilizing clean leading and tracking.
-- **Live Story Preview Card**: Interactive visual mockup of an active VTT session (Turn #12) complete with pulsing status indicator, DM narration, and party member HP/SP/Clue chips.
+- **Brand Logo Navigation**: Frosted glass sticky header with official brand logo (`logo.png`), language toggle (`LanguageToggle`), and clean Sign In link (distraction-free without duplicate enter hub buttons).
+- **Hero & Typography**: Focused typography without colored glow blobs or cluttered pill tags, utilizing clean leading and tracking.
+- **Streamlined Direct Flow**: Connects the Hero call-to-action buttons directly into the 3-pillar feature grid, eliminating extraneous preview mockups for maximum focus, speed, and elegance.
 - **Pillar Feature Grid**: 3-column card grid explaining Synchronized Action Drafting, Dynamic Lorebooks, and Host Authority using `.surface-panel .surface-panel-hover`.
 - **Bilingual Support**: Dynamic Thai/English switching seamlessly applied to all landing page copy.
+- **Minimalist Footer**: Clean single-line copyright statement without redundant navigation hotlinks.
 
 ### 4.2 Login & Authentication Screen (`src/app/login/page.tsx`)
 - **Floating Glass Container**: Layered `.surface-panel` card with deep shadow (`shadow-2xl`) and backdrop blur.
-- **Navigation**: Integrated header with return link (`/`) and `LanguageToggle`.
+- **Branded Header**: Displays official brand logo (`logo.png`) with return link (`/`) and `LanguageToggle`.
 - **Recessed Dark Inputs**: Low-contrast, distraction-free text inputs with subtle focus states (`focus:border-zinc-600 focus:bg-black/60`).
 - **Tactile Matte Button**: Amber action button with micro-lift on hover and built-in loading spinner (`Loader2`).
 - **Localized Feedback**: Bilingual authentication error messaging and switchable login/register modes.
 
 ### 4.3 Hub & Campaign Management (`src/features/hub/...`, `src/features/campaign/...`)
-- **Hub Header (`HubHeader.tsx`)**: Frosted navigation bar with brand emblem, character codex shortcut, and campaign authoring trigger with smooth hover micro-lifts.
+- **Hub Header (`HubHeader.tsx`)**: Frosted navigation bar with brand logo (`logo.png`), character codex shortcut, and campaign authoring trigger with smooth hover micro-lifts.
 - **Quick Join Bar (`HubClient.tsx`)**: Low-profile frosted container with monospace uppercase table code input and tactile join button.
-- **Active Table Cards**: Real-time table status with pulsing emerald connection dots, monospace code pills, and copyable invite link chips.
-- **Campaign Cards Carousel**: 3-column card deck with category badges, author chips, sheet template tags, and smooth slide navigation with indicator dots.
+- **Active Table Cards**: Real-time table cards with rotating geometric amber triangle accents, monospace code pills, and copyable invite link chips.
+- **Public Campaign Cards**: Streamlined card deck with category badges, author chips, 2-line story preview (`line-clamp-2`), removed sheet format tags, and smooth slide navigation with indicator dots.
 - **Campaign Studio (`CampaignForm.tsx` & `CampaignDetailsClient.tsx`)**: Refined layered opacity sections, recessed form inputs, structured rule builder tiles, and lorebook keyword tags without harsh glare.
 
 ### 4.4 Character Codex & Template Studio (`src/features/character/...`)
@@ -127,4 +139,23 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 - [x] **Phase 3: Hub & Campaign Management** — *Completed*
 - [x] **Phase 4: Character Codex & Template Studio** — *Completed*
 - [x] **Phase 5: Virtual Tabletop (VTT) & In-Table HUD** — *Completed*
-- [ ] **Phase 6: Verification & QA** — *Pending*
+- [x] **Phase 6: Verification & QA** — *Completed*
+
+---
+
+## 6. การแก้ไขที่ต้องการ (Completed Edits)
+
+### 1. หน้าแรก (`src/app/page.tsx`)
+- [x] **ใช้อันนี้เป็น logo แทน lucide-shield `dnd-playground\public\assets\pictures\logo.png`**: ติดตั้ง `<Image src="/assets/pictures/logo.png">` แสดงผลโลโก้แบรนด์อย่างคมชัดบน Navbar
+- [x] **AI-Orchestrated Tabletop Engine ลบตรงนี้ออก**: ลบ Pill Tag ในส่วน Hero ออกเรียบร้อยแล้ว
+- [x] **ไม่ว่าที่ไหนที่มีการใช้ lucide-shield เอาออกให้หมด ไม่ว่าจะเป็นหน้าแรก หน้า login หรือหน้าอื่น ๆ**: ปลด Shield ออกจากทั้งระบบ (`page.tsx`, `login/page.tsx`, `HubHeader.tsx`, `TemplateModal.tsx`, `CharacterInspectorPanel.tsx`, `NarrativeFeedPanel.tsx`, `BoardPanels.tsx`) ทั้งหมด 100%
+- [x] **ตัดส่วน {/* DM Chronicle Passage */} และกล่อง Preview ออก**: ลบกล่อง Live Story Preview Mockup ออกทั้งหมดตามที่ผู้ใช้ปรับแต่ง เพื่อให้หน้าแรกเรียบง่าย กระชับ และมุ่งเน้นการเริ่มต้นเล่นทันที
+- [x] **ตัดปุ่ม enter hub ที่ navbar ออกเพราะไม่จำเป็น**: ลบปุ่ม เข้าสู่ฮับ (Enter Hub) จาก Navbar หน้าแรกแล้ว
+- [x] **ตัด hotlink Campaign Hub และ Player Account ออก**: ลบลิงก์สองตัวนี้ออกจาก Footer หน้าแรก คงเหลือข้อความลิขสิทธิ์คลีนๆ ตัวเดียว
+
+### 2. หน้า Hub (`src/features/hub/components/...`)
+- [x] **ที่ Public Worlds & Campaigns การ์ดของข้อมูลให้แสดงตัวอย่างของ campaign แค่ 2 บรรทัดพอ ปัจจุบันแสดง 4**: ปรับเป็น `line-clamp-2` เรียบร้อย
+- [x] **ที่ Public Worlds & Campaigns การ์ดของข้อมูลให้ตัด sheet format ออก ไม่จำเป็นต้องแสดง**: ตัดแถบแท็ก `sheetFormat` ออกจากการ์ดแคมเปญสาธารณะเรียบร้อย
+- [x] **ไม่ว่าที่ไหนที่มีการใช้ lucide-shield เอาออกให้หมด**: ตรวจสอบและปลดออกครบถ้วนทุกจุดใน Hub และ Header
+- [x] **เอา `<span className="w-2 h-2 rounded-full bg-emerald-500/80 inline-block animate-pulse" />` ออกใน section ของ active tables เพราะไม่จำเป็นต้องแสดงสถานะของ table ว่า online หรือ offline ลองดีไซน์มาใหม่ เช่น 3 เหลี่ยมหมุน สีเขียวหรือ amber**: แทนที่ด้วย 3 เหลี่ยม Amber หมุนนุ่มนวล (`animate-[spin_6s_linear_infinite]`) ทั้งในหัวข้อ Active Tables และบนการ์ดโต๊ะเล่น
+

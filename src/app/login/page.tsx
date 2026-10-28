@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, ArrowLeft, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { LanguageToggle } from '@/components/ui/LanguageToggle'
 
@@ -114,8 +115,15 @@ export default function LoginPage() {
         <div className="w-full max-w-md surface-panel rounded-2xl p-7 sm:p-8 shadow-2xl space-y-6">
           {/* Logo & Headline */}
           <div className="space-y-2 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-xl bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center mx-auto sm:mx-0">
-              <Shield className="w-5 h-5 text-amber-500/90" />
+            <div className="flex items-center justify-center sm:justify-start mb-2">
+              <Image
+                src="/assets/pictures/logo.png"
+                alt="TofuTablePlay"
+                width={150}
+                height={50}
+                className="h-10 w-auto object-contain"
+                priority
+              />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
               {isSignUp

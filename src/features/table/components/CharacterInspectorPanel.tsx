@@ -14,7 +14,6 @@ import {
   Plus,
   RotateCcw,
   Save,
-  Shield,
   Sliders,
   Sparkles,
   Trash2,
@@ -1378,7 +1377,7 @@ export default function CharacterInspectorPanel({
                 <div className="space-y-2.5">
                   <div className="p-2.5 bg-zinc-900/70 border border-white/10 rounded flex justify-between items-center">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-amber-400" />{" "}
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />{" "}
                       {t('character.statusCondition')}
                     </span>
                     <span

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { Check, CheckCircle2, CircleDot, Clock, Compass, Dices, Edit3, Loader2, ShieldAlert, X } from 'lucide-react'
+import { Check, CheckCircle2, CircleDot, Clock, Compass, Dices, Edit3, Loader2, X } from 'lucide-react'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
 import { type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
@@ -257,7 +257,7 @@ function FormattedNarrativeOutput({
               className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 space-y-2.5"
             >
               <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-amber-400 border-b border-amber-900/50 pb-2">
-                <ShieldAlert className="w-3.5 h-3.5" />
+                <Compass className="w-3.5 h-3.5" />
                 <span>[ Decision ]</span>
               </div>
               <div className="space-y-2 text-base leading-relaxed text-zinc-200">

@@ -352,14 +352,22 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 ## 📊 Route Map
 
 | Route | Auth | Description |
-| :--- | :---: | :--- |
-| `/` | ✗ | Landing page with hero section, feature grid, CTAs |
-| `/login` | ✗ | Sign In / Sign Up (redirects to `/hub` if already authenticated) |
+| :--- | :--- | :--- |
+| `/` | ✗ | Landing page with official brand logo, hero section, CTA buttons, and 3-pillar feature grid |
+| `/login` | ✗ | Sign In / Sign Up (floating frosted glass card with language switch) |
 | `/auth/callback` | ✗ | Supabase OAuth / email confirmation handler |
 | `/hub` | ✓ | Campaign Hub — browse campaigns, manage active tables, Quick Join |
-| `/campaigns/new` | ✓ | Create new campaign with lorebook |
-| `/campaigns/[id]` | ✓ | Campaign detail view |
+| `/campaigns/new` | ✓ | Create new campaign with mandatory template and lorebook |
+| `/campaigns/[id]` | ✓ | Campaign detail view & table launcher |
 | `/campaigns/[id]/edit` | ✓ | Edit campaign (owner only) |
-| `/characters` | ✓ | Character Codex — full template-driven sheet editor workspace |
-| `/table/[id]` | ✓ | Synchronized Multiplayer Table (supports UUID or 6-char table_code) |
+| `/characters` | ✓ | Character Codex — template-driven sheet editor workspace |
+| `/table/[id]` | ✓ | Synchronized Multiplayer Table (SAO orb, narrative chronicle, chat) |
 | `/board` | ✓ | Solo 3D Tactical Battle Board _(not in active dev)_ |
+
+---
+
+## 🎨 UI & Design System
+
+The application features a modern, distraction-free **Swiss Dark / Minimalist Dark** design system utilizing layered opacity surfaces (`backdrop-blur-md`, subtle alpha channels), smooth fade micro-interactions, matte amber accents, and zero glare/neon bloom.
+
+👉 See [website_ui.md](website_ui.md) for full design system tokens, surface hierarchy, and component specifications.

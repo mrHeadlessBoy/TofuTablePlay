@@ -13,7 +13,7 @@ import {
   Trash2,
   Sparkles,
   Heart,
-  Shield,
+  Package,
   FileText,
   AlertCircle,
   RotateCcw,
@@ -829,7 +829,7 @@ export default function TemplateModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Shield className="w-4 h-4 text-emerald-500" />
+                    <Package className="w-4 h-4 text-emerald-500" />
                     <h3 className="text-xs font-semibold uppercase text-zinc-300">
                       Equipment Slots (ช่องสวมใส่)
                     </h3>

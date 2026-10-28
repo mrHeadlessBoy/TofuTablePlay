@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, type FormEvent } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from '../actions'
-import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Link2, Check, User, Sliders } from 'lucide-react'
+import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Link2, Check, User } from 'lucide-react'
 import Link from 'next/link'
 
 import { playSystemSound } from '@/lib/sound'
@@ -94,7 +94,11 @@ function ActiveTableCard({
       <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500/80 inline-block animate-pulse" />
+            <span className="inline-flex items-center justify-center text-amber-500/90 animate-[spin_6s_linear_infinite] select-none" aria-hidden="true">
+              <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 fill-current">
+                <path d="M6 1.5L11 10.5H1L6 1.5Z" />
+              </svg>
+            </span>
             <span className="text-[11px] uppercase font-mono tracking-wider text-amber-400/90 font-medium">
               {t('hub.tableCode')}: {tbl.table_code}
             </span>
@@ -197,18 +201,7 @@ function CampaignCard({
         </div>
 
         <h3 className="text-lg font-bold text-zinc-100 mt-3 tracking-tight">{camp.title}</h3>
-        <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3 leading-relaxed">{camp.core_description}</p>
-
-        {camp.template_name && (
-          <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-1 text-[11px]">
-            <span className="text-zinc-500 flex items-center gap-1 shrink-0">
-              <Sliders className="w-3 h-3 text-amber-500/90 shrink-0" /> {t('hub.sheetFormat')}:
-            </span>
-            <span className="text-amber-400/90 font-mono truncate text-right" title={`${camp.template_name} (${t('hub.byAuthor')} ${camp.template_author || 'D&D Playground'})`}>
-              {camp.template_name} <span className="text-zinc-500 text-[10px]">({t('hub.byAuthor')} {camp.template_author || 'D&D Playground'})</span>
-            </span>
-          </div>
-        )}
+        <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed">{camp.core_description}</p>
       </div>
 
       <div className="space-y-2 pt-5">
@@ -520,7 +513,11 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       {activeTables.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500/80 inline-block animate-pulse" />
+            <span className="inline-flex items-center justify-center text-amber-500/90 animate-[spin_6s_linear_infinite] select-none" aria-hidden="true">
+              <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 fill-current">
+                <path d="M6 1.5L11 10.5H1L6 1.5Z" />
+              </svg>
+            </span>
             <h2 className="text-base sm:text-lg font-semibold text-zinc-100 tracking-tight">{t('hub.activeTables')}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

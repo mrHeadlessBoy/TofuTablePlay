@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { Dices, Footprints, Heart, MapPin, Minus, PenLine, Plus, Shield, Skull, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { Dices, Footprints, Heart, MapPin, Minus, PenLine, Plus, Skull, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { abilityModifier, formatModifier } from '@/components/dice/dice'
 import type { CodexCharacter } from '../lib/session'
 import { ABILITY_KEYS, type AbilityKey, type RollRequest, type SceneSummary, type Token } from '../lib/types'
@@ -445,7 +445,7 @@ export function TokenInspector({ token, remainingFeet, locked, onHp, onRemove, o
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/70">
-          <Shield className="h-3.5 w-3.5 text-sky-400" /> AC <span className="ml-auto font-mono font-bold text-white">{token.ac}</span>
+          <span className="font-mono text-sky-400 font-bold text-[10px]">AC</span> AC <span className="ml-auto font-mono font-bold text-white">{token.ac}</span>
         </div>
         <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/70">
           <Footprints className="h-3.5 w-3.5 shrink-0 text-sky-400" />

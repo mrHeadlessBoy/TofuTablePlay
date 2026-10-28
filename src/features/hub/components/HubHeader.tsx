@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { signOut } from '@/features/hub/actions';
-import { LogOut, Plus, Users, Shield } from 'lucide-react';
+import Image from 'next/image';
+import { LogOut, Plus, Users } from 'lucide-react';
 
 export function HubHeader() {
   const { t } = useLanguage();
@@ -13,10 +14,16 @@ export function HubHeader() {
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800/40 pb-5">
       <div className="space-y-1">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center">
-            <Shield className="w-4 h-4 text-amber-500/90" />
-          </div>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center" title="TofuTablePlay">
+            <Image
+              src="/assets/pictures/logo.png"
+              alt="TofuTablePlay"
+              width={130}
+              height={44}
+              className="h-8 w-auto object-contain"
+            />
+          </Link>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
             {t('hub.title')}
           </h1>
