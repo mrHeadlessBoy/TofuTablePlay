@@ -301,16 +301,19 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   ├── template.ts               # Built-in presets (Classic, Drama, Romance, Horror), sanitizers, blank canvas & CST1./CST0. codec
     │   │   ├── actions.ts                # Create, update, delete character sheets & getCampaignRequiredTemplate resolver
     │   │   └── components/
+    │   │       ├── CharacterCodexHeader.tsx # Character Codex header with LanguageToggle & navigation
     │   │       ├── CharacterEditor.tsx   # Template-driven sheet editor (auto-forking presets, async campaign loader, dynamic stats & equipment)
     │   │       └── TemplateModal.tsx     # Visual template customizer, preset-to-custom forking, blank reset, CST1. exporter & importer
     │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
     │   │   ├── actions.ts                # Create & update campaigns (with strict template binding validation) and lorebook entries
     │   │   ├── rules.ts                  # Structured rule mechanics parser, JSON serializer & AI prompt formatter
     │   │   └── components/
+    │   │       ├── CampaignDetailsClient.tsx # Localized campaign details view, requirements & table launcher
     │   │       └── CampaignForm.tsx      # Shared campaign authoring form (structured rule builder, preset customization & lorebook registry)
     │   ├── hub/                          # Campaign Hub & Session Management
     │   │   ├── actions.ts                # Launch table (with AI opening scene), join, leave, delete, sign out
     │   │   └── components/
+    │   │       ├── HubHeader.tsx         # Hub navigation header with LanguageToggle & brand
     │   │       └── HubClient.tsx         # Quick Join (Code/Invite Link), Active Tables & Campaign carousel
     │   └── board/                        # Solo 3D Tactical Battle Board (NOT IN ACTIVE DEV)
     │       ├── actions.ts                # Server Action bridging board turns & lorebooks to Gemini
@@ -324,11 +327,16 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   ├── dice.ts                   # Pure dice math (crypto RNG), ability modifiers & roll formatters
     │   │   └── index.ts                  # Barrel exports
     │   └── ui/
-    │       └── AlertModal.tsx            # Global modal & confirmation dialog context (useAlert, showConfirm)
+    │       ├── AlertModal.tsx            # Global modal & confirmation dialog context (useAlert, showConfirm)
+    │       └── LanguageToggle.tsx        # 🇹🇭 TH / 🇺🇸 EN bilingual language switcher
     │
     └── lib/                              # Core Infrastructure & Cross-Cutting Services
         ├── sound.ts                      # Autoplay-resilient dice & system sound notification player
         ├── turns.ts                      # Opening narration turn index constant (OPENING_TURN_NUMBER = 1)
+        ├── i18n/                         # Full-stack bilingual localization system (English & Thai)
+        │   ├── types.ts                  # Typed translation schema & dictionary interface
+        │   ├── LanguageContext.tsx       # Reactive language context, localStorage & cookie sync
+        │   └── locales/                  # Localized dictionaries (th.ts, en.ts)
         ├── ai/
         │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, dynamic combat/zero-resource modes & parser
         │   ├── boardDm.ts                # Battle Board JSON AI DM: prompt builder & safe reply parser
