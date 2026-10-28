@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCampaign, updateCampaign, LoreEntryInput } from '../actions'
-import { Trash2, Plus, BookOpen, Sparkles, Pencil, Sliders, Check, RotateCcw } from 'lucide-react'
+import { Trash2, Plus, BookOpen, Sparkles, Pencil, Sliders, Check, RotateCcw, ArrowLeft } from 'lucide-react'
 import {
   BUILTIN_TEMPLATES,
   createEmptyTemplate,
@@ -284,27 +284,30 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Sparkles className="w-7 h-7 text-amber-500" /> {isEdit ? t('campaign.editTitle') : t('campaign.newTitle')}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-800/40 pb-5">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-amber-500/90" /> {isEdit ? t('campaign.editTitle') : t('campaign.newTitle')}
             </h1>
-            <p className="text-zinc-400 text-sm">Author your campaign universe and configure context triggers for the AI DM.</p>
+            <p className="text-zinc-400 text-xs sm:text-sm">
+              Author your campaign universe and configure context triggers for the AI DM.
+            </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
             <LanguageToggle />
             <Link
-            href="/hub"
-            className="text-xs text-amber-500 hover:text-amber-400 underline"
-          >
-            {t('common.backToHub')}
+              href="/hub"
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{t('common.backToHub')}</span>
             </Link>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Section 1: Campaign Overview */}
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-4">
+          <div className="surface-panel rounded-2xl p-6 space-y-5 shadow-lg">
             <h2 className="text-lg font-semibold text-white">{t('campaign.foundation')}</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -316,7 +319,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                   placeholder="The Citadel of Ash"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
+                  className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
                 />
               </div>
 
@@ -331,7 +334,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                       setSelectedTemplate(getPresetTemplateForCategory(nextCat))
                     }
                   }}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
+                  className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
                 >
                   {CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -348,7 +351,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                   required
                   value={customCategory}
                   onChange={(e) => setCustomCategory(e.target.value)}
-                  className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
+                  className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
                 />
               </div>
             )}
@@ -361,7 +364,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                 placeholder="Brief summary of the overarching journey and party objectives..."
                 value={coreDescription}
                 onChange={(e) => setCoreDescription(e.target.value)}
-                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
+                className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
               />
             </div>
 
@@ -373,7 +376,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                 placeholder="Geographic layout, political tensions, environmental tone..."
                 value={worldSetting}
                 onChange={(e) => setWorldSetting(e.target.value)}
-                className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none"
+                className="w-full mt-1.5 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
               />
             </div>
 
@@ -392,7 +395,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                 {ruleMechanicsList.map((rule, idx) => (
                   <div
                     key={rule.id || idx}
-                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                    className="p-3.5 bg-black/30 border border-zinc-800/70 rounded-xl space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] text-amber-500 font-mono uppercase">
@@ -417,7 +420,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                           placeholder="e.g., Sanity Meter, Perma-death..."
                           value={rule.title}
                           onChange={(e) => handleRuleChange(idx, 'title', e.target.value)}
-                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                          className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                         />
                       </div>
                       <div className="md:col-span-1">
@@ -429,7 +432,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                           placeholder="e.g., Survival, Combat..."
                           value={rule.category || ''}
                           onChange={(e) => handleRuleChange(idx, 'category', e.target.value)}
-                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                          className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -441,7 +444,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                           placeholder="Describe how this rule works..."
                           value={rule.description}
                           onChange={(e) => handleRuleChange(idx, 'description', e.target.value)}
-                          className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                          className="w-full mt-1 bg-black/40 border border-zinc-800/80 rounded-xl p-2 text-xs text-zinc-100 focus:border-zinc-600 outline-none"
                         />
                       </div>
                     </div>
@@ -466,7 +469,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
           </div>
 
           {/* Section 2: Character Sheet Template Requirement */}
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-6">
+          <div className="surface-panel rounded-2xl p-6 space-y-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-amber-500" />
@@ -490,7 +493,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                     className={`p-4 rounded-xl border text-left transition flex flex-col justify-between ${
                       isSelected
                         ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-500/30'
-                        : 'bg-zinc-950/80 border-zinc-800 hover:border-zinc-700'
+                        : 'bg-black/40 border-zinc-800/80 hover:border-zinc-700/80'
                     }`}
                   >
                     <div>
@@ -585,7 +588,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
               className={`p-4 rounded-xl border transition cursor-pointer ${
                 isCustomTemplate
                   ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-500/30'
-                  : 'bg-zinc-950/80 border-zinc-800 hover:border-zinc-700'
+                  : 'bg-black/40 border-zinc-800/80 hover:border-zinc-700/80'
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -656,7 +659,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
           </div>
 
           {/* Section 3: Lorebook Registry */}
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-6">
+          <div className="surface-panel rounded-2xl p-6 space-y-6 shadow-lg">
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-amber-500" />
               <h2 className="text-lg font-semibold text-white">Dynamic Lorebook Registry</h2>
@@ -808,7 +811,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-sm transition disabled:opacity-50 cursor-pointer"
+            className="w-full py-3 bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 text-zinc-100 font-semibold rounded-xl text-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 cursor-pointer shadow-md"
           >
             {loading
               ? (isEdit ? t('common.saving') : (language === 'en' ? 'Creating Campaign...' : 'กำลังสร้างแคมเปญ...'))

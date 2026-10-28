@@ -45,15 +45,17 @@ function LaunchButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+      className="w-full py-2.5 bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 rounded-xl text-xs font-semibold text-zinc-100 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:hover:translate-y-0 disabled:cursor-wait shadow-sm"
     >
       {pending ? (
         <>
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('hub.dmWritingOpening')}
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-200" />
+          <span>{t('hub.dmWritingOpening')}</span>
         </>
       ) : (
         <>
-          <Play className="w-3.5 h-3.5" /> {t('hub.launchAsHead')}
+          <Play className="w-3.5 h-3.5" />
+          <span>{t('hub.launchAsHead')}</span>
         </>
       )}
     </button>
@@ -88,17 +90,20 @@ function ActiveTableCard({
   }
 
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
-      <div>
+    <div className="surface-panel surface-panel-hover rounded-2xl p-5 flex flex-col justify-between shadow-lg">
+      <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] uppercase font-mono tracking-widest text-amber-500">
-            {t('hub.tableCode')}: {tbl.table_code}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500/80 inline-block animate-pulse" />
+            <span className="text-[11px] uppercase font-mono tracking-wider text-amber-400/90 font-medium">
+              {t('hub.tableCode')}: {tbl.table_code}
+            </span>
+          </div>
           <button
             type="button"
             onClick={handleCopyInviteLink}
             title={t('hub.inviteLink')}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 text-[10px] font-mono text-zinc-300 hover:text-amber-400 transition cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/70 text-[10px] font-mono text-zinc-300 hover:text-amber-400 transition cursor-pointer"
           >
             {copiedLink ? (
               <>
@@ -113,46 +118,52 @@ function ActiveTableCard({
             )}
           </button>
         </div>
-        <h3 className="text-base font-semibold text-white mt-1">{tbl.campaigns?.title}</h3>
-        <p className="text-xs text-zinc-400 mt-1">
+
+        <h3 className="text-base font-semibold text-zinc-100 tracking-tight">{tbl.campaigns?.title}</h3>
+        <p className="text-xs text-zinc-400 font-mono">
           {t('hub.turn')}: {tbl.current_turn} | {t('hub.phase')}: {tbl.turn_phase}
         </p>
       </div>
-      <Link
-        href={`/table/${tbl.id}`}
-        className="mt-4 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition"
-      >
-        <Play className="w-3.5 h-3.5" /> {t('hub.reEnterTable')}
-      </Link>
-      {currentUserId && tbl.head_table_id === currentUserId ? (
-        <button
-          type="button"
-          onClick={() => onDelete(tbl)}
-          disabled={deletingId !== null}
-          className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition disabled:opacity-50 cursor-pointer"
+
+      <div className="space-y-2 pt-4">
+        <Link
+          href={`/table/${tbl.id}`}
+          className="inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/70 hover:bg-zinc-700/80 border border-zinc-700/60 rounded-xl text-xs font-medium text-zinc-200 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
         >
-          {deletingId === `table:${tbl.id}` ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Trash2 className="w-3.5 h-3.5" />
-          )}
-          {t('hub.deleteTable')}
-        </button>
-      ) : currentUserId ? (
-        <button
-          type="button"
-          onClick={() => onLeave(tbl)}
-          disabled={deletingId !== null}
-          className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg text-xs font-medium text-zinc-300 hover:text-white transition disabled:opacity-50 cursor-pointer"
-        >
-          {deletingId === `leave:${tbl.id}` ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <LogOut className="w-3.5 h-3.5" />
-          )}
-          {t('hub.leaveTable')}
-        </button>
-      ) : null}
+          <Play className="w-3.5 h-3.5 text-amber-400/90" />
+          <span>{t('hub.reEnterTable')}</span>
+        </Link>
+
+        {currentUserId && tbl.head_table_id === currentUserId ? (
+          <button
+            type="button"
+            onClick={() => onDelete(tbl)}
+            disabled={deletingId !== null}
+            className="inline-flex items-center justify-center gap-2 w-full py-2 bg-red-950/30 hover:bg-red-900/50 border border-red-900/50 rounded-xl text-xs font-medium text-red-300 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 cursor-pointer"
+          >
+            {deletingId === `table:${tbl.id}` ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
+            <span>{t('hub.deleteTable')}</span>
+          </button>
+        ) : currentUserId ? (
+          <button
+            type="button"
+            onClick={() => onLeave(tbl)}
+            disabled={deletingId !== null}
+            className="inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/70 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 cursor-pointer"
+          >
+            {deletingId === `leave:${tbl.id}` ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <LogOut className="w-3.5 h-3.5" />
+            )}
+            <span>{t('hub.leaveTable')}</span>
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -173,21 +184,25 @@ function CampaignCard({
   const creatorDisplay = camp.creator_name || (isOwner ? (language === 'en' ? 'You' : 'คุณ (You)') : t('common.creator'))
 
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
+    <div className="surface-panel surface-panel-hover rounded-2xl p-6 flex flex-col justify-between shadow-lg">
       <div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-zinc-800/70 border border-zinc-700/60 text-zinc-300 font-medium">
+            {camp.category}
+          </span>
           <span className="text-[11px] text-zinc-400 flex items-center gap-1 font-mono">
-            <User className="w-3 h-3 text-amber-500 shrink-0" />
+            <User className="w-3 h-3 text-amber-500/90 shrink-0" />
             <span className="truncate max-w-36">{t('hub.createdBy')}: <strong className="text-zinc-200 font-medium">{creatorDisplay}</strong></span>
           </span>
         </div>
-        <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
-        <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3">{camp.core_description}</p>
+
+        <h3 className="text-lg font-bold text-zinc-100 mt-3 tracking-tight">{camp.title}</h3>
+        <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3 leading-relaxed">{camp.core_description}</p>
+
         {camp.template_name && (
-          <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-1 text-[11px]">
+          <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between gap-1 text-[11px]">
             <span className="text-zinc-500 flex items-center gap-1 shrink-0">
-              <Sliders className="w-3 h-3 text-amber-500 shrink-0" /> {t('hub.sheetFormat')}:
+              <Sliders className="w-3 h-3 text-amber-500/90 shrink-0" /> {t('hub.sheetFormat')}:
             </span>
             <span className="text-amber-400/90 font-mono truncate text-right" title={`${camp.template_name} (${t('hub.byAuthor')} ${camp.template_author || 'D&D Playground'})`}>
               {camp.template_name} <span className="text-zinc-500 text-[10px]">({t('hub.byAuthor')} {camp.template_author || 'D&D Playground'})</span>
@@ -195,43 +210,51 @@ function CampaignCard({
           </div>
         )}
       </div>
-      <form action={launchTable.bind(null, String(camp.id), language)} className="mt-5">
-        <LaunchButton />
-      </form>
-      {/* Details Button - Only shown if user is NOT the owner */}
-      {camp.creator_id !== currentUserId && (
-        <Link
-          href={`/campaigns/${camp.id}`}
-          className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition flex items-center justify-center gap-1.5"
-        >
-          <Info className="w-3.5 h-3.5" /> {t('common.details')}
-        </Link>
-      )}
 
-      {/* Edit Button - Only shown if user IS the owner */}
-      {currentUserId && camp.creator_id === currentUserId && (
-        <Link
-          href={`/campaigns/${camp.id}/edit`}
-          className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
-        >
-          <Pencil className="w-3.5 h-3.5" /> {t('common.edit')}
-        </Link>
-      )}
-      {currentUserId && camp.creator_id === currentUserId && (
-        <button
-          type="button"
-          onClick={() => onDelete(camp)}
-          disabled={deletingId !== null}
-          className="mt-2 w-full py-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/60 rounded-lg text-xs font-medium text-red-300 transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-        >
-          {deletingId === `campaign:${camp.id}` ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Trash2 className="w-3.5 h-3.5" />
-          )}
-          {t('hub.deleteCampaign')}
-        </button>
-      )}
+      <div className="space-y-2 pt-5">
+        <form action={launchTable.bind(null, String(camp.id), language)}>
+          <LaunchButton />
+        </form>
+
+        {/* Details Button - Only shown if user is NOT the owner */}
+        {camp.creator_id !== currentUserId && (
+          <Link
+            href={`/campaigns/${camp.id}`}
+            className="py-2 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/70 rounded-xl text-xs font-medium text-zinc-300 hover:text-white transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-1.5"
+          >
+            <Info className="w-3.5 h-3.5 text-zinc-400" />
+            <span>{t('common.details')}</span>
+          </Link>
+        )}
+
+        {/* Edit Button - Only shown if user IS the owner */}
+        {currentUserId && camp.creator_id === currentUserId && (
+          <Link
+            href={`/campaigns/${camp.id}/edit`}
+            className="py-2 bg-zinc-900/60 hover:bg-zinc-800/80 border border-amber-600/40 rounded-xl text-xs font-medium text-amber-300 transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-1.5"
+          >
+            <Pencil className="w-3.5 h-3.5 text-amber-400/90" />
+            <span>{t('common.edit')}</span>
+          </Link>
+        )}
+
+        {/* Delete Campaign Button - Only shown if user IS the owner */}
+        {currentUserId && camp.creator_id === currentUserId && (
+          <button
+            type="button"
+            onClick={() => onDelete(camp)}
+            disabled={deletingId !== null}
+            className="w-full py-2 bg-red-950/30 hover:bg-red-900/50 border border-red-900/50 rounded-xl text-xs font-medium text-red-300 transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+          >
+            {deletingId === `campaign:${camp.id}` ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
+            <span>{t('hub.deleteCampaign')}</span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -455,9 +478,9 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
   return (
     <div className="space-y-10">
       {/* Quick Join Bar */}
-      <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="surface-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
         <div>
-          <h2 className="text-base font-semibold text-white">{t('hub.quickJoin')}</h2>
+          <h2 className="text-base font-semibold text-zinc-100 tracking-tight">{t('hub.quickJoin')}</h2>
           <p className="text-xs text-zinc-400 mt-1">
             {t('hub.subtitle')}
           </p>
@@ -471,20 +494,22 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
               const val = e.target.value
               setTableCode(val.includes('/') || val.includes(':') ? val : val.toUpperCase())
             }}
-            className="bg-zinc-950 border border-zinc-700 px-3 py-2 rounded-lg text-sm font-mono text-white focus:border-amber-500 outline-none w-full sm:w-64"
+            className="bg-black/40 border border-zinc-800/80 px-3.5 py-2.5 rounded-xl text-sm font-mono text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none w-full sm:w-64 transition-all"
           />
           <button
             type="submit"
             disabled={joining}
-            className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60"
+            className="bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 px-4 py-2.5 rounded-xl text-sm font-medium text-zinc-100 flex items-center gap-2 cursor-pointer shrink-0 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:hover:translate-y-0 shadow-sm"
           >
             {joining ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> {t('hub.joining')}
+                <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
+                <span>{t('hub.joining')}</span>
               </>
             ) : (
               <>
-                <LogIn className="w-4 h-4" /> {t('hub.joinTableBtn')}
+                <LogIn className="w-4 h-4" />
+                <span>{t('hub.joinTableBtn')}</span>
               </>
             )}
           </button>
@@ -494,8 +519,11 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       {/* Active Tables */}
       {activeTables.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">{t('hub.activeTables')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500/80 inline-block animate-pulse" />
+            <h2 className="text-base sm:text-lg font-semibold text-zinc-100 tracking-tight">{t('hub.activeTables')}</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {activeTables.map((tbl) => (
               <ActiveTableCard
                 key={tbl.id}
@@ -512,17 +540,17 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
       {/* Public Campaigns */}
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/40 pb-3">
           <button
             type="button"
             onClick={() => setIsExtended((prev) => !prev)}
             aria-expanded={isExtended}
             aria-controls="explore-campaigns-section"
-            className="flex items-center gap-2.5 text-lg font-semibold text-white hover:text-amber-400 transition cursor-pointer select-none group text-left"
+            className="flex items-center gap-2.5 text-base sm:text-lg font-semibold text-zinc-100 hover:text-amber-400 transition-colors cursor-pointer select-none group text-left"
           >
-            <Compass className="w-5 h-5 text-amber-500 group-hover:rotate-12 transition-transform" />
+            <Compass className="w-5 h-5 text-amber-500/90 group-hover:rotate-12 transition-transform" />
             <span>{t('hub.publicCampaigns')}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 group-hover:text-zinc-200 font-normal">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800/70 border border-zinc-700/50 text-zinc-400 group-hover:text-zinc-200 font-normal">
               {publicCampaigns.length}
             </span>
             <span className="text-xs text-zinc-400 group-hover:text-amber-400 flex items-center gap-1 ml-1 font-normal">
@@ -542,17 +570,17 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
 
           <div className="flex items-center gap-2">
             {isExtended && totalPages > 1 && (
-              <div className="flex items-center gap-1.5 text-xs bg-zinc-900/80 border border-zinc-800 rounded-lg p-1">
+              <div className="flex items-center gap-1.5 text-xs bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-1">
                 <button
                   type="button"
                   onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
                   disabled={safeCurrentPage === 0}
                   aria-label="Previous campaigns"
-                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400 disabled:cursor-not-allowed transition cursor-pointer"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="px-1.5 text-zinc-300 font-mono text-[11px] select-none">
+                <span className="px-2 text-zinc-300 font-mono text-[11px] select-none">
                   {t('hub.page')} {safeCurrentPage + 1} / {totalPages}
                 </span>
                 <button
@@ -560,7 +588,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                   onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={safeCurrentPage >= totalPages - 1}
                   aria-label="Next campaigns"
-                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400 disabled:cursor-not-allowed transition cursor-pointer"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -572,7 +600,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
               onClick={() => setIsExtended((prev) => !prev)}
               aria-expanded={isExtended}
               aria-controls="explore-campaigns-section"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 rounded-lg transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-zinc-100 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/70 rounded-xl transition-all cursor-pointer"
             >
               {isExtended ? (
                 <>
@@ -592,7 +620,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
         {isExtended ? (
           <div id="explore-campaigns-section" className="space-y-4">
             {publicCampaigns.length === 0 ? (
-              <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-8 text-center text-zinc-500 text-sm">
+              <div className="surface-panel rounded-2xl p-8 text-center text-zinc-500 text-sm">
                 {language === 'en' ? 'No public campaigns available yet.' : 'ยังไม่มีแคมเปญสาธารณะในขณะนี้'}
               </div>
             ) : (
@@ -631,7 +659,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
                       disabled={safeCurrentPage === 0}
-                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" /> {language === 'en' ? 'Previous' : 'ย้อนกลับ'}
                     </button>
@@ -645,7 +673,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                           aria-label={`Go to slide ${idx + 1}`}
                           className={`h-1.5 rounded-full transition-all cursor-pointer ${
                             idx === safeCurrentPage
-                              ? 'w-6 bg-amber-500'
+                              ? 'w-6 bg-amber-500/90'
                               : 'w-2 bg-zinc-700 hover:bg-zinc-500'
                           }`}
                         />
@@ -656,7 +684,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
                       disabled={safeCurrentPage >= totalPages - 1}
-                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     >
                       {language === 'en' ? 'Next' : 'ถัดไป'} <ChevronRight className="w-4 h-4" />
                     </button>
@@ -668,7 +696,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
         ) : (
           <div
             onClick={() => setIsExtended(true)}
-            className="bg-zinc-900/20 border border-zinc-800/60 border-dashed rounded-xl p-4 text-center text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition cursor-pointer flex items-center justify-center gap-2"
+            className="surface-panel rounded-2xl p-4 text-center text-xs text-zinc-400 hover:text-zinc-200 transition cursor-pointer flex items-center justify-center gap-2"
           >
             <span>
               {language === 'en'
@@ -682,14 +710,14 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       {/* Battle Board entry: floats in the bottom-right corner of the hub */}
       <Link
         href="/board"
-        className="group fixed bottom-6 right-6 z-20 flex items-center gap-3 rounded-xl border border-amber-500/40 bg-zinc-900/80 px-4 py-3 shadow-lg shadow-black/40 backdrop-blur transition hover:border-amber-400 hover:bg-zinc-900"
+        className="group fixed bottom-6 right-6 z-20 flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-4 py-3 shadow-xl backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-700/80 hover:bg-zinc-900/80"
       >
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-amber-600 text-white transition group-hover:bg-amber-500">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-600/90 text-zinc-100 transition-colors group-hover:bg-amber-600">
           <Dices className="w-5 h-5" />
         </span>
         <span>
-          <span className="block text-sm font-semibold text-white">Battle Board</span>
-          <span className="block text-[11px] text-zinc-400">3D grid tabletop · solo prototype</span>
+          <span className="block text-sm font-semibold text-zinc-100">Battle Board</span>
+          <span className="block text-[11px] text-zinc-400 font-mono">3D grid tabletop · solo prototype</span>
         </span>
       </Link>
 

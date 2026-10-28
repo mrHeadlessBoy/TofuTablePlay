@@ -5,39 +5,54 @@ import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { signOut } from '@/features/hub/actions';
-import { LogOut } from 'lucide-react';
+import { LogOut, Plus, Users, Shield } from 'lucide-react';
 
 export function HubHeader() {
   const { t } = useLanguage();
 
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800 pb-4">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">{t('hub.title')}</h1>
-        <p className="text-zinc-400 text-sm mt-0.5">{t('hub.subtitle')}</p>
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800/40 pb-5">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center">
+            <Shield className="w-4 h-4 text-amber-500/90" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
+            {t('hub.title')}
+          </h1>
+        </div>
+        <p className="text-zinc-400 text-xs sm:text-sm pl-0.5 leading-relaxed">
+          {t('hub.subtitle')}
+        </p>
       </div>
+
       <div className="flex flex-wrap gap-2.5 items-center">
         <LanguageToggle />
+
         <Link
           href="/characters"
-          className="text-xs text-zinc-300 hover:text-white bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg transition"
+          className="text-xs text-zinc-300 hover:text-white bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/70 hover:border-zinc-700/80 px-3.5 py-2 rounded-xl transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 font-medium shadow-sm"
         >
-          {t('nav.characterSheets')}
+          <Users className="w-3.5 h-3.5 text-zinc-400" />
+          <span>{t('nav.characterSheets')}</span>
         </Link>
+
         <Link
           href="/campaigns/new"
-          className="text-xs text-white bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded-lg font-medium transition"
+          className="text-xs text-zinc-100 bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 px-3.5 py-2 rounded-xl font-medium transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 shadow-sm"
         >
-          {t('nav.newCampaign')}
+          <Plus className="w-3.5 h-3.5 text-amber-200" />
+          <span>{t('nav.newCampaign')}</span>
         </Link>
+
         <form action={signOut}>
           <button
             type="submit"
-            className="text-xs text-zinc-400 hover:text-red-400 bg-zinc-900 hover:bg-red-950/30 border border-zinc-800 hover:border-red-900/50 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer font-medium"
+            className="text-xs text-zinc-400 hover:text-red-300 bg-zinc-900/60 hover:bg-red-950/40 border border-zinc-800/70 hover:border-red-900/60 px-3 py-2 rounded-xl transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 cursor-pointer font-medium"
             title={t('nav.signOut')}
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>{t('nav.signOut')}</span>
+            <span className="hidden sm:inline">{t('nav.signOut')}</span>
           </button>
         </form>
       </div>
