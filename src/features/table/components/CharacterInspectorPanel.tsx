@@ -370,8 +370,9 @@ export default function CharacterInspectorPanel({
                   {activeChar ? activeChar.name : "No Character Bound"}
                 </h2>
                 <p className="text-[11px] text-zinc-400 truncate">
-                  {activeChar?.class_archetype ||
-                    "Select a character sheet below"}
+                  {activeChar
+                    ? `${activeChar.class_archetype || 'Adventurer'} • ${activeTemplate.name} (ผู้สร้างชีท: ${activeTemplate.author || 'D&D Playground'})`
+                    : "Select a character sheet below"}
                 </p>
               </div>
             </div>
@@ -442,7 +443,7 @@ export default function CharacterInspectorPanel({
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-amber-300 flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5" />
-                      Required: {campaignTemplate.name}
+                      Required: {campaignTemplate.name} (ผู้สร้างชีท: {campaignTemplate.author || 'Campaign Creator'})
                     </span>
                     <span className="text-[10px] font-medium bg-amber-900/70 text-amber-200 px-2 py-0.5 rounded border border-amber-700/60">
                       Enforced
@@ -516,7 +517,7 @@ export default function CharacterInspectorPanel({
                                   รูปแบบของตัวละครนี้ ({char.name})
                                 </span>
                                 <span className="text-amber-400 font-bold text-sm block mt-0.5">
-                                  {charTemplate.name}
+                                  {charTemplate.name} <span className="text-xs text-zinc-400 font-normal">(ผู้สร้าง: {charTemplate.author || 'D&D Playground'})</span>
                                 </span>
                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
@@ -539,7 +540,7 @@ export default function CharacterInspectorPanel({
                                   <Check className="w-3 h-3" /> แคมเปญนี้กำหนดให้ใช้ (Required Format)
                                 </span>
                                 <span className="text-emerald-300 font-bold text-sm block mt-0.5">
-                                  {campaignTemplate.name}
+                                  {campaignTemplate.name} <span className="text-xs text-emerald-400/80 font-normal">(ผู้สร้าง: {campaignTemplate.author || 'Campaign Creator'})</span>
                                 </span>
                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80">
@@ -594,7 +595,7 @@ export default function CharacterInspectorPanel({
                               </span>
                             ) : (
                               <span className="text-[10px] font-normal bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded">
-                                {charTemplate.name}
+                                {charTemplate.name} ({charTemplate.author || 'D&D Playground'})
                               </span>
                             )}
                           </p>

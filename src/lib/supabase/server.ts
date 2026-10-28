@@ -55,3 +55,73 @@ export function createAdminClient() {
     }
   )
 }
+
+export async function resolveUserDisplayName(
+  userId: string | null | undefined,
+  currentUserId?: string | null
+): Promise<string> {
+  if (!userId) return 'ผู้สร้างแคมเปญ'
+  if (currentUserId && userId === currentUserId) return 'คุณ (You)'
+
+  try {
+    const admin = createAdminClient()
+    if (admin) {
+      const { data, error } = await admin.auth.admin.getUserById(userId)
+      if (!error && data?.user) {
+        const u = data.user
+        const meta = u.user_metadata || {}
+        const name = meta.display_name || meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : null)
+        if (name) return name
+      }
+    }
+  } catch {
+    // Admin API not reachable or service key not configured
+  }
+
+  return `User (${userId.slice(0, 6)})`
+}
+
+export async function resolveMultipleUserDisplayNames(
+  userIds: (string | null | undefined)[],
+  currentUserId?: string | null
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  const validIds = Array.from(new Set(userIds.filter((id): id is string => !!id)))
+
+  if (currentUserId) {
+    map.set(currentUserId, 'คุณ (You)')
+  }
+
+  const idsToFetch = validIds.filter((id) => id !== currentUserId)
+  if (idsToFetch.length === 0) return map
+
+  const admin = createAdminClient()
+  if (!admin) {
+    for (const id of idsToFetch) {
+      map.set(id, `User (${id.slice(0, 6)})`)
+    }
+    return map
+  }
+
+  await Promise.all(
+    idsToFetch.map(async (id) => {
+      try {
+        const { data, error } = await admin.auth.admin.getUserById(id)
+        if (!error && data?.user) {
+          const u = data.user
+          const meta = u.user_metadata || {}
+          const name = meta.display_name || meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : null)
+          if (name) {
+            map.set(id, name)
+            return
+          }
+        }
+      } catch {
+        // Fallback below
+      }
+      map.set(id, `User (${id.slice(0, 6)})`)
+    })
+  )
+
+  return map
+}

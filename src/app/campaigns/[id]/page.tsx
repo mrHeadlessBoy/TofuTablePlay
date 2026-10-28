@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { BookOpen, Lock, Play, Sliders, Plus } from 'lucide-react'
+import { createClient, resolveUserDisplayName } from "@/lib/supabase/server";
+import { BookOpen, Lock, Play, Sliders, Plus, User } from 'lucide-react'
 import { extractCampaignTemplate, stripCampaignTemplateFromRules } from '@/features/character/template'
 import { parseRuleMechanics } from '@/features/campaign/rules'
 import { launchTable } from '@/features/hub/actions'
@@ -59,7 +59,9 @@ async function CampaignDetails({
   const isOwner = !!user && campaign.creator_id === user.id;
   if (!campaign.is_public && !isOwner) notFound();
 
-    let loreQuery = supabase
+  const creatorDisplayName = await resolveUserDisplayName(campaign.creator_id, user?.id);
+
+  let loreQuery = supabase
     .from('lorebook_entries')
     .select('id, title, content, category, activation_mode, trigger_keys')
     .eq('campaign_id', campaign.id)
@@ -73,8 +75,6 @@ async function CampaignDetails({
       ? campaign.custom_category
       : campaign.category;
 
-
-
   const campaignTemplate = extractCampaignTemplate(campaign);
   const cleanRuleMechanics = stripCampaignTemplateFromRules(campaign.rule_mechanics);
   const parsedRules = parseRuleMechanics(cleanRuleMechanics);
@@ -83,9 +83,15 @@ async function CampaignDetails({
     <>
       <div className="flex justify-between items-start gap-4 border-b border-zinc-800 pb-4">
         <div>
-          <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-            {categoryLabel}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+              {categoryLabel}
+            </span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-700/60 text-zinc-300 flex items-center gap-1.5 font-mono">
+              <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>สร้างโดย: <strong className="text-zinc-200 font-semibold">{creatorDisplayName}</strong></span>
+            </span>
+          </div>
           <h1 className="text-3xl font-bold tracking-tight text-white mt-2">
             {campaign.title}
           </h1>
@@ -97,6 +103,7 @@ async function CampaignDetails({
           &larr; Back to Hub
         </Link>
       </div>
+
       {/* Required Character Sheet Template Card */}
       <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-5 space-y-3">
         <div className="flex items-center justify-between">
@@ -113,8 +120,13 @@ async function CampaignDetails({
         </p>
         <div className="p-3.5 bg-zinc-950 border border-zinc-800 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <div className="font-semibold text-sm text-white">{campaignTemplate.name}</div>
-            <p className="text-xs text-zinc-400 mt-0.5">{campaignTemplate.description}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm text-white">{campaignTemplate.name}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/70 border border-amber-800/60 text-amber-300 font-mono">
+                ผู้สร้างชีท: {campaignTemplate.author || 'Campaign Creator'}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400 mt-1">{campaignTemplate.description}</p>
           </div>
           <div className="flex flex-wrap gap-1.5 text-[10px] shrink-0">
             {campaignTemplate.resources.length > 0 ? (
@@ -151,13 +163,12 @@ async function CampaignDetails({
       </section>
 
       <form action={launchTable.bind(null, String(campaign.id))}>
-                <button 
-            type="submit"
-            className="w-full py-2.5 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-sm font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Play className="w-4 h-4" /> Launch as Head Table
-          </button>
-
+        <button 
+          type="submit"
+          className="w-full py-2.5 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-sm font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <Play className="w-4 h-4" /> Launch as Head Table
+        </button>
       </form>
 
       <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-5">
@@ -165,7 +176,7 @@ async function CampaignDetails({
           Campaign Foundation
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-xs text-zinc-400 uppercase font-medium">
               Campaign Title
@@ -184,24 +195,34 @@ async function CampaignDetails({
               {campaign.category}
             </div>
           </div>
+
+          <div>
+            <label className="text-xs text-zinc-400 uppercase font-medium">
+              Creator (ผู้สร้าง)
+            </label>
+            <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-amber-400 flex items-center gap-1.5 font-medium">
+              <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>{creatorDisplayName}</span>
+            </div>
+          </div>
         </div>
 
         <div>
           <label className="text-xs text-zinc-400 uppercase font-medium">
             Core Narrative Brief
           </label>
-            <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none">
-              {campaign.core_description}
-            </div>
+          <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none">
+            {campaign.core_description}
+          </div>
         </div>
 
         <div>
           <label className="text-xs text-zinc-400 uppercase font-medium">
             World Setting & Environment Lore
           </label>
-            <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none">
-              {campaign.world_setting}
-            </div>
+          <div className="w-full mt-1 border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-amber-500 outline-none">
+            {campaign.world_setting}
+          </div>
         </div>
 
         <div>
@@ -231,6 +252,7 @@ async function CampaignDetails({
           )}
         </div>
       </section>
+
       <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-4">
         <div className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-amber-500" />
@@ -270,4 +292,3 @@ async function CampaignDetails({
     </>
   );
 }
-

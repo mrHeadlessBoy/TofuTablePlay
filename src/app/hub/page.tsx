@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, resolveMultipleUserDisplayNames } from '@/lib/supabase/server'
+import { extractCampaignTemplate } from '@/features/character/template'
 import Link from 'next/link'
 import HubClient from '@/features/hub/components/HubClient'
 import { signOut } from '@/features/hub/actions'
@@ -17,6 +18,23 @@ async function HubData() {
     .eq('is_public', true)
     .order('created_at', { ascending: false })
 
+  const creatorIds = (publicCampaigns ?? []).map((c) => c.creator_id)
+  const creatorNamesMap = await resolveMultipleUserDisplayNames(creatorIds, user?.id)
+
+  const enrichedPublicCampaigns = (publicCampaigns ?? []).map((camp) => {
+    const tpl = extractCampaignTemplate(camp)
+    const creatorName = camp.creator_id === user?.id
+      ? 'คุณ (You)'
+      : (creatorNamesMap.get(camp.creator_id) || (camp.creator_id ? `User (${camp.creator_id.slice(0, 6)})` : 'ผู้สร้างแคมเปญ'))
+
+    return {
+      ...camp,
+      creator_name: creatorName,
+      template_name: tpl.name,
+      template_author: tpl.author || 'D&D Playground',
+    }
+  })
+
   // 2. Active tables where user is a participant
   const { data: activeMemberships } = await supabase
     .from('table_members')
@@ -30,7 +48,7 @@ async function HubData() {
 
   return (
     <HubClient
-      publicCampaigns={publicCampaigns || []}
+      publicCampaigns={enrichedPublicCampaigns}
       activeTables={activeTables}
       currentUserId={user?.id ?? null}
     />

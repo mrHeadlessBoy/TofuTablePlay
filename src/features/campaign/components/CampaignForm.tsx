@@ -490,7 +490,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <div className="font-semibold text-sm text-white flex items-center gap-1.5">
-                          {preset.name}
+                          {preset.name} <span className="text-[10px] text-zinc-500 font-mono font-normal">(โดย {preset.author || 'D&D Playground'})</span>
                         </div>
                         {isSelected && <Check className="w-4 h-4 text-amber-400" />}
                       </div>
@@ -601,7 +601,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                   </div>
                   <p className="text-xs text-zinc-400 mt-1">
                     {isCustomTemplate
-                      ? `"${selectedTemplate.name}" — ${selectedTemplate.resources.length === 0 ? '0 Resource Bars (Item-Only)' : `${selectedTemplate.resources.length} resources`}, ${selectedTemplate.stats.length} stats, ${selectedTemplate.equipmentSlots.length} equipment slots, ${selectedTemplate.conditions.length} conditions.`
+                      ? `"${selectedTemplate.name}" (โดย ${selectedTemplate.author || 'Campaign Creator'}) — ${selectedTemplate.resources.length === 0 ? '0 Resource Bars (Item-Only)' : `${selectedTemplate.resources.length} resources`}, ${selectedTemplate.stats.length} stats, ${selectedTemplate.equipmentSlots.length} equipment slots, ${selectedTemplate.conditions.length} conditions.`
                       : 'ออกแบบโครงสร้างแผ่นตัวละครด้วยตัวเอง เริ่มต้นจากชีทว่างเปล่าโดยไม่มีสเตตัสหรือหลอดพลังงานค้างไว้ (สามารถใส่เฉพาะไอเทม หรือสเตตัสเฉพาะตามใจชอบ)'}
                   </p>
                 </div>

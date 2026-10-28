@@ -578,7 +578,7 @@ export default function CharacterEditor({
           <div className="flex items-center gap-2 text-amber-200">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              กำลังสร้างตัวละครสำหรับแคมเปญนี้ด้วยรูปแบบชีท: <strong>{activeTemplate.name}</strong> (ระบบได้จัดรูปแบบชีทให้ตรงกับข้อกำหนดโดยอัตโนมัติ)
+              กำลังสร้างตัวละครสำหรับแคมเปญนี้ด้วยรูปแบบชีท: <strong>{activeTemplate.name}</strong> (ผู้สร้างเทมเพลต: <strong>{activeTemplate.author || 'Campaign Creator'}</strong>)
             </span>
           </div>
           <Link
@@ -633,7 +633,7 @@ export default function CharacterEditor({
                       <h3 className="font-semibold text-white truncate">{char.name}</h3>
                       {tpl.id !== 'builtin-classic' && (
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-950/80 border border-amber-800/80 text-amber-400 font-mono">
-                          {tpl.name}
+                          {tpl.name} (โดย: {tpl.author || 'D&D Playground'})
                         </span>
                       )}
                     </div>
@@ -689,7 +689,7 @@ export default function CharacterEditor({
                   {selectedChar.id ? 'Edit Character Sheet' : 'New Character Sheet'}
                 </h2>
                 <span className="text-[11px] text-zinc-400 font-mono">
-                  {activeTemplate.name}
+                  {activeTemplate.name} • ผู้สร้างเทมเพลต: {activeTemplate.author || 'D&D Playground'}
                 </span>
               </div>
 

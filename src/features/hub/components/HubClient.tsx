@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, type FormEvent } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { launchTable, joinTableByCode, deleteTable, deleteCampaign, leaveTable } from '../actions'
-import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Link2, Check } from 'lucide-react'
+import { Play, LogIn, Compass, Trash2, Loader2, LogOut, Dices, Info, Pencil, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Link2, Check, User, Sliders } from 'lucide-react'
 import Link from 'next/link'
 
 import { playSystemSound } from '@/lib/sound'
@@ -16,6 +16,9 @@ type PublicCampaign = {
   title: string
   core_description: string
   creator_id?: string | null
+  creator_name?: string
+  template_name?: string
+  template_author?: string
 }
 
 type ActiveTable = {
@@ -163,12 +166,31 @@ function CampaignCard({
   deletingId: string | null
   onDelete: (camp: PublicCampaign) => void
 }) {
+  const isOwner = !!currentUserId && camp.creator_id === currentUserId
+  const creatorDisplay = camp.creator_name || (isOwner ? 'คุณ (You)' : 'ผู้สร้างแคมเปญ')
+
   return (
     <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
       <div>
-        <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
+          <span className="text-[11px] text-zinc-400 flex items-center gap-1 font-mono">
+            <User className="w-3 h-3 text-amber-500 shrink-0" />
+            <span className="truncate max-w-36">สร้างโดย: <strong className="text-zinc-200 font-medium">{creatorDisplay}</strong></span>
+          </span>
+        </div>
         <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
         <p className="text-xs text-zinc-400 mt-2 min-h-20 line-clamp-3">{camp.core_description}</p>
+        {camp.template_name && (
+          <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-1 text-[11px]">
+            <span className="text-zinc-500 flex items-center gap-1 shrink-0">
+              <Sliders className="w-3 h-3 text-amber-500 shrink-0" /> ชีท:
+            </span>
+            <span className="text-amber-400/90 font-mono truncate text-right" title={`${camp.template_name} (โดย ${camp.template_author || 'D&D Playground'})`}>
+              {camp.template_name} <span className="text-zinc-500 text-[10px]">(โดย {camp.template_author || 'D&D Playground'})</span>
+            </span>
+          </div>
+        )}
       </div>
       <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
         <LaunchButton />
