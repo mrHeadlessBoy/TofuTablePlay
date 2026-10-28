@@ -15,6 +15,7 @@ import {
   sanitizeAbilityScores,
   sanitizeCharacterSkills,
   sanitizeInventoryItems,
+  type CharacterInventoryItem,
 } from '../domain'
 import {
   BUILTIN_TEMPLATES,
@@ -104,6 +105,14 @@ function createInitialCustomValues(tpl: CharacterTemplate): SheetCustomValues {
     initialRes[r.id] = { current: r.defaultMax, max: r.defaultMax }
   }
   return { stats: initialStats, resources: initialRes, fields: {}, equipment: {} }
+}
+
+function getCharacterInventoryItems(char: CharacterRecord | null): CharacterInventoryItem[] {
+  if (!char) return []
+  if (Array.isArray(char.inventory)) {
+    return char.inventory as CharacterInventoryItem[]
+  }
+  return extractCharacterInventory(char)
 }
 
 export default function CharacterEditor({
@@ -454,7 +463,7 @@ export default function CharacterEditor({
   // Inventory handlers
   const handleAddInventoryItem = () => {
     if (!selectedChar) return
-    const currentItems = extractCharacterInventory(selectedChar)
+    const currentItems = getCharacterInventoryItems(selectedChar)
     setSelectedChar({
       ...selectedChar,
       inventory: [...currentItems, { name: '', quantity: 1, description: '' }],
@@ -467,7 +476,7 @@ export default function CharacterEditor({
     value: string | number
   ) => {
     if (!selectedChar) return
-    const currentItems = [...extractCharacterInventory(selectedChar)]
+    const currentItems = [...getCharacterInventoryItems(selectedChar)]
     currentItems[index] = {
       ...currentItems[index],
       [field]: value,
@@ -480,7 +489,7 @@ export default function CharacterEditor({
 
   const handleRemoveInventoryItem = (index: number) => {
     if (!selectedChar) return
-    const currentItems = extractCharacterInventory(selectedChar).filter((_, i) => i !== index)
+    const currentItems = getCharacterInventoryItems(selectedChar).filter((_, i) => i !== index)
     setSelectedChar({
       ...selectedChar,
       inventory: currentItems,
@@ -1130,103 +1139,106 @@ export default function CharacterEditor({
             )}
 
             {/* Inventory Item Slots (Shown only if template enables inventory) */}
-            {activeTemplate.sections.inventory && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5 text-amber-400" /> Inventory (Item Log)
-                  </label>
-                  <span className="text-[11px] text-zinc-500 font-mono">
-                    {extractCharacterInventory(selectedChar).length} item(s)
-                  </span>
-                </div>
-
+            {activeTemplate.sections.inventory && (() => {
+              const inventoryItems = getCharacterInventoryItems(selectedChar)
+              return (
                 <div className="space-y-3">
-                  {extractCharacterInventory(selectedChar).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-amber-500 font-mono uppercase">
-                          Item #{idx + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveInventoryItem(idx)}
-                          title="Remove item"
-                          className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-zinc-900 transition cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                        <div className="md:col-span-2">
-                          <label className="text-[10px] text-zinc-400 font-mono uppercase block">
-                            Item Name :
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g., Health Potion, Rope..."
-                            value={item.name}
-                            onChange={(e) => handleInventoryItemChange(idx, 'name', e.target.value)}
-                            className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
-                          />
-                        </div>
-                        <div className="md:col-span-1">
-                          <label className="text-[10px] text-zinc-400 font-mono uppercase block">
-                            Quantity :
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            placeholder="1"
-                            value={item.quantity ?? 1}
-                            onChange={(e) => {
-                              const val = Number(e.target.value)
-                              handleInventoryItemChange(
-                                idx,
-                                'quantity',
-                                Number.isNaN(val) ? 1 : Math.max(1, Math.round(val))
-                              )
-                            }}
-                            className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-[10px] text-zinc-400 font-mono uppercase block">
-                            Description :
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g., Restores 20 HP, 50ft length..."
-                            value={item.description || ''}
-                            onChange={(e) =>
-                              handleInventoryItemChange(idx, 'description', e.target.value)
-                            }
-                            className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-amber-400" /> Inventory (Item Log)
+                    </label>
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      {inventoryItems.length} item(s)
+                    </span>
+                  </div>
 
-                  {extractCharacterInventory(selectedChar).length === 0 && (
-                    <p className="text-xs text-zinc-500 italic">
-                      No items in inventory yet. Click &quot;Add Item&quot; below to add an item.
-                    </p>
-                  )}
+                  <div className="space-y-3">
+                    {inventoryItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-amber-500 font-mono uppercase">
+                            Item #{idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInventoryItem(idx)}
+                            title="Remove item"
+                            className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-zinc-900 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                          <div className="md:col-span-2">
+                            <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                              Item Name :
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g., Health Potion, Rope..."
+                              value={item.name}
+                              onChange={(e) => handleInventoryItemChange(idx, 'name', e.target.value)}
+                              className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                          <div className="md:col-span-1">
+                            <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                              Quantity :
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              placeholder="1"
+                              value={item.quantity ?? 1}
+                              onChange={(e) => {
+                                const val = Number(e.target.value)
+                                handleInventoryItemChange(
+                                  idx,
+                                  'quantity',
+                                  Number.isNaN(val) ? 1 : Math.max(1, Math.round(val))
+                                )
+                              }}
+                              className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-[10px] text-zinc-400 font-mono uppercase block">
+                              Description :
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g., Restores 20 HP, 50ft length..."
+                              value={item.description || ''}
+                              onChange={(e) =>
+                                handleInventoryItemChange(idx, 'description', e.target.value)
+                              }
+                              className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {inventoryItems.length === 0 && (
+                      <p className="text-xs text-zinc-500 italic">
+                        No items in inventory yet. Click &quot;Add Item&quot; below to add an item.
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddInventoryItem}
+                    className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Item
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleAddInventoryItem}
-                  className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Item
-                </button>
-              </div>
-            )}
+              )
+            })()}
 
             <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
               {selectedChar.id && isOwner(selectedChar) ? (
