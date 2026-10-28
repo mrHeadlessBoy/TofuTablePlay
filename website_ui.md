@@ -97,13 +97,20 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 - **Tactile Matte Button**: Amber action button with micro-lift on hover and built-in loading spinner (`Loader2`).
 - **Localized Feedback**: Bilingual authentication error messaging and switchable login/register modes.
 
+### 4.3 Hub & Campaign Management (`src/features/hub/...`, `src/features/campaign/...`)
+- **Hub Header (`HubHeader.tsx`)**: Frosted navigation bar with brand emblem, character codex shortcut, and campaign authoring trigger with smooth hover micro-lifts.
+- **Quick Join Bar (`HubClient.tsx`)**: Low-profile frosted container with monospace uppercase table code input and tactile join button.
+- **Active Table Cards**: Real-time table status with pulsing emerald connection dots, monospace code pills, and copyable invite link chips.
+- **Campaign Cards Carousel**: 3-column card deck with category badges, author chips, sheet template tags, and smooth slide navigation with indicator dots.
+- **Campaign Studio (`CampaignForm.tsx` & `CampaignDetailsClient.tsx`)**: Refined layered opacity sections, recessed form inputs, structured rule builder tiles, and lorebook keyword tags without harsh glare.
+
 ---
 
 ## 5. Implementation Status by Phase
 
 - [x] **Phase 1: Global Theme & Base Tokens** — *Completed*
 - [x] **Phase 2: Landing Page & Authentication** — *Completed*
-- [ ] **Phase 3: Hub & Campaign Management** — *Pending*
+- [x] **Phase 3: Hub & Campaign Management** — *Completed*
 - [ ] **Phase 4: Character Codex & Template Studio** — *Pending*
 - [ ] **Phase 5: Virtual Tabletop (VTT) & In-Table HUD** — *Pending*
 - [ ] **Phase 6: Verification & QA** — *Pending*
