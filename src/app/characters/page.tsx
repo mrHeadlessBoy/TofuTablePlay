@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import CharacterEditor from '@/features/character/components/CharacterEditor'
-import Link from 'next/link'
+import CharacterCodexHeader from '@/features/character/components/CharacterCodexHeader'
 
 // Reads cookies (runtime data), so it must render inside <Suspense>.
 async function CharacterList() {
@@ -21,16 +21,7 @@ export default function CharactersPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Character Codex</h1>
-            <p className="text-zinc-400 text-sm">Manage and author your reusable tabletop character sheets.</p>
-          </div>
-          <Link href="/hub" className="text-xs text-amber-500 hover:text-amber-400 underline">
-            &larr; Back to Campaign Hub
-          </Link>
-        </div>
-
+        <CharacterCodexHeader />
         <Suspense fallback={<p className="text-sm text-zinc-500">Loading characters...</p>}>
           <CharacterList />
         </Suspense>

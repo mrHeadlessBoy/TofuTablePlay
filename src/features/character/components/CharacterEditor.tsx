@@ -37,6 +37,7 @@ import TemplateModal from './TemplateModal'
 import { playSystemSound } from '@/lib/sound'
 import { Plus, Trash2, Loader2, Package, Sparkles, Sliders, Heart } from 'lucide-react'
 import { useAlert } from '@/components/ui/AlertModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type CharacterRecord = CharacterFormData & { id?: string | number; user_id?: string | null }
 
@@ -129,6 +130,7 @@ export default function CharacterEditor({
   const templateIdParam = searchParams.get('templateId')
   const returnToParam = searchParams.get('returnTo')
   const { showAlert, showConfirm } = useAlert()
+  const { t, language } = useLanguage()
   const builtinInitial = templateIdParam ? BUILTIN_TEMPLATES.find((t) => t.id === templateIdParam) : null
   const [activeTemplate, setActiveTemplate] = useState<CharacterTemplate>(() => {
     return builtinInitial ?? CLASSIC_TEMPLATE
@@ -578,14 +580,14 @@ export default function CharacterEditor({
           <div className="flex items-center gap-2 text-amber-200">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              กำลังสร้างตัวละครสำหรับแคมเปญนี้ด้วยรูปแบบชีท: <strong>{activeTemplate.name}</strong> (ผู้สร้างเทมเพลต: <strong>{activeTemplate.author || 'Campaign Creator'}</strong>)
+              {t('character.campaignNotice')} <strong>{activeTemplate.name}</strong> (ผู้สร้างเทมเพลต: <strong>{activeTemplate.author || 'Campaign Creator'}</strong>)
             </span>
           </div>
           <Link
             href={returnToParam}
             className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs transition"
           >
-            กลับไปยังห้องเล่น (Back)
+            {t('character.backToRoom')}
           </Link>
         </div>
       )}
@@ -604,7 +606,7 @@ export default function CharacterEditor({
           onClick={() => handleNew()}
           className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg text-sm transition cursor-pointer shadow-sm"
         >
-          + Create New Character
+          {t('character.createNew')}
         </button>
 
         <div className="space-y-3">
@@ -638,7 +640,7 @@ export default function CharacterEditor({
                       )}
                     </div>
                     <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 inline-block mt-1">
-                      {char.class_archetype || 'No class'}
+                      {char.class_archetype || t('character.noClass')}
                     </span>
                   </div>
                   {char.id && isOwner(char) && (
@@ -686,17 +688,17 @@ export default function CharacterEditor({
             <div className="flex flex-wrap justify-between items-center gap-3 border-b border-zinc-800 pb-3">
               <div>
                 <h2 className="text-lg font-semibold text-white">
-                  {selectedChar.id ? 'Edit Character Sheet' : 'New Character Sheet'}
+                  {selectedChar.id ? t('character.editTitle') : t('character.newTitle')}
                 </h2>
                 <span className="text-[11px] text-zinc-400 font-mono">
-                  {activeTemplate.name} • ผู้สร้างเทมเพลต: {activeTemplate.author || 'D&D Playground'}
+                  {activeTemplate.name} • {t('common.sheetAuthor')}: {activeTemplate.author || 'D&D Playground'}
                 </span>
               </div>
 
               {/* Template Controls Replacing 'Draft' Badge */}
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs">
-                  <span className="text-[10px] uppercase font-mono text-zinc-500">Template:</span>
+                  <span className="text-[10px] uppercase font-mono text-zinc-500">{t('character.template')}:</span>
                   <select
                     value={activeTemplate.id}
                     onChange={(e) => handleSwitchTemplate(e.target.value)}
@@ -722,7 +724,7 @@ export default function CharacterEditor({
                   className="flex items-center gap-1.5 px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 hover:text-white text-zinc-200 border border-zinc-700 rounded-lg transition cursor-pointer shadow-sm"
                 >
                   <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{isBuiltinTemplateId(activeTemplate.id) ? 'ปรับแต่งชีตนี้ (Customize)' : 'แก้ไขโครงสร้าง / Key'}</span>
+                  <span>{isBuiltinTemplateId(activeTemplate.id) ? t('character.templateCustomizer') : (language === 'en' ? 'Edit Structure / Key' : 'แก้ไขโครงสร้าง / Key')}</span>
                 </button>
               </div>
             </div>
@@ -730,7 +732,7 @@ export default function CharacterEditor({
             {/* Core Identity */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-400 uppercase">Character Name</label>
+                <label className="text-xs text-zinc-400 uppercase">{t('character.name')}</label>
                 <input
                   type="text"
                   required
@@ -741,7 +743,7 @@ export default function CharacterEditor({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 uppercase">Class Archetype</label>
+                <label className="text-xs text-zinc-400 uppercase">{t('character.archetype')}</label>
                 <input
                   type="text"
                   required
@@ -924,7 +926,7 @@ export default function CharacterEditor({
 
             {/* Status Condition (Populated dynamically from template.conditions) */}
             <div>
-              <label className="text-xs text-zinc-400 uppercase">Status Condition</label>
+              <label className="text-xs text-zinc-400 uppercase">{t('character.statusCondition')}</label>
               <select
                 value={selectedChar.status_condition || activeTemplate.conditions[0] || 'Normal'}
                 onChange={(e) =>
@@ -951,7 +953,7 @@ export default function CharacterEditor({
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-xs text-zinc-400 uppercase">
-                    Attributes & Stats ({activeTemplate.stats.length})
+                    {t('character.statsAndAttributes')} ({activeTemplate.stats.length})
                   </label>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
@@ -1016,7 +1018,7 @@ export default function CharacterEditor({
             {activeTemplate.equipmentSlots.length > 0 && (
               <div>
                 <label className="text-xs text-zinc-400 uppercase block mb-2">
-                  Equipment Slots ({activeTemplate.equipmentSlots.length})
+                  {t('character.equipmentSlots')} ({activeTemplate.equipmentSlots.length})
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {activeTemplate.equipmentSlots.map((slot) => {
@@ -1050,7 +1052,7 @@ export default function CharacterEditor({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Skills
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {t('character.skills')}
                   </label>
                   <span className="text-[11px] text-zinc-500 font-mono">
                     {(selectedChar.skills ?? extractCharacterSkills(selectedChar)).length} slot(s)
@@ -1133,7 +1135,7 @@ export default function CharacterEditor({
                   onClick={handleAddSkill}
                   className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add Skill
+                  <Plus className="w-3.5 h-3.5" /> {t('character.addSkill')}
                 </button>
               </div>
             )}
@@ -1145,7 +1147,7 @@ export default function CharacterEditor({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5">
-                      <Package className="w-3.5 h-3.5 text-amber-400" /> Inventory (Item Log)
+                      <Package className="w-3.5 h-3.5 text-amber-400" /> {t('character.inventory')}
                     </label>
                     <span className="text-[11px] text-zinc-500 font-mono">
                       {inventoryItems.length} item(s)
@@ -1234,7 +1236,7 @@ export default function CharacterEditor({
                     onClick={handleAddInventoryItem}
                     className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Item
+                    <Plus className="w-3.5 h-3.5" /> {t('character.addItem')}
                   </button>
                 </div>
               )
@@ -1253,7 +1255,7 @@ export default function CharacterEditor({
                   ) : (
                     <Trash2 className="w-3.5 h-3.5" />
                   )}
-                  Delete Character
+                  {t('character.deleteChar')}
                 </button>
               ) : (
                 <div />
@@ -1264,14 +1266,14 @@ export default function CharacterEditor({
                   onClick={() => setSelectedChar(null)}
                   className="px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving || deletingId !== null}
                   className="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium cursor-pointer disabled:opacity-50 shadow-md"
                 >
-                  {isSaving ? 'Saving...' : 'Save Character Sheet'}
+                  {isSaving ? t('character.savingChar') : t('character.saveChar')}
                 </button>
               </div>
             </div>

@@ -23,6 +23,8 @@ import {
   Zap,
 } from "lucide-react";
 import { useAlert } from "@/components/ui/AlertModal";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import LanguageToggle from "@/components/ui/LanguageToggle";
 import {
   EMPTY_EQUIPMENT,
   extractCharacterSkillCost,
@@ -109,6 +111,7 @@ export default function CharacterInspectorPanel({
 }: CharacterInspectorPanelProps) {
   const { showAlert } = useAlert();
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [scalePercent, setScalePercent] = useState<number>(() => {
@@ -304,29 +307,32 @@ export default function CharacterInspectorPanel({
           className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-amber-400 transition pr-2 border-r border-zinc-800"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-amber-500" />
-          <span className="hidden sm:inline">Hub</span>
+          <span className="hidden sm:inline">{t('nav.hub')}</span>
         </Link>
         <span className="text-[10px] font-mono text-zinc-400 tracking-wider">
-          CODE: <strong className="text-amber-400">{tableCode}</strong>
+          {t('table.tableCode')}: <strong className="text-amber-400">{tableCode}</strong>
         </span>
         <button
           type="button"
           onClick={handleCopyInviteLink}
-          title="Copy Invite Link"
+          title={t('table.copyLink')}
           className="inline-flex items-center gap-1 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 px-2 py-0.5 text-[10px] font-mono text-zinc-300 hover:text-amber-300 transition cursor-pointer"
         >
           {copiedInvite ? (
             <>
               <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <span className="text-emerald-400">{t('table.inviteLinkCopied')}</span>
             </>
           ) : (
             <>
               <Link2 className="w-3 h-3 text-amber-500" />
-              <span>Invite</span>
+              <span>{t('table.copyLink')}</span>
             </>
           )}
         </button>
+        <div className="pl-1 border-l border-zinc-800">
+          <LanguageToggle />
+        </div>
       </div>
 
       {/* EXTRACTED RESPONSIVE FLOATING SAO CIRCULAR ORB WITH [ − | 100% | + ] SIZE CONTROLS */}
@@ -360,19 +366,19 @@ export default function CharacterInspectorPanel({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[9px] font-mono uppercase tracking-[0.22em] text-amber-400">
-                    PLAYER STATUS
+                    {t('sao.playerStatus')}
                   </span>
                   <span className="text-[9px] font-mono px-1.5 py-0.2 bg-white/10 text-zinc-300 rounded-xs">
-                    {isHeadTable ? "HOST" : "PARTY"}
+                    {isHeadTable ? t('sao.host') : t('sao.party')}
                   </span>
                 </div>
                 <h2 className="text-base font-bold text-white truncate">
-                  {activeChar ? activeChar.name : "No Character Bound"}
+                  {activeChar ? activeChar.name : t('sao.noCharBound')}
                 </h2>
                 <p className="text-[11px] text-zinc-400 truncate">
                   {activeChar
-                    ? `${activeChar.class_archetype || 'Adventurer'} • ${activeTemplate.name} (ผู้สร้างชีท: ${activeTemplate.author || 'D&D Playground'})`
-                    : "Select a character sheet below"}
+                    ? `${activeChar.class_archetype || 'Adventurer'} • ${activeTemplate.name} (${language === 'en' ? 'Sheet Creator' : 'ผู้สร้างชีท'}: ${activeTemplate.author || 'D&D Playground'})`
+                    : t('sao.selectCharBelow')}
                 </p>
               </div>
             </div>
@@ -384,7 +390,7 @@ export default function CharacterInspectorPanel({
                     type="button"
                     onClick={onToggleEdit}
                     title={
-                      isEditingChar ? "Close Editor" : "Edit Character Sheet"
+                      isEditingChar ? t('sao.closeEditor') : t('sao.editSheet')
                     }
                     className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider border transition flex items-center gap-1 cursor-pointer ${
                       isEditingChar
@@ -393,16 +399,16 @@ export default function CharacterInspectorPanel({
                     }`}
                   >
                     <Edit3 className="w-3 h-3" />
-                    <span>{isEditingChar ? "Close" : "Edit"}</span>
+                    <span>{isEditingChar ? t('sao.closeEditor') : t('common.edit')}</span>
                   </button>
                   <button
                     type="button"
                     onClick={onStartSwitch}
-                    title="Switch Character Sheet"
+                    title={t('sao.switchSheet')}
                     className="px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider bg-white/5 border border-white/15 text-zinc-300 hover:border-white/40 hover:text-white transition flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    <span>Switch</span>
+                    <span>{t('sao.switchSheet')}</span>
                   </button>
                 </>
               )}
@@ -425,7 +431,7 @@ export default function CharacterInspectorPanel({
                 <div className="flex justify-between items-center">
                   <label className="text-xs text-zinc-300 font-medium flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Select character for this session:</span>
+                    <span>{t('sao.selectCharBelow')}</span>
                   </label>
                   {isSwitchingChar && (
                     <button
@@ -433,7 +439,7 @@ export default function CharacterInspectorPanel({
                       onClick={onCancelSwitch}
                       className="text-[10px] font-mono uppercase text-zinc-400 hover:text-white cursor-pointer"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   )}
                 </div>
@@ -443,10 +449,10 @@ export default function CharacterInspectorPanel({
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-amber-300 flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5" />
-                      Required: {campaignTemplate.name} (ผู้สร้างชีท: {campaignTemplate.author || 'Campaign Creator'})
+                      {language === 'en' ? 'Required:' : 'ข้อกำหนด:'} {campaignTemplate.name} ({language === 'en' ? 'Sheet Creator' : 'ผู้สร้างชีท'}: {campaignTemplate.author || 'Campaign Creator'})
                     </span>
                     <span className="text-[10px] font-medium bg-amber-900/70 text-amber-200 px-2 py-0.5 rounded border border-amber-700/60">
-                      Enforced
+                      {t('sao.enforced')}
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-400 leading-snug">
@@ -461,7 +467,7 @@ export default function CharacterInspectorPanel({
                       ))
                     ) : (
                       <span className="bg-amber-950/80 border border-amber-800 text-amber-300 px-1.5 py-0.5 rounded font-medium">
-                        0 Resource Bars (Item & Clues Only)
+                        {t('sao.inventoryCluesOnly')}
                       </span>
                     )}
                     <span className="bg-zinc-900/90 border border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
@@ -478,7 +484,7 @@ export default function CharacterInspectorPanel({
                   href={`/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`}
                   className="w-full py-2.5 px-3 bg-linear-to-r from-amber-600/90 to-amber-500/90 hover:from-amber-600 hover:to-amber-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> สร้างตัวละครจากเทมเพลตที่แคมเปญกำหนด
+                  <Plus className="w-3.5 h-3.5" /> {t('sao.createCharButton')}
                 </Link>
 
                 {/* Character List with Compatibility Checking */}
@@ -490,13 +496,13 @@ export default function CharacterInspectorPanel({
 
                     const handleMismatchedCharClick = () => {
                       showAlert({
-                        title: "รูปแบบชีทไม่ตรงกับข้อกำหนดของแคมเปญ",
+                        title: language === 'en' ? 'Sheet Format Mismatches Campaign Requirements' : 'รูปแบบชีทไม่ตรงกับข้อกำหนดของแคมเปญ',
                         status: "warning",
                         badge: "Sheet Mismatch",
                         maxWidth: "md",
-                        buttonText: "เลือกตัวละครอื่น",
+                        buttonText: language === 'en' ? 'Pick Another Character' : 'เลือกตัวละครอื่น',
                         action: {
-                          label: "สร้างตัวละครใหม่สำหรับแคมเปญนี้",
+                          label: language === 'en' ? 'Create New Character For This Campaign' : 'สร้างตัวละครใหม่สำหรับแคมเปญนี้',
                           variant: "accent",
                           onClick: () => {
                             router.push(
@@ -591,7 +597,7 @@ export default function CharacterInspectorPanel({
                             {char.name}
                             {isCompatible ? (
                               <span className="text-[10px] font-normal bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Compatible
+                                <Check className="w-3 h-3" /> {t('sao.compatible')}
                               </span>
                             ) : (
                               <span className="text-[10px] font-normal bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded">
@@ -601,7 +607,7 @@ export default function CharacterInspectorPanel({
                           </p>
                           {!isCompatible && (
                             <span className="text-[10px] text-red-400 flex items-center gap-1 font-mono">
-                              <AlertCircle className="w-3 h-3" /> Mismatched
+                              <AlertCircle className="w-3 h-3" /> {t('sao.mismatched')}
                             </span>
                           )}
                         </div>
@@ -620,7 +626,7 @@ export default function CharacterInspectorPanel({
                   <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs space-y-2 text-amber-200">
                     <div className="flex items-center gap-1.5 font-semibold text-amber-300">
                       <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>ยังไม่มีตัวละครที่ตรงตามเงื่อนไขของแคมเปญนี้</span>
+                      <span>{language === 'en' ? 'No character matches this campaign yet' : 'ยังไม่มีตัวละครที่ตรงตามเงื่อนไขของแคมเปญนี้'}</span>
                     </div>
                     <p className="text-[11px] text-amber-200/80 leading-relaxed">
                       แคมเปญนี้กำหนดให้ใช้รูปแบบชีท <strong className="text-white font-medium">&ldquo;{campaignTemplate.name}&rdquo;</strong> คุณสามารถกดปุ่มด้านล่างเพื่อสร้างตัวละครที่ตรงตามเงื่อนไขได้ทันที
@@ -629,7 +635,7 @@ export default function CharacterInspectorPanel({
                       href={`/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`}
                       className="inline-flex items-center justify-center gap-1.5 w-full py-2 bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-xs font-semibold shadow transition cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" /> สร้างตัวละครจากเทมเพลตของแคมเปญนี้
+                      <Plus className="w-3.5 h-3.5" /> {t('sao.createCharButton')}
                     </Link>
                   </div>
                 )}
@@ -637,13 +643,13 @@ export default function CharacterInspectorPanel({
                 {userCharacters.length === 0 && (
                   <div className="p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-xl text-center space-y-2.5">
                     <p className="text-xs text-zinc-400">
-                      ยังไม่พบแผ่นตัวละครในคลังของคุณ
+                      {language === 'en' ? 'No character sheets found in your codex' : 'ยังไม่พบแผ่นตัวละครในคลังของคุณ'}
                     </p>
                     <Link
                       href={`/characters?tableCode=${encodeURIComponent(tableCode)}&templateId=${encodeURIComponent(campaignTemplate.id)}&returnTo=${encodeURIComponent(`/table/${tableCode}`)}`}
                       className="inline-flex items-center justify-center gap-1.5 w-full py-2 bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-xs font-semibold shadow transition cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" /> สร้างตัวละครสำหรับแคมเปญนี้ทันที
+                      <Plus className="w-3.5 h-3.5" /> {t('sao.createCharButton')}
                     </Link>
                   </div>
                 )}
@@ -830,7 +836,7 @@ export default function CharacterInspectorPanel({
 
                 <div>
                   <label className="text-[10px] text-zinc-400 uppercase font-mono">
-                    Condition
+                    {t('character.statusCondition')}
                   </label>
                   <select
                     value={charForm.status_condition}
@@ -863,7 +869,7 @@ export default function CharacterInspectorPanel({
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[10px] text-zinc-400 uppercase font-mono block">
-                        Attributes & Stats
+                        {t('character.statsAndAttributes')}
                       </label>
                       <span className="text-[9px] text-zinc-500 font-mono">
                         Allows negative
@@ -1066,7 +1072,7 @@ export default function CharacterInspectorPanel({
                       }
                       className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      <Plus className="w-3 h-3" /> Add Item
+                      <Plus className="w-3 h-3" /> {t('character.addItem')}
                     </button>
                   </div>
                 )}
@@ -1075,7 +1081,7 @@ export default function CharacterInspectorPanel({
                 {activeTemplate.equipmentSlots.length > 0 && (
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-1">
-                      Equipment Slots
+                      {t('character.equipmentSlots')}
                     </label>
                     <div className="grid grid-cols-2 gap-1.5">
                       {activeTemplate.equipmentSlots.map((slot) => {
@@ -1250,7 +1256,7 @@ export default function CharacterInspectorPanel({
                       }
                       className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded text-[11px] font-medium transition flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      <Plus className="w-3 h-3" /> Add Skill
+                      <Plus className="w-3 h-3" /> {t('character.addSkill')}
                     </button>
                   </div>
                 )}
@@ -1373,7 +1379,7 @@ export default function CharacterInspectorPanel({
                   <div className="p-2.5 bg-zinc-900/70 border border-white/10 rounded flex justify-between items-center">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                       <Shield className="w-3.5 h-3.5 text-amber-400" />{" "}
-                      Condition
+                      {t('character.statusCondition')}
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
@@ -1429,7 +1435,7 @@ export default function CharacterInspectorPanel({
                 {activeTemplate.equipmentSlots.length > 0 && (
                   <div>
                     <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/90 block mb-1.5">
-                      Equipment Slots
+                      {t('character.equipmentSlots')}
                     </span>
                     <div className="grid grid-cols-2 gap-1.5">
                       {activeTemplate.equipmentSlots.map((slot) => {
@@ -1578,14 +1584,14 @@ export default function CharacterInspectorPanel({
                   className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 rounded text-xs font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />{" "}
-                  {isSavingChar ? "Saving..." : "Save Sheet"}
+                  {isSavingChar ? t('character.savingChar') : t('character.saveChar')}
                 </button>
                 <button
                   type="button"
                   onClick={onCancelEdit}
                   className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300 cursor-pointer"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>

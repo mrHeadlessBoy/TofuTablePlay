@@ -22,6 +22,8 @@ import {
 import TemplateModal from '@/features/character/components/TemplateModal'
 import Link from 'next/link'
 import { useAlert } from '@/components/ui/AlertModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { LanguageToggle } from '@/components/ui/LanguageToggle'
 
 const CATEGORIES = [
   'Fantasy', 'Sci-Fi', 'Horror', 'Comedy', 'Romance',
@@ -60,6 +62,7 @@ const EMPTY_ENTRY: LoreEntryInput = {
 export default function CampaignForm({ mode, campaignId, initial }: CampaignFormProps) {
   const router = useRouter()
   const { showAlert, showConfirm } = useAlert()
+  const { t, language } = useLanguage()
   const isEdit = mode === 'edit'
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState(initial?.title ?? '')
@@ -284,26 +287,29 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
         <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Sparkles className="w-7 h-7 text-amber-500" /> {isEdit ? 'Edit Campaign' : 'Campaign & Lorebook Studio'}
+              <Sparkles className="w-7 h-7 text-amber-500" /> {isEdit ? t('campaign.editTitle') : t('campaign.newTitle')}
             </h1>
             <p className="text-zinc-400 text-sm">Author your campaign universe and configure context triggers for the AI DM.</p>
           </div>
-          <Link
+          <div className="flex items-center gap-3 shrink-0">
+            <LanguageToggle />
+            <Link
             href="/hub"
             className="text-xs text-amber-500 hover:text-amber-400 underline"
           >
-            &larr; Back to Hub
-          </Link>
+            {t('common.backToHub')}
+            </Link>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Section 1: Campaign Overview */}
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-white">Campaign Foundation</h2>
+            <h2 className="text-lg font-semibold text-white">{t('campaign.foundation')}</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-400 uppercase font-medium">Campaign Title</label>
+                <label className="text-xs text-zinc-400 uppercase font-medium">{t('campaign.campaignTitle')}</label>
                 <input
                   type="text"
                   required
@@ -315,7 +321,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
               </div>
 
               <div>
-                <label className="text-xs text-zinc-400 uppercase font-medium">Genre / Category</label>
+                <label className="text-xs text-zinc-400 uppercase font-medium">{t('campaign.genre')}</label>
                 <select
                   value={category}
                   onChange={(e) => {
@@ -336,7 +342,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
 
             {category === 'Custom' && (
               <div>
-                <label className="text-xs text-zinc-400 uppercase font-medium">Custom Category Name</label>
+                <label className="text-xs text-zinc-400 uppercase font-medium">{t('campaign.genreCustom')}</label>
                 <input
                   type="text"
                   required
@@ -348,7 +354,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             )}
 
             <div>
-              <label className="text-xs text-zinc-400 uppercase font-medium">Core Narrative Brief</label>
+              <label className="text-xs text-zinc-400 uppercase font-medium">{t('campaign.coreBrief')}</label>
               <textarea
                 required
                 rows={3}
@@ -360,7 +366,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             </div>
 
             <div>
-              <label className="text-xs text-zinc-400 uppercase font-medium">World Setting & Environment Lore</label>
+              <label className="text-xs text-zinc-400 uppercase font-medium">{t('campaign.worldSetting')}</label>
               <textarea
                 required
                 rows={3}
@@ -375,7 +381,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs text-zinc-400 uppercase flex items-center gap-1.5 font-medium">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Rule Mechanics & Custom Systems
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {t('campaign.ruleMechanics')}
                 </label>
                 <span className="text-[11px] text-zinc-500 font-mono">
                   {ruleMechanicsList.length} rule(s)
@@ -454,7 +460,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                 onClick={handleAddRule}
                 className="w-full py-2 px-3 bg-zinc-950 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-amber-500/60 text-amber-400 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> Add Rule Mechanic
+                <Plus className="w-3.5 h-3.5" /> {t('campaign.addRule')}
               </button>
             </div>
           </div>
@@ -464,10 +470,10 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-amber-500" />
-                <h2 className="text-lg font-semibold text-white">Required Character Sheet Template</h2>
+                <h2 className="text-lg font-semibold text-white">{t('campaign.requiredSheetTemplate')}</h2>
               </div>
               <span className="text-[11px] font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 px-2.5 py-0.5 rounded-full">
-                Strict Table Requirement
+                {t('campaign.mandatoryFormat')}
               </span>
             </div>
             <p className="text-xs text-zinc-400">
@@ -536,7 +542,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                               : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60'
                           }`}
                         >
-                          {isSelected ? '✓ เลือกใช้อยู่' : 'เลือกพรีเซ็ตนี้'}
+                          {isSelected ? t('campaign.selected') : t('campaign.selectPreset')}
                         </button>
 
                         <button
@@ -555,7 +561,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                           title={`ปรับแต่งโดยใช้ ${preset.name} เป็นโครงสร้างเริ่มต้น`}
                         >
                           <Sliders className="w-3.5 h-3.5" />
-                          <span>ปรับแต่งจากพรีเซ็ต</span>
+                          <span>{t('campaign.customizeFromPreset')}</span>
                         </button>
                       </div>
                     </div>
@@ -587,7 +593,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-white flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-amber-400" />
-                      Custom Campaign Template (กำหนดโครงสร้างชีทเอง)
+                      {t('campaign.customTemplate')}
                     </span>
                     {isCustomTemplate ? (
                       <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded flex items-center gap-1">
@@ -623,7 +629,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                       title="Reset to a blank sheet canvas"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>ล้างเป็นชีทว่างใหม่</span>
+                      <span>{language === 'en' ? 'Reset to Blank' : 'ล้างเป็นชีทว่างใหม่'}</span>
                     </button>
                   )}
                   <button
@@ -642,7 +648,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium cursor-pointer shadow"
                   >
                     <Sliders className="w-3.5 h-3.5" />
-                    <span>{isCustomTemplate ? 'Edit in Builder / Key' : 'สร้างชีท Custom ว่างเปล่า'}</span>
+                    <span>{isCustomTemplate ? t('campaign.editInBuilder') : t('campaign.createBlankSheet')}</span>
                   </button>
                 </div>
               </div>
@@ -805,8 +811,8 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-sm transition disabled:opacity-50 cursor-pointer"
           >
             {loading
-              ? (isEdit ? 'Saving Changes...' : 'Creating Campaign...')
-              : (isEdit ? 'Save Changes' : 'Publish Campaign')}
+              ? (isEdit ? t('common.saving') : (language === 'en' ? 'Creating Campaign...' : 'กำลังสร้างแคมเปญ...'))
+              : (isEdit ? t('campaign.saveChanges') : t('campaign.createCampaign'))}
           </button>
         </form>
 

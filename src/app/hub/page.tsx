@@ -1,10 +1,8 @@
 import { Suspense } from 'react'
 import { createClient, resolveMultipleUserDisplayNames } from '@/lib/supabase/server'
 import { extractCampaignTemplate } from '@/features/character/template'
-import Link from 'next/link'
 import HubClient from '@/features/hub/components/HubClient'
-import { signOut } from '@/features/hub/actions'
-import { LogOut } from 'lucide-react'
+import HubHeader from '@/features/hub/components/HubHeader'
 
 // Reads cookies (runtime data), so it must render inside <Suspense>.
 async function HubData() {
@@ -59,31 +57,7 @@ export default function CampaignHubPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Campaign Hub</h1>
-            <p className="text-zinc-400 text-sm">Join an existing room, launch a session, or build your worlds.</p>
-          </div>
-          <div className="flex gap-3 items-center">
-            <Link href="/characters" className="text-xs text-zinc-300 hover:text-white bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg transition">
-              Character Sheets
-            </Link>
-            <Link href="/campaigns/new" className="text-xs text-white bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded-lg font-medium transition">
-              + New Campaign
-            </Link>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="text-xs text-zinc-400 hover:text-red-400 bg-zinc-900 hover:bg-red-950/30 border border-zinc-800 hover:border-red-900/50 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer font-medium"
-                title="Sign out of your account"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
-              </button>
-            </form>
-          </div>
-        </div>
-
+        <HubHeader />
         <Suspense fallback={<p className="text-sm text-zinc-500">Loading campaigns...</p>}>
           <HubData />
         </Suspense>

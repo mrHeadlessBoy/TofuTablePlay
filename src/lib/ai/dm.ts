@@ -173,6 +173,7 @@ export interface DmTurnInput {
     party_actions_summary?: string
   }[]
   partyActions: PartyMemberAction[]
+  language?: 'th' | 'en'
 }
 
 const NO_ACTION_TEXT =
@@ -482,7 +483,8 @@ function formatPartyMemberForPrompt(
 }
 
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
-  const { campaign, loreEntries, recentTurns, partyActions } = input
+  const { campaign, loreEntries, recentTurns, partyActions, language = 'th' } = input
+  const isEn = language === 'en'
 
   // เช็กว่าเป็นเทิร์นแรกที่ผู้เล่นเริ่มเล่นหรือไม่ (มีเฉพาะ Opening Turn อยู่ในประวัติ)
   const isFirstPlayerTurn = recentTurns.length <= 1
@@ -706,7 +708,38 @@ export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
    - ให้ใช้ผลทอยเต๋า (SUCCESS/FAIL/NAT 20/NAT 1) เป็นตัวตัดสินผลลัพธ์เบื้องหลัง แล้วบรรยายผลลัพธ์นั้นออกมาเป็นเหตุการณ์ในเรื่องแทน
    - ในหมวด [ Decision ] ให้ระบุเฉพาะสิ่งที่ตัวละครต้องเผชิญและทอยในเทิร์นถัดไปเท่านั้น ซึ่งเป็นคำสั่งไปข้างหน้า ไม่ใช่การรายงานผลเต๋าในเทิร์นนี้`)
 
-  const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
+  const systemInstruction = isEn
+    ? `You are the AI Dungeon Master, supreme referee, storyteller, and immersive world-builder for the tabletop RPG campaign titled "${campaign.title}" (${campaign.category}).
+
+[WORLD SETTING & TONE]
+${campaign.world_setting}
+
+[OVERARCHING STORY]
+${campaign.core_description}
+
+[ACTIVE MECHANICS / RULES]
+${formatRuleMechanicsForPrompt(campaign.rule_mechanics)}
+
+[LANGUAGE DIRECTIVE]
+Output all narrative descriptions, atmospheric prose, character dialogues, [ Overview ], and [ Decision ] strictly in natural, fluent, and evocative English.
+
+[CORE DIRECTIVES & RESOLUTION RULES]
+${ruleModules.join('\n\n')}
+
+[REQUIRED OUTPUT FORMAT]
+${requiredOutputDescription}
+
+[ Overview ]
+Location & Time : (Location name, environment brief, and current time)
+Current Situation : (Concise summary of immediate party circumstances)
+${overviewMiddleSection}
+Party Status : (Report all resources from each member's sheet and latest condition, separated by " ; " e.g. "${dynamicPartyStatusFormatExample}")
+
+[ Decision ]
+*(Important: Only include this section if members must make an urgent decision or skill check in the next turn! Otherwise omit [ Decision ] completely)*
+(1 line per character, citing real stats from that character's sheet e.g. ${dynamicStatsSummary}):
+${decisionDiceInstructions.join('\n')}`
+    : `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
 [WORLD SETTING & TONE]
 ${campaign.world_setting}
@@ -1108,7 +1141,7 @@ export function extractPartyStateUpdates(
   // 2. Parse "สถานะปาร์ตี้ :" inside [ Overview ] (authoritative end-of-turn lock for all template resources & condition)
   // Supports both single-line (";"-separated) and multi-line / bulleted party status blocks.
   const partyStatusBlockMatch = narrative.match(
-    /สถานะปาร์ตี้\s*[:：]\s*([\s\S]*?)(?=\n\s*(?:\[\s*Decision\s*\]|สถานที่และเวลา|สถานการณ์ปัจจุบัน|สถานะศัตรู)|$)/i
+    /(?:สถานะปาร์ตี้|Party\s+Status)\s*[:：]\s*([\s\S]*?)(?=\n\s*(?:\[\s*Decision\s*\]|สถานที่และเวลา|สถานการณ์ปัจจุบัน|สถานะศัตรู|Location\s*(?:&|and)\s*Time|Current\s+Situation|Enemy\s+Status)|$)/i
   )
   if (partyStatusBlockMatch) {
     const statusBlock = partyStatusBlockMatch[1].trim()
@@ -1237,8 +1270,10 @@ export function extractPartyStateUpdates(
 export async function generateOpeningNarrative(input: {
   campaign: DmTurnInput['campaign']
   loreEntries: LoreEntry[]
+  language?: 'th' | 'en'
 }): Promise<string> {
-  const { campaign, loreEntries } = input
+  const { campaign, loreEntries, language = 'th' } = input
+  const isEn = language === 'en'
 
   const scanTargetText = `${campaign.world_setting}\n${campaign.core_description}`
   const openingLore = extractTriggeredLore(loreEntries, scanTargetText, true)
@@ -1251,7 +1286,33 @@ export async function generateOpeningNarrative(input: {
   const isCombatCampaign =
     campaignTpl.mechanics.mode === 'combat' && campaignTpl.mechanics.vitalityResourceId !== null
 
-  const systemInstruction = `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
+  const systemInstruction = isEn
+    ? `You are the AI Dungeon Master, supreme referee, storyteller, and immersive world-builder for the tabletop RPG campaign titled "${campaign.title}" (${campaign.category}). Output all narrative descriptions, atmospheric prose, and structured output strictly in vivid, engaging, and evocative English.
+
+[WORLD SETTING & TONE]
+${campaign.world_setting}
+
+[OVERARCHING STORY]
+${campaign.core_description}
+
+[ACTIVE MECHANICS / RULES]
+${formatRuleMechanicsForPrompt(campaign.rule_mechanics)}
+
+[OPENING SCENE DIRECTIVES]
+1. This is the opening scene prologue before any player has acted. Introduce the world and set the stage using the campaign details above.
+2. Describe the location, time of day, atmosphere, and the immediate situation unfolding before the adventurers in 2-3 compelling paragraphs.
+3. Players have not yet bound characters or acted. Do not name specific characters or invent personal backstories; refer to them collectively as "the party" or "you".
+4. There are no dice rolls yet. Do NOT ask for checks and do NOT output [ Decision ].
+5. Conclude with a brief call to action prompting players for their opening moves.
+
+[REQUIRED OUTPUT FORMAT]
+(Opening story narrative text)
+
+[ Overview ]
+Location & Time : (Location name, environment summary, and explicit time of day)
+Current Situation : (Concise summary of the immediate situation facing the party)
+${isCombatCampaign ? 'Enemy Status : (If hostiles appear in the opening, name them with HP: 100% / if none yet, write "None")' : 'Obstacle & Tension Status : (If obstacles, mysteries, or tension exist, state them briefly / if none yet, write "None")'}`
+    : `คุณคือ Dungeon Master AI ผู้มีอำนาจตัดสินใจและสร้างบรรยากาศที่สมจริง สำหรับแคมเปญเกม tabletop RPG เรื่อง "${campaign.title}" (${campaign.category}).
 
 [WORLD SETTING & TONE]
 ${campaign.world_setting}
@@ -1279,7 +1340,7 @@ ${isCombatCampaign ? 'สถานะศัตรู : (หากในฉาก
 
   const openingRequest = [
     loreContext ? `[LORE FOR THE OPENING SCENE]\n${loreContext}\n` : '',
-    '[OPENING]: โต๊ะเพิ่งเปิด ปาร์ตี้มารวมตัวกันแล้ว จงบรรยายฉากเปิดของการผจญภัย',
+    isEn ? '[OPENING]: The table has just opened and the party is assembled. Narrate the opening scene.' : '[OPENING]: โต๊ะเพิ่งเปิด ปาร์ตี้มารวมตัวกันแล้ว จงบรรยายฉากเปิดของการผจญภัย',
   ]
     .filter(Boolean)
     .join('\n')

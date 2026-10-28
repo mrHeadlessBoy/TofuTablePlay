@@ -42,6 +42,7 @@ import NarrativeFeedPanel from './NarrativeFeedPanel'
 import PartyRosterSidebar from './PartyRosterSidebar'
 import PartyChatWidget from './PartyChatWidget'
 import { useAlert } from '@/components/ui/AlertModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import {
   MAX_PARTY_CHAT_MESSAGES,
   READY_CLAIM_TTL_MS,
@@ -69,6 +70,7 @@ export default function TablePlayground({
   isHeadTable,
 }: TablePlaygroundProps) {
   const { showAlert, showConfirm } = useAlert()
+  const { t, language } = useLanguage()
   const [table, setTable] = useState(initialTable)
   const [members, setMembers] = useState(initialMembers)
   const [memberLoadError, setMemberLoadError] = useState<string | null>(null)
@@ -465,7 +467,7 @@ export default function TablePlayground({
     setIsResolving(true)
     let failure: string | null = null
     try {
-      const result = await resolveTurn(table.id)
+      const result = await resolveTurn(table.id, language)
       setDraftAction('')
       setAttachedRolls([])
       tableSetAtRef.current = Date.now()
@@ -502,7 +504,7 @@ export default function TablePlayground({
     if (failure) {
       showAlert(failure)
     }
-  }, [table.id, broadcastSync, showAlert, refreshMembers])
+  }, [table.id, broadcastSync, showAlert, refreshMembers, language])
 
   // Synchronized countdown timer
   useEffect(() => {
@@ -728,9 +730,9 @@ export default function TablePlayground({
       broadcastSync()
     } catch (err: unknown) {
       showAlert({
-        title: 'ไม่สามารถบันทึกข้อมูลตัวละครได้',
+        title: language === 'en' ? 'Failed to save character' : 'ไม่สามารถบันทึกข้อมูลตัวละครได้',
         status: 'error',
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการบันทึกข้อมูลตัวละคร (Failed to update character)',
+        message: err instanceof Error ? err.message : (language === 'en' ? 'Failed to update character' : 'เกิดข้อผิดพลาดในการบันทึกข้อมูลตัวละคร'),
       })
     } finally {
       setIsSavingChar(false)
@@ -744,19 +746,19 @@ export default function TablePlayground({
       broadcastSync()
     } catch (err: unknown) {
       showAlert({
-        title: 'ไม่สามารถบันทึกเนื้อเรื่องได้',
+        title: language === 'en' ? 'Failed to save narrative' : 'ไม่สามารถบันทึกเนื้อเรื่องได้',
         status: 'error',
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการแก้ไขเนื้อเรื่อง (Failed to save narrative edit)',
+        message: err instanceof Error ? err.message : (language === 'en' ? 'Failed to save narrative edit' : 'เกิดข้อผิดพลาดในการแก้ไขเนื้อเรื่อง'),
       })
     }
   }
 
   const handleKick = async (targetUserId: string, targetName: string) => {
     const confirmed = await showConfirm({
-      title: 'ยืนยันการนำผู้เล่นออกจากโต๊ะ',
-      message: `คุณแน่ใจหรือไม่ว่าต้องการนำ ${targetName} ออกจากโต๊ะนี้?`,
-      confirmText: 'นำออก',
-      cancelText: 'ยกเลิก',
+      title: language === 'en' ? 'Confirm Member Removal' : 'ยืนยันการนำผู้เล่นออกจากโต๊ะ',
+      message: language === 'en' ? `Are you sure you want to remove ${targetName} from this table?` : `คุณแน่ใจหรือไม่ว่าต้องการนำ ${targetName} ออกจากโต๊ะนี้?`,
+      confirmText: language === 'en' ? 'Remove' : 'นำออก',
+      cancelText: t('common.cancel'),
     })
     if (confirmed) {
       try {
@@ -764,9 +766,9 @@ export default function TablePlayground({
         broadcastSync()
       } catch (err: unknown) {
         showAlert({
-          title: 'ไม่สามารถนำผู้เล่นออกจากโต๊ะได้',
+          title: language === 'en' ? 'Failed to remove member' : 'ไม่สามารถนำผู้เล่นออกจากโต๊ะได้',
           status: 'error',
-          message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการนำผู้เล่นออกจากโต๊ะ (Failed to remove member)',
+          message: err instanceof Error ? err.message : (language === 'en' ? 'Failed to remove member' : 'เกิดข้อผิดพลาดในการนำผู้เล่นออกจากโต๊ะ'),
         })
       }
     }

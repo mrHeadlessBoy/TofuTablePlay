@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import {
   X,
   Copy,
@@ -65,6 +66,7 @@ export default function TemplateModal({
   currentTemplate,
   onApplyTemplate,
 }: TemplateModalProps) {
+  const { t, language } = useLanguage()
   const [tab, setTab] = useState<TemplateModalTab>('customize')
 
   // Working copy of the template being edited in the visual builder
@@ -417,7 +419,7 @@ export default function TemplateModal({
                   title="Clear all fields to a blank canvas"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>ล้างเป็นชีทว่าง (Start from Blank)</span>
+                  <span>{language === 'en' ? 'Start from Blank Sheet' : 'ล้างเป็นชีทว่าง (Start from Blank)'}</span>
                 </button>
               </div>
 
@@ -1063,14 +1065,14 @@ export default function TemplateModal({
                 onClick={onClose}
                 className="px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
               >
-                ยกเลิก
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleApplyCustomization}
                 className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold cursor-pointer transition shadow"
               >
-                บันทึกการปรับแต่ง (Apply)
+                {language === 'en' ? 'Apply Template' : 'บันทึกการปรับแต่ง (Apply)'}
               </button>
             </div>
           </div>

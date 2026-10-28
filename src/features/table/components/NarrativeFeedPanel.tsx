@@ -7,6 +7,7 @@ import { OPENING_TURN_NUMBER } from '@/lib/turns'
 import { type DiceRoll } from '@/components/dice/dice'
 import type { DiceActor } from '@/components/dice/DiceRoller'
 import { buildPlayerColorMap, getPlayerNameColor, type Turn } from '../types'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 // The dice tray draws a 3D die with three.js, so it is only downloaded when a player opens it
 const DiceRoller = dynamic(() => import('@/components/dice/DiceRoller'), { ssr: false })
@@ -391,6 +392,7 @@ export default function NarrativeFeedPanel({
   onDiceRoll,
   onReadyToggle,
 }: NarrativeFeedPanelProps) {
+  const { t, language } = useLanguage()
   const { colorMap, playerNamesRegex } = useMemo(() => {
     const discoveredNames: string[] = [...playerNames]
     for (const turn of turns) {
@@ -481,24 +483,24 @@ export default function NarrativeFeedPanel({
                   <span className="text-xs font-mono font-bold text-amber-500 uppercase tracking-wider">
                     {/* The opening narration is not a played turn, so play is numbered from the row after it */}
                     {turn.turn_number === OPENING_TURN_NUMBER
-                      ? 'คำบรรยาย'
-                      : `Turn ${turn.turn_number - OPENING_TURN_NUMBER}`}
+                      ? (language === 'en' ? 'Prologue' : 'คำบรรยาย')
+                      : `${t('table.turnLabel')} ${turn.turn_number - OPENING_TURN_NUMBER}`}
                   </span>
                   {turn.edited_by_host && (
                     <span className="text-[10px] text-amber-400/80 bg-amber-950/60 border border-amber-800 px-1.5 py-0.5 rounded">
-                      Edited by Host
+                      {language === 'en' ? 'Edited by Host' : 'แก้ไขโดยโฮสต์'}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-500">AI Dungeon Master</span>
+                  <span className="text-[10px] text-zinc-500">{t('table.dmNarrative')}</span>
                   {isHeadTable && editingTurnId !== turn.id && (
                     <button
                       onClick={() => onStartEditTurn(turn)}
                       className="text-zinc-500 hover:text-zinc-300 text-xs flex items-center gap-1 transition cursor-pointer"
                     >
-                      <Edit3 className="w-3 h-3" /> Edit
+                      <Edit3 className="w-3 h-3" /> {t('common.edit')}
                     </button>
                   )}
                 </div>
@@ -517,13 +519,13 @@ export default function NarrativeFeedPanel({
                       onClick={onCancelEditTurn}
                       className="px-3 py-1 text-xs text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
                     >
-                      <X className="w-3 h-3" /> Cancel
+                      <X className="w-3 h-3" /> {t('common.cancel')}
                     </button>
                     <button
                       onClick={() => onSaveHostEdit(turn.id)}
                       className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs flex items-center gap-1 cursor-pointer"
                     >
-                      <Check className="w-3 h-3" /> Save Changes
+                      <Check className="w-3 h-3" /> {t('table.saveOverride')}
                     </button>
                   </div>
                 </div>
@@ -541,7 +543,7 @@ export default function NarrativeFeedPanel({
           {turnResolving && (
             <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3 text-amber-400 text-sm animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin" />
-              The AI Dungeon Master is resolving the party&apos;s actions...
+              {t('table.phaseResolving')}
             </div>
           )}
         </div>
@@ -553,7 +555,7 @@ export default function NarrativeFeedPanel({
           type="button"
           onClick={() => scrollToBottom('smooth')}
           aria-label="Scroll to latest turn"
-          title="ไปยังข้อความล่าสุด"
+          title={language === 'en' ? 'Scroll to latest' : 'ไปยังข้อความล่าสุด'}
           className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-zinc-950/90 hover:bg-zinc-900 border border-amber-500/60 hover:border-amber-400 text-amber-400 hover:text-amber-300 shadow-[0_4px_20px_rgba(245,158,11,0.35)] backdrop-blur-md transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer group"
         >
           <CircleDot className="w-4 h-4 animate-pulse group-hover:scale-110 transition-transform" />
@@ -565,7 +567,7 @@ export default function NarrativeFeedPanel({
         <div className="max-w-3xl mx-auto space-y-3">
           {turnPhase === 'countdown' && !turnResolving && (
             <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-600/50 flex items-center justify-center gap-2 text-amber-300 font-mono text-sm animate-pulse">
-              <Clock className="w-4 h-4" /> ALL PLAYERS READY — Submitting actions in{' '}
+              <Clock className="w-4 h-4" /> {language === 'en' ? 'ALL PLAYERS READY — Submitting actions in ' : 'ผู้เล่นทุกคนพร้อมแล้ว — กำลังส่งการกระทำใน '}
               {countdownSeconds ?? defaultCountdownSeconds}s...
             </div>
           )}
@@ -574,7 +576,7 @@ export default function NarrativeFeedPanel({
           {attachedRolls && attachedRolls.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 px-1">
               <span className="text-[11px] font-medium text-zinc-400 flex items-center gap-1">
-                <Dices className="w-3.5 h-3.5 text-amber-400" /> Attached Rolls:
+                <Dices className="w-3.5 h-3.5 text-amber-400" /> {language === 'en' ? 'Attached Rolls:' : 'ผลการทอยที่แนบ:'}
               </span>
               {attachedRolls.map((roll) => (
                 <div
@@ -602,7 +604,7 @@ export default function NarrativeFeedPanel({
                     <button
                       type="button"
                       onClick={() => onRemoveRoll(roll.id)}
-                      title="ลบผลทอยนี้"
+                      title={language === 'en' ? 'Remove this roll' : 'ลบผลทอยนี้'}
                       aria-label="Remove roll"
                       className="text-amber-400/60 hover:text-rose-300 hover:bg-rose-950/50 transition-colors ml-0.5 p-0.5 rounded cursor-pointer"
                     >
@@ -619,8 +621,8 @@ export default function NarrativeFeedPanel({
               type="text"
               placeholder={
                 isPlayerReady
-                  ? 'Action locked. Waiting for other players...'
-                  : 'Draft your hidden turn action...'
+                  ? (language === 'en' ? 'Action locked. Waiting for other players...' : 'ยืนยันการกระทำแล้ว กำลังรอผู้เล่นคนอื่น...')
+                  : t('table.actionPlaceholder')
               }
               value={draftAction}
               disabled={draftLocked}
@@ -638,7 +640,7 @@ export default function NarrativeFeedPanel({
                 disabled={draftLocked}
                 aria-label="Dice tray"
                 aria-expanded={diceOpen}
-                title="ทอยเต๋า"
+                title={t('table.diceRoller')}
                 className={`h-full px-3 rounded-lg border transition disabled:opacity-50 ${
                   diceOpen && !draftLocked
                     ? 'border-amber-500 bg-amber-950/40 text-amber-400'
@@ -653,7 +655,7 @@ export default function NarrativeFeedPanel({
                     actors={diceActors}
                     onRoll={onDiceRoll}
                     onClose={onCloseDice}
-                    hint="เลือกลูกเต๋าแล้วกด ROLL ผลทอยจะถูกแนบเป็น Badge ผลเต๋าให้"
+                    hint={language === 'en' ? 'Select dice then press ROLL, roll result will be attached as a badge' : 'เลือกลูกเต๋าแล้วกด ROLL ผลทอยจะถูกแนบเป็น Badge ผลเต๋าให้'}
                     className="bg-zinc-950"
                   />
                 </div>
@@ -670,7 +672,7 @@ export default function NarrativeFeedPanel({
               } cursor-pointer`}
             >
               <CheckCircle2 className="w-4 h-4" />
-              {isPlayerReady ? 'Ready!' : 'Ready Up'}
+              {isPlayerReady ? (language === 'en' ? 'Ready!' : 'พร้อมแล้ว!') : t('table.readyUp')}
             </button>
           </div>
         </div>

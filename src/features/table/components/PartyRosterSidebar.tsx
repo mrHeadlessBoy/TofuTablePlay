@@ -9,6 +9,7 @@ import {
   type ResourceColor,
 } from '@/features/character/template'
 import { buildPlayerColorMap, getPlayerNameColor, type LorebookEntry, type Member } from '../types'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 const ROSTER_RESOURCE_TEXT_COLOR: Record<ResourceColor, string> = {
   red: 'text-red-400',
@@ -45,6 +46,7 @@ export default function PartyRosterSidebar({
   lorebook,
   onKickMember,
 }: PartyRosterSidebarProps) {
+  const { t, language } = useLanguage()
   const [isPartyOpen, setIsPartyOpen] = useState(true)
   const [isLorebookOpen, setIsLorebookOpen] = useState(true)
 
@@ -72,13 +74,13 @@ export default function PartyRosterSidebar({
           type="button"
           onClick={() => setIsPartyOpen((prev) => !prev)}
           className="flex items-center justify-between text-left cursor-pointer group w-full select-none"
-          title={isPartyOpen ? 'คลิกเพื่อพับเก็บ Party Roster' : 'คลิกเพื่อเปิดดู Party Roster'}
+          title={isPartyOpen ? (language === 'en' ? 'Click to collapse Party Roster' : 'คลิกเพื่อพับเก็บ Party Roster') : (language === 'en' ? 'Click to expand Party Roster' : 'คลิกเพื่อเปิดดู Party Roster')}
         >
           <div className="flex items-center gap-2">
             <div className="w-1 h-3.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             <Users className="w-3.5 h-3.5 text-amber-400" />
             <h3 className="text-xs font-mono font-bold tracking-wider text-amber-400 uppercase drop-shadow-sm">
-              Party Roster
+              {t('table.partyRoster')}
             </h3>
             <span className="text-[10px] font-mono text-zinc-400">
               ({readyCount}/{members.length})
@@ -123,12 +125,12 @@ export default function PartyRosterSidebar({
                         </span>
                         {m.user_id === headTableId && (
                           <span className="text-[9px] font-mono text-amber-400 border border-amber-500/70 px-1 rounded bg-transparent">
-                            HOST
+                            {t('sao.host')}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center flex-wrap gap-2 mt-0.5 text-[10px] text-zinc-400 drop-shadow-sm">
-                        <span className="text-zinc-300">{char?.class_archetype || 'No class'}</span>
+                        <span className="text-zinc-300">{char?.class_archetype || t('character.noClass')}</span>
                         {char &&
                           charTemplate &&
                           charTemplate.resources.map((res) => {
@@ -190,13 +192,13 @@ export default function PartyRosterSidebar({
                             : 'border-zinc-700 text-zinc-400'
                         }`}
                       >
-                        {m.is_ready ? 'READY' : 'DRAFTING'}
+                        {m.is_ready ? (language === 'en' ? 'READY' : 'พร้อม') : (language === 'en' ? 'DRAFTING' : 'กำลังคิด')}
                       </span>
                       {isHeadTable && m.user_id !== userId && (
                         <button
                           type="button"
                           onClick={() => onKickMember(m.user_id, charName)}
-                          title="Kick Player (Host)"
+                          title={language === 'en' ? 'Kick Player (Host)' : 'นำผู้เล่นออกจากโต๊ะ (โฮสต์)'}
                           className="text-zinc-500 hover:text-red-400 transition cursor-pointer p-0.5"
                         >
                           <UserX className="w-3.5 h-3.5" />
@@ -210,14 +212,14 @@ export default function PartyRosterSidebar({
                     <div className="border-l-2 border-emerald-500/80 pl-2 py-0.5 text-[11px] text-zinc-300 bg-transparent">
                       <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium mb-0.5">
                         <Check className="w-3 h-3 shrink-0" />
-                        <span>Declared Action:</span>
+                        <span>{language === 'en' ? 'Declared Action:' : 'การกระทำที่ส่ง:'}</span>
                       </div>
                       {m.action_text ? (
                         <p className="italic text-zinc-200 whitespace-pre-wrap wrap-break-words leading-relaxed drop-shadow-sm">
                           &ldquo;{m.action_text}&rdquo;
                         </p>
                       ) : (
-                        <p className="italic text-zinc-500 text-[10px]">(Ready without action)</p>
+                        <p className="italic text-zinc-500 text-[10px]">{language === 'en' ? '(Ready without action)' : '(พร้อมโดยไม่มีการกระทำ)'}</p>
                       )}
                     </div>
                   )}
@@ -235,13 +237,13 @@ export default function PartyRosterSidebar({
           type="button"
           onClick={() => setIsLorebookOpen((prev) => !prev)}
           className="flex items-center justify-between text-left cursor-pointer group w-full select-none"
-          title={isLorebookOpen ? 'คลิกเพื่อพับเก็บ Campaign Lorebook' : 'คลิกเพื่อเปิดดู Campaign Lorebook'}
+          title={isLorebookOpen ? (language === 'en' ? 'Click to collapse Campaign Lorebook' : 'คลิกเพื่อพับเก็บ Campaign Lorebook') : (language === 'en' ? 'Click to expand Campaign Lorebook' : 'คลิกเพื่อเปิดดู Campaign Lorebook')}
         >
           <div className="flex items-center gap-2">
             <div className="w-1 h-3.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             <BookOpen className="w-3.5 h-3.5 text-amber-400" />
             <h3 className="text-xs font-mono font-bold tracking-wider text-amber-400 uppercase drop-shadow-sm">
-              Campaign Lorebook
+              {t('table.lorebook')}
             </h3>
             <span className="text-[10px] font-mono text-zinc-400">
               ({lorebook.length})
@@ -278,7 +280,7 @@ export default function PartyRosterSidebar({
               </div>
             ))}
             {lorebook.length === 0 && (
-              <p className="text-zinc-500 text-xs italic">No entries in the lorebook.</p>
+              <p className="text-zinc-500 text-xs italic">{t('campaign.noLorebook')}</p>
             )}
           </div>
         )}

@@ -9,6 +9,7 @@ import Link from 'next/link'
 
 import { playSystemSound } from '@/lib/sound'
 import { AlertModal, useAlert } from '@/components/ui/AlertModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type PublicCampaign = {
   id: string | number
@@ -36,23 +37,23 @@ type HubClientProps = {
   currentUserId: string | null
 }
 
-// Launching now waits for the AI Dungeon Master to write the opening scene. The button shows that
-// it is working and cannot be pressed twice, because a second press would open a second table.
 function LaunchButton() {
   const { pending } = useFormStatus()
+  const { t } = useLanguage()
+
   return (
     <button
       type="submit"
       disabled={pending}
-      className="w-full  py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+      className="w-full py-2 bg-amber-600/90 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
     >
       {pending ? (
         <>
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> The DM is writing the opening scene...
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('hub.dmWritingOpening')}
         </>
       ) : (
         <>
-          <Play className="w-3.5 h-3.5" /> Launch as Head Table
+          <Play className="w-3.5 h-3.5" /> {t('hub.launchAsHead')}
         </>
       )}
     </button>
@@ -72,6 +73,7 @@ function ActiveTableCard({
   onDelete: (tbl: ActiveTable) => void
   onLeave: (tbl: ActiveTable) => void
 }) {
+  const { t } = useLanguage()
   const [copiedLink, setCopiedLink] = useState(false)
 
   const handleCopyInviteLink = async () => {
@@ -90,37 +92,37 @@ function ActiveTableCard({
       <div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] uppercase font-mono tracking-widest text-amber-500">
-            CODE: {tbl.table_code}
+            {t('hub.tableCode')}: {tbl.table_code}
           </span>
           <button
             type="button"
             onClick={handleCopyInviteLink}
-            title="Copy direct invite link to Table Playground"
+            title={t('hub.inviteLink')}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 text-[10px] font-mono text-zinc-300 hover:text-amber-400 transition cursor-pointer"
           >
             {copiedLink ? (
               <>
                 <Check className="w-3 h-3 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
+                <span className="text-emerald-400">{t('hub.copiedLink')}</span>
               </>
             ) : (
               <>
                 <Link2 className="w-3 h-3" />
-                <span>Invite Link</span>
+                <span>{t('hub.inviteLink')}</span>
               </>
             )}
           </button>
         </div>
         <h3 className="text-base font-semibold text-white mt-1">{tbl.campaigns?.title}</h3>
         <p className="text-xs text-zinc-400 mt-1">
-          Turn: {tbl.current_turn} | Phase: {tbl.turn_phase}
+          {t('hub.turn')}: {tbl.current_turn} | {t('hub.phase')}: {tbl.turn_phase}
         </p>
       </div>
       <Link
         href={`/table/${tbl.id}`}
         className="mt-4 inline-flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition"
       >
-        <Play className="w-3.5 h-3.5" /> Re-enter Table
+        <Play className="w-3.5 h-3.5" /> {t('hub.reEnterTable')}
       </Link>
       {currentUserId && tbl.head_table_id === currentUserId ? (
         <button
@@ -134,7 +136,7 @@ function ActiveTableCard({
           ) : (
             <Trash2 className="w-3.5 h-3.5" />
           )}
-          Delete Table
+          {t('hub.deleteTable')}
         </button>
       ) : currentUserId ? (
         <button
@@ -148,7 +150,7 @@ function ActiveTableCard({
           ) : (
             <LogOut className="w-3.5 h-3.5" />
           )}
-          Leave Table
+          {t('hub.leaveTable')}
         </button>
       ) : null}
     </div>
@@ -166,8 +168,9 @@ function CampaignCard({
   deletingId: string | null
   onDelete: (camp: PublicCampaign) => void
 }) {
+  const { t, language } = useLanguage()
   const isOwner = !!currentUserId && camp.creator_id === currentUserId
-  const creatorDisplay = camp.creator_name || (isOwner ? 'คุณ (You)' : 'ผู้สร้างแคมเปญ')
+  const creatorDisplay = camp.creator_name || (isOwner ? (language === 'en' ? 'You' : 'คุณ (You)') : t('common.creator'))
 
   return (
     <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
@@ -176,7 +179,7 @@ function CampaignCard({
           <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{camp.category}</span>
           <span className="text-[11px] text-zinc-400 flex items-center gap-1 font-mono">
             <User className="w-3 h-3 text-amber-500 shrink-0" />
-            <span className="truncate max-w-36">สร้างโดย: <strong className="text-zinc-200 font-medium">{creatorDisplay}</strong></span>
+            <span className="truncate max-w-36">{t('hub.createdBy')}: <strong className="text-zinc-200 font-medium">{creatorDisplay}</strong></span>
           </span>
         </div>
         <h3 className="text-lg font-bold text-white mt-2">{camp.title}</h3>
@@ -184,15 +187,15 @@ function CampaignCard({
         {camp.template_name && (
           <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-1 text-[11px]">
             <span className="text-zinc-500 flex items-center gap-1 shrink-0">
-              <Sliders className="w-3 h-3 text-amber-500 shrink-0" /> ชีท:
+              <Sliders className="w-3 h-3 text-amber-500 shrink-0" /> {t('hub.sheetFormat')}:
             </span>
-            <span className="text-amber-400/90 font-mono truncate text-right" title={`${camp.template_name} (โดย ${camp.template_author || 'D&D Playground'})`}>
-              {camp.template_name} <span className="text-zinc-500 text-[10px]">(โดย {camp.template_author || 'D&D Playground'})</span>
+            <span className="text-amber-400/90 font-mono truncate text-right" title={`${camp.template_name} (${t('hub.byAuthor')} ${camp.template_author || 'D&D Playground'})`}>
+              {camp.template_name} <span className="text-zinc-500 text-[10px]">({t('hub.byAuthor')} {camp.template_author || 'D&D Playground'})</span>
             </span>
           </div>
         )}
       </div>
-      <form action={launchTable.bind(null, String(camp.id))} className="mt-5">
+      <form action={launchTable.bind(null, String(camp.id), language)} className="mt-5">
         <LaunchButton />
       </form>
       {/* Details Button - Only shown if user is NOT the owner */}
@@ -201,7 +204,7 @@ function CampaignCard({
           href={`/campaigns/${camp.id}`}
           className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition flex items-center justify-center gap-1.5"
         >
-          <Info className="w-3.5 h-3.5" /> Details
+          <Info className="w-3.5 h-3.5" /> {t('common.details')}
         </Link>
       )}
 
@@ -211,7 +214,7 @@ function CampaignCard({
           href={`/campaigns/${camp.id}/edit`}
           className="mt-2 py-2 bg-zinc-800 hover:bg-zinc-700 border border-amber-700/50 rounded-lg text-xs font-medium text-amber-300 transition flex items-center justify-center gap-1.5"
         >
-          <Pencil className="w-3.5 h-3.5" /> Edit
+          <Pencil className="w-3.5 h-3.5" /> {t('common.edit')}
         </Link>
       )}
       {currentUserId && camp.creator_id === currentUserId && (
@@ -226,7 +229,7 @@ function CampaignCard({
           ) : (
             <Trash2 className="w-3.5 h-3.5" />
           )}
-          Delete Campaign
+          {t('hub.deleteCampaign')}
         </button>
       )}
     </div>
@@ -238,6 +241,7 @@ const CAMPAIGNS_PER_PAGE = 6
 export default function HubClient({ publicCampaigns, activeTables, currentUserId }: HubClientProps) {
   const router = useRouter()
   const { showAlert, showConfirm } = useAlert()
+  const { t, language } = useLanguage()
   const [tableCode, setTableCode] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinModal, setJoinModal] = useState<{
@@ -294,10 +298,13 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
   const handleDeleteTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
     const confirmed = await showConfirm({
-      title: 'ยืนยันการลบโต๊ะเล่น',
-      message: `คุณแน่ใจหรือไม่ว่าต้องการลบโต๊ะ "${name}" (${tbl.table_code})? เทิร์นการเล่นและสมาชิกทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้ (This cannot be undone)`,
-      confirmText: 'ลบโต๊ะ',
-      cancelText: 'ยกเลิก',
+      title: language === 'en' ? 'Confirm Delete Table' : 'ยืนยันการลบโต๊ะเล่น',
+      message:
+        language === 'en'
+          ? `Are you sure you want to permanently delete table "${name}" (${tbl.table_code})? All turns and party members will be removed.`
+          : `คุณแน่ใจหรือไม่ว่าต้องการลบโต๊ะ "${name}" (${tbl.table_code})? เทิร์นการเล่นและสมาชิกทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้`,
+      confirmText: language === 'en' ? 'Delete Table' : 'ลบโต๊ะ',
+      cancelText: language === 'en' ? 'Cancel' : 'ยกเลิก',
     })
     if (!confirmed) return
     setDeletingId(`table:${tbl.id}`)
@@ -306,9 +313,9 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       router.refresh()
     } catch (err: unknown) {
       showAlert({
-        title: 'ไม่สามารถลบโต๊ะได้',
+        title: language === 'en' ? 'Failed to delete table' : 'ไม่สามารถลบโต๊ะได้',
         status: 'error',
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบโต๊ะ (Failed to delete table)',
+        message: err instanceof Error ? err.message : 'Error deleting table',
       })
     } finally {
       setDeletingId(null)
@@ -318,10 +325,13 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
   const handleLeaveTable = async (tbl: ActiveTable) => {
     const name = tbl.campaigns?.title ?? tbl.table_code
     const confirmed = await showConfirm({
-      title: 'ยืนยันการออกจากโต๊ะ',
-      message: `คุณต้องการออกจากโต๊ะ "${name}" (${tbl.table_code}) ใช่หรือไม่?`,
-      confirmText: 'ออกจากโต๊ะ',
-      cancelText: 'ยกเลิก',
+      title: language === 'en' ? 'Confirm Leave Table' : 'ยืนยันการออกจากโต๊ะ',
+      message:
+        language === 'en'
+          ? `Are you sure you want to leave table "${name}" (${tbl.table_code})?`
+          : `คุณต้องการออกจากโต๊ะ "${name}" (${tbl.table_code}) ใช่หรือไม่?`,
+      confirmText: language === 'en' ? 'Leave Table' : 'ออกจากโต๊ะ',
+      cancelText: language === 'en' ? 'Cancel' : 'ยกเลิก',
     })
     if (!confirmed) return
     setDeletingId(`leave:${tbl.id}`)
@@ -330,9 +340,9 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       router.refresh()
     } catch (err: unknown) {
       showAlert({
-        title: 'ไม่สามารถออกจากโต๊ะได้',
+        title: language === 'en' ? 'Failed to leave table' : 'ไม่สามารถออกจากโต๊ะได้',
         status: 'error',
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการออกจากโต๊ะ (Failed to leave table)',
+        message: err instanceof Error ? err.message : 'Error leaving table',
       })
     } finally {
       setDeletingId(null)
@@ -342,10 +352,13 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
   const handleDeleteCampaign = async (camp: PublicCampaign) => {
     const title = camp.title || 'Untitled Campaign'
     const confirmed = await showConfirm({
-      title: 'ยืนยันการลบแคมเปญ',
-      message: `คุณแน่ใจหรือไม่ว่าต้องการลบแคมเปญ "${title}"? ลอว์บุ๊กและโต๊ะทั้งหมดที่สร้างจากแคมเปญนี้จะถูกลบถาวร ไม่สามารถกู้คืนได้ (This cannot be undone)`,
-      confirmText: 'ลบแคมเปญ',
-      cancelText: 'ยกเลิก',
+      title: language === 'en' ? 'Confirm Delete Campaign' : 'ยืนยันการลบแคมเปญ',
+      message:
+        language === 'en'
+          ? `Are you sure you want to delete campaign "${title}"? All lorebook entries and tables created from this world will be permanently erased.`
+          : `คุณแน่ใจหรือไม่ว่าต้องการลบแคมเปญ "${title}"? ลอว์บุ๊กและโต๊ะทั้งหมดที่สร้างจากแคมเปญนี้จะถูกลบถาวร ไม่สามารถกู้คืนได้`,
+      confirmText: language === 'en' ? 'Delete Campaign' : 'ลบแคมเปญ',
+      cancelText: language === 'en' ? 'Cancel' : 'ยกเลิก',
     })
     if (!confirmed) return
     setDeletingId(`campaign:${camp.id}`)
@@ -354,9 +367,9 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       router.refresh()
     } catch (err: unknown) {
       showAlert({
-        title: 'ไม่สามารถลบแคมเปญได้',
+        title: language === 'en' ? 'Failed to delete campaign' : 'ไม่สามารถลบแคมเปญได้',
         status: 'error',
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบแคมเปญ (Failed to delete campaign)',
+        message: err instanceof Error ? err.message : 'Error deleting campaign',
       })
     } finally {
       setDeletingId(null)
@@ -368,10 +381,13 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
     const rawInput = tableCode.trim()
     if (!rawInput) {
       showAlert({
-        title: 'กรุณากรอกรหัสโต๊ะ',
+        title: language === 'en' ? 'Table Code Required' : 'กรุณากรอกรหัสโต๊ะ',
         status: 'warning',
         badge: 'Table Code Required',
-        message: 'กรุณากรอก Table Code 6 หลัก หรือวาง Invite Link ก่อนกดเข้าร่วมโต๊ะ (Please enter a table code or invite link)',
+        message:
+          language === 'en'
+            ? 'Please enter a 6-character table code or paste an invite link.'
+            : 'กรุณากรอก Table Code 6 หลัก หรือวาง Invite Link ก่อนกดเข้าร่วมโต๊ะ',
       })
       return
     }
@@ -385,7 +401,10 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       open: true,
       status: 'loading',
       code: displayBadge,
-      message: 'กำลังตรวจสอบรหัสโต๊ะและจัดเตรียมที่นั่งสำหรับคุณ...',
+      message:
+        language === 'en'
+          ? 'Verifying table code and preparing your seat...'
+          : 'กำลังตรวจสอบรหัสโต๊ะและจัดเตรียมที่นั่งสำหรับคุณ...',
     })
 
     try {
@@ -395,11 +414,13 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           open: true,
           status: 'success',
           code: res.tableCode || displayBadge,
-          message: 'เข้าร่วมโต๊ะสำเร็จ! กำลังพาท่านเดินทางเข้าสู่ห้องเล่น...',
+          message:
+            language === 'en'
+              ? 'Joined table successfully! Transporting you into the chamber...'
+              : 'เข้าร่วมโต๊ะสำเร็จ! กำลังพาท่านเดินทางเข้าสู่ห้องเล่น...',
         })
         const targetTableId = res.tableId
         router.push(`/table/${targetTableId}`)
-        // Reset modal and inputs after starting navigation so returning via Back button is clean
         setTimeout(() => {
           setJoinModal({ open: false, status: 'loading' })
           setJoining(false)
@@ -411,7 +432,11 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           open: true,
           status: 'error',
           code: displayBadge,
-          message: res.error || 'ไม่พบโต๊ะดังกล่าว กรุณาตรวจสอบ Table Code หรือ Invite Link อีกครั้ง',
+          message:
+            res.error ||
+            (language === 'en'
+              ? 'Table not found. Please verify the Table Code or Invite Link.'
+              : 'ไม่พบโต๊ะดังกล่าว กรุณาตรวจสอบ Table Code หรือ Invite Link อีกครั้ง'),
         })
       }
     } catch (err: unknown) {
@@ -420,7 +445,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
         open: true,
         status: 'error',
         code: displayBadge,
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเชื่อมต่อเข้าโต๊ะ',
+        message: err instanceof Error ? err.message : (language === 'en' ? 'Connection failed' : 'เกิดข้อผิดพลาดในการเชื่อมต่อเข้าโต๊ะ'),
       })
     } finally {
       setJoining(false)
@@ -432,15 +457,15 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       {/* Quick Join Bar */}
       <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold text-white">Have a Table Code or Invite Link?</h2>
-          <p className="text-xs text-zinc-400">
-            Enter the 6-character code or paste an invite link from your Head Table to join or re-enter.
+          <h2 className="text-base font-semibold text-white">{t('hub.quickJoin')}</h2>
+          <p className="text-xs text-zinc-400 mt-1">
+            {t('hub.subtitle')}
           </p>
         </div>
         <form onSubmit={handleJoin} className="flex gap-2 w-full sm:w-auto">
           <input
             type="text"
-            placeholder="Code (e.g. 7K4X9B) or Invite Link"
+            placeholder={t('hub.enterCodePlaceholder')}
             value={tableCode}
             onChange={(e) => {
               const val = e.target.value
@@ -451,9 +476,17 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           <button
             type="submit"
             disabled={joining}
-            className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60"
           >
-            <LogIn className="w-4 h-4" /> Join
+            {joining ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> {t('hub.joining')}
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" /> {t('hub.joinTableBtn')}
+              </>
+            )}
           </button>
         </form>
       </div>
@@ -461,7 +494,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
       {/* Active Tables */}
       {activeTables.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">Your Active Tables</h2>
+          <h2 className="text-lg font-semibold text-white">{t('hub.activeTables')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {activeTables.map((tbl) => (
               <ActiveTableCard
@@ -488,7 +521,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
             className="flex items-center gap-2.5 text-lg font-semibold text-white hover:text-amber-400 transition cursor-pointer select-none group text-left"
           >
             <Compass className="w-5 h-5 text-amber-500 group-hover:rotate-12 transition-transform" />
-            <span>Explore Campaigns</span>
+            <span>{t('hub.publicCampaigns')}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 group-hover:text-zinc-200 font-normal">
               {publicCampaigns.length}
             </span>
@@ -496,12 +529,12 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
               {isExtended ? (
                 <>
                   <ChevronUp className="w-4 h-4" />
-                  <span className="hidden sm:inline">Collapse</span>
+                  <span className="hidden sm:inline">{language === 'en' ? 'Collapse' : 'ย่อ'}</span>
                 </>
               ) : (
                 <>
                   <ChevronDown className="w-4 h-4" />
-                  <span className="hidden sm:inline">Extend</span>
+                  <span className="hidden sm:inline">{language === 'en' ? 'Expand' : 'ขยาย'}</span>
                 </>
               )}
             </span>
@@ -520,7 +553,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <span className="px-1.5 text-zinc-300 font-mono text-[11px] select-none">
-                  {safeCurrentPage + 1} / {totalPages}
+                  {t('hub.page')} {safeCurrentPage + 1} / {totalPages}
                 </span>
                 <button
                   type="button"
@@ -543,12 +576,12 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
             >
               {isExtended ? (
                 <>
-                  <span>Collapse</span>
+                  <span>{language === 'en' ? 'Collapse' : 'ย่อ'}</span>
                   <ChevronUp className="w-3.5 h-3.5 text-zinc-400" />
                 </>
               ) : (
                 <>
-                  <span>Extend</span>
+                  <span>{language === 'en' ? 'Expand' : 'ขยาย'}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
                 </>
               )}
@@ -560,7 +593,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
           <div id="explore-campaigns-section" className="space-y-4">
             {publicCampaigns.length === 0 ? (
               <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-8 text-center text-zinc-500 text-sm">
-                No public campaigns available yet.
+                {language === 'en' ? 'No public campaigns available yet.' : 'ยังไม่มีแคมเปญสาธารณะในขณะนี้'}
               </div>
             ) : (
               <>
@@ -600,7 +633,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                       disabled={safeCurrentPage === 0}
                       className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
                     >
-                      <ChevronLeft className="w-4 h-4" /> Previous
+                      <ChevronLeft className="w-4 h-4" /> {language === 'en' ? 'Previous' : 'ย้อนกลับ'}
                     </button>
 
                     <div className="flex items-center gap-1.5">
@@ -625,7 +658,7 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
                       disabled={safeCurrentPage >= totalPages - 1}
                       className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
                     >
-                      Next <ChevronRight className="w-4 h-4" />
+                      {language === 'en' ? 'Next' : 'ถัดไป'} <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 )}
@@ -637,7 +670,11 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
             onClick={() => setIsExtended(true)}
             className="bg-zinc-900/20 border border-zinc-800/60 border-dashed rounded-xl p-4 text-center text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition cursor-pointer flex items-center justify-center gap-2"
           >
-            <span>Explore Campaigns is collapsed ({publicCampaigns.length} campaigns available). Click to extend.</span>
+            <span>
+              {language === 'en'
+                ? `Explore Campaigns is collapsed (${publicCampaigns.length} campaigns available). Click to expand.`
+                : `มุมมองแคมเปญถูกย่อไว้ (มีแคมเปญทั้งหมด ${publicCampaigns.length} รายการ) คลิกเพื่อขยาย`}
+            </span>
           </div>
         )}
       </div>
@@ -663,10 +700,10 @@ export default function HubClient({ publicCampaigns, activeTables, currentUserId
         status={joinModal.status}
         title={
           joinModal.status === 'loading'
-            ? 'กำลังเข้าสู่โต๊ะ...'
+            ? (language === 'en' ? 'Connecting to Table...' : 'กำลังเข้าสู่โต๊ะ...')
             : joinModal.status === 'success'
-            ? 'เข้าร่วมสำเร็จ!'
-            : 'ไม่สามารถเข้าห้องได้'
+            ? (language === 'en' ? 'Joined Successfully!' : 'เข้าร่วมสำเร็จ!')
+            : (language === 'en' ? 'Cannot Join Table' : 'ไม่สามารถเข้าห้องได้')
         }
         badge={joinModal.code ? `CODE: ${joinModal.code}` : undefined}
         message={joinModal.message}

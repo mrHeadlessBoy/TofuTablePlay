@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { AlertCircle, CheckCircle2, Loader2, AlertTriangle, Info, X } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export type AlertStatus = 'loading' | 'success' | 'error' | 'warning' | 'info'
 
@@ -54,18 +55,28 @@ export function AlertModal({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, status, onClose])
 
+  const { language } = useLanguage()
+
   if (!isOpen) return null
 
   const defaultTitles: Record<AlertStatus, string> = {
-    loading: 'กำลังดำเนินการ...',
-    success: 'ดำเนินการสำเร็จ',
-    error: 'เกิดข้อผิดพลาด',
-    warning: isConfirm ? 'ยืนยันการทำรายการ' : 'แจ้งเตือน',
-    info: 'ข้อความแจ้งเตือน',
+    loading: language === 'en' ? 'Processing...' : 'กำลังดำเนินการ...',
+    success: language === 'en' ? 'Successful' : 'ดำเนินการสำเร็จ',
+    error: language === 'en' ? 'Error' : 'เกิดข้อผิดพลาด',
+    warning: isConfirm
+      ? (language === 'en' ? 'Confirm Action' : 'ยืนยันการทำรายการ')
+      : (language === 'en' ? 'Warning' : 'แจ้งเตือน'),
+    info: language === 'en' ? 'Notice' : 'ข้อความแจ้งเตือน',
   }
 
+  const defaultBtn = status === 'error'
+    ? (language === 'en' ? 'Close' : 'ปิดหน้าต่าง')
+    : (language === 'en' ? 'OK' : 'ตกลง')
+
   const displayTitle = title ?? defaultTitles[status]
-  const displayButtonText = buttonText ?? (status === 'error' ? 'ปิดหน้าต่าง' : 'ตกลง')
+  const displayButtonText = buttonText ?? defaultBtn
+  const defaultCancelText = language === 'en' ? 'Cancel' : 'ยกเลิก'
+  const defaultConfirmText = language === 'en' ? 'Confirm' : 'ยืนยัน'
   const widthClass = maxWidth === 'lg' ? 'max-w-lg' : maxWidth === 'sm' ? 'max-w-sm' : 'max-w-md'
 
   return (
@@ -141,7 +152,7 @@ export function AlertModal({
                   onClick={onClose}
                   className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
                 >
-                  {cancelText ?? 'ยกเลิก'}
+                  {cancelText ?? defaultCancelText}
                 </button>
                 <button
                   type="button"
@@ -152,7 +163,7 @@ export function AlertModal({
                       : 'bg-amber-600 hover:bg-amber-500'
                   }`}
                 >
-                  {confirmText ?? 'ยืนยัน'}
+                  {confirmText ?? defaultConfirmText}
                 </button>
               </>
             ) : action ? (

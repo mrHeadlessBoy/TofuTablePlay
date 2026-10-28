@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Dices, Minus, Plus, X } from 'lucide-react'
 import { twMerge } from 'tailwind-merge'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import Die3D, { ROLL_ANIMATION_MS } from './Die3D'
 import { DIE_SIDES, describeRoll, formatModifier, rollDice, rollDie, clampModifier, MIN_DICE_MODIFIER, MAX_DICE_MODIFIER, type DiceRoll, type DieSides, type RollMode } from './dice'
 
@@ -133,6 +134,7 @@ export default function DiceRoller({
   hint = 'เลือกลูกเต๋าแล้วกด ROLL',
   className,
 }: DiceRollerProps) {
+  const { t, language } = useLanguage()
   const [sides, setSides] = useState<DieSides>(() => actors[0]?.defaultSides ?? 20)
   const [count, setCount] = useState<number>(() => actors[0]?.defaultCount ?? 1)
   const [modifier, setModifier] = useState(0)
@@ -233,11 +235,11 @@ export default function DiceRoller({
       </div>
 
       <div className="mt-3 space-y-2">
-        <Stepper label="Dice" value={count} onChange={setCount} min={1} max={10} />
-        <Stepper label="Modifier" value={modifier} onChange={setModifier} min={MIN_DICE_MODIFIER} max={MAX_DICE_MODIFIER} format={formatModifier} />
+        <Stepper label={language === 'en' ? 'Dice' : 'เต๋า'} value={count} onChange={setCount} min={1} max={10} />
+        <Stepper label={language === 'en' ? 'Modifier' : 'ตัวบวก'} value={modifier} onChange={setModifier} min={MIN_DICE_MODIFIER} max={MAX_DICE_MODIFIER} format={formatModifier} />
 
         <div className="flex items-center justify-between gap-2">
-          <span className={LABEL}>Mode</span>
+          <span className={LABEL}>{t('dice.mode')}</span>
           <div className="flex overflow-hidden rounded border border-white/15">
             {(['normal', 'advantage', 'disadvantage'] as RollMode[]).map((value) => (
               <button
@@ -249,7 +251,7 @@ export default function DiceRoller({
                   modeAllowed && mode === value ? 'bg-white/20 text-white' : 'text-white/55 hover:bg-white/10'
                 } cursor-pointer`}
               >
-                {value === 'normal' ? 'Normal' : value === 'advantage' ? 'Adv' : 'Dis'}
+                {value === 'normal' ? t('dice.normal') : value === 'advantage' ? (language === 'en' ? 'Adv' : 'ได้เปรียบ') : (language === 'en' ? 'Dis' : 'เสียเปรียบ')}
               </button>
             ))}
           </div>
@@ -269,7 +271,7 @@ export default function DiceRoller({
               aria-label="Roll as"
               className={`min-w-0 px-2 ${fieldClass}`}
             >
-              <option value="">Free roll</option>
+              <option value="">{language === 'en' ? 'Free roll' : 'ทอยอิสระ'}</option>
               {actors.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.name}
@@ -320,7 +322,7 @@ export default function DiceRoller({
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 py-2 font-mono text-xs font-bold uppercase tracking-[0.2em] text-black transition hover:bg-amber-400 cursor-pointer"
       >
         <Dices className="h-4 w-4" />
-        Roll {count > 1 ? count : ''}d{sides}
+        {language === 'en' ? 'Roll' : 'ทอย'} {count > 1 ? count : ''}d{sides}
         {totalModifier !== 0 ? ` ${formatModifier(totalModifier)}` : ''}
       </button>
 

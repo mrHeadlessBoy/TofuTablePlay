@@ -22,7 +22,7 @@ function generateTableCode(length = 6): string {
 
 // The opening narration of a new table: ask the AI Dungeon Master to open the story from the campaign sheet.
 // A failed or slow AI call must never stop a table from opening, so any error ends in the fallback line.
-async function writeOpeningScene(supabase: SessionClient, campaignId: string): Promise<string> {
+async function writeOpeningScene(supabase: SessionClient, campaignId: string, language?: 'th' | 'en'): Promise<string> {
   try {
     const db = createAdminClient() || supabase
     const [{ data: campaign }, { data: loreEntries }] = await Promise.all([
@@ -31,19 +31,20 @@ async function writeOpeningScene(supabase: SessionClient, campaignId: string): P
     ])
     if (!campaign) return OPENING_FALLBACK
 
-    return await generateOpeningNarrative({ campaign, loreEntries: loreEntries || [] })
+    const cookieStore = await cookies()
+    const activeLang = (language || cookieStore.get('dnd_language')?.value || 'th') as 'th' | 'en'
+
+    return await generateOpeningNarrative({ campaign, loreEntries: loreEntries || [], language: activeLang })
   } catch (err) {
     console.error('[launchTable] Opening scene generation failed:', err)
     return OPENING_FALLBACK
   }
 }
 
-export async function launchTable(campaignId: string) {
+export async function launchTable(campaignId: string, languageOrFormData?: 'th' | 'en' | FormData) {
   const { supabase, user } = await requireAuthenticatedUser()
-
-  // Written before anything is saved: if this request dies while the AI is thinking,
-  // no half-made table (one without its opening row) is left behind.
-  const openingNarrative = await writeOpeningScene(supabase, campaignId)
+  const language = typeof languageOrFormData === 'string' ? languageOrFormData : undefined
+  const openingNarrative = await writeOpeningScene(supabase, campaignId, language)
 
   const code = generateTableCode()
 

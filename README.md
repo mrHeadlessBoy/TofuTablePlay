@@ -1,6 +1,6 @@
 # 🐉 TofuTablePlay — Synchronized AI Tabletop RPG
 
-An intelligent, real-time tabletop roleplaying platform combining **synchronized multiplayer text campaigns**, **customizable character sheet templates with shareable keys**, a **solo 3D tactical grid battle board**, **3D polyhedral dice rolling**, **dynamic multilingual lorebooks**, and an automated **AI Dungeon Master** powered by Google Gemini.
+An intelligent, real-time tabletop roleplaying platform combining **synchronized multiplayer text campaigns**, **customizable character sheet templates with shareable keys**, a **solo 3D tactical grid battle board**, **3D polyhedral dice rolling**, **dynamic multilingual lorebooks**, **full-stack bilingual localization (English & Thai)**, and an automated **AI Dungeon Master** powered by Google Gemini.
 
 ---
 
@@ -98,7 +98,21 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
 * **Bounded Sliding-Window History & Anti-Repetition:** Maintains the last 4 turns as multi-turn conversation history for token efficiency while preventing repeated phrasing or overriding unsubmitted player agency.
 * **Host Narrative Override & Atomic Locking:** Head Table hosts can edit any turn's narrative output in place, while atomic database phase transitions (`turn_phase: 'resolving'`) prevent duplicate AI executions.
 
-### 8. 🛡️ Authentication, Security & Room Governance
+### 8. 🌐 Full-Stack Bilingual Localization (English & Thai) (`src/lib/i18n/`)
+* **Lightweight Reactive Core & Dictionaries (`src/lib/i18n/`):** Built-in zero-dependency localization engine with strictly typed translation schema (`Language`, `Translations`) and comprehensive Thai and English dictionaries (`th.ts`, `en.ts`) covering all domains (`common`, `nav`, `hub`, `campaign`, `character`, `table`, `sao`, `dice`, `dm`).
+* **Universal Persistence & SSR Synchronization (`LanguageContext.tsx`):** Managed via `LanguageProvider` and `useLanguage()` hook with dynamic parameter replacement (`t('path.to.key', { param: 'value' })`), immediate UI reactivity without page reloads, client `localStorage` persistence, multi-tab `storage` synchronization, and cookie persistence (`tofu_language`) for seamless SSR hydration.
+* **Instant Language Switcher (`LanguageToggle.tsx`):** A sleek, compact toggler (`🇹🇭 TH | 🇺🇸 EN`) embedded conveniently in the global navigation headers across the **Campaign Hub**, **Campaign Details & Studio**, **Character Codex**, and in-table **SAO Navigation Bar**.
+* **End-to-End Bilingual Interface Coverage:**
+  * **Campaign Studio & Rules Builder:** Localized form controls, category pickers, lorebook activation modes, template requirement cards, and custom rules builder.
+  * **Character Codex & Template Modal:** Localized identity fields, stats clamping, equipment slots, skill manager, inventory editor, and template customization tabs.
+  * **In-Game SAO HUD & Inspector Panel:** Localized player status badges, dial gauge tooltips, inline combat editor, compatibility warnings, and character switcher.
+  * **Party Roster & 3D Dice Roller:** Localized party status badges, declared action previews, lorebook entries, and 3D dice tray controls (`Dice`, `Modifier`, `Mode`, `Adv/Dis`, `Roll`).
+* **Bilingual AI Dungeon Master Engine (`src/lib/ai/dm.ts`):**
+  * **Dynamic Language Directives:** When toggled to English, Gemini is explicitly instructed to narrate the adventure, compose character dialogues, and format structured tactical cards (`[ Overview ]` with `Location & Time`, `Current Situation`, `Enemy Status`, `Party Status` and `[ Decision ]` with real sheet stats and DC checks) entirely in fluent, atmospheric English. When set to Thai, rich Thai tabletop RPG prose is maintained.
+  * **Bilingual Opening Scene Generation (`generateOpeningNarrative`):** Automatically initializes new tables with an opening prologue tailored to the creator's active language preference.
+  * **Resilient Dual-Language State Extraction:** `extractPartyStateUpdates` regex dynamically matches both Thai (`สถานะปาร์ตี้ :`) and English (`Party Status :`) overview blocks, ensuring automated HP, Skill Cost (SP), and custom resource syncing works flawlessly in both languages.
+
+### 9. 🛡️ Authentication, Security & Room Governance
 * **Supabase Auth & 6-Hour Session Guard:** Email/password authentication with middleware-enforced 6-hour session expiration (`dnd_session_start` cookie) and post-login route restoration (`?next=...`).
 * **Room & Campaign Governance:** Head Table member kick controls, player `Leave Table` support, custom confirmation/status modals (`AlertModal`), and cascading cleanup when deleting tables or campaigns.
 

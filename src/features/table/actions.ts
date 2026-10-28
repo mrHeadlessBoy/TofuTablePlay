@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireAuthenticatedUser, type DbClient, type SessionClient } from '@/lib/supabase/auth'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { extractPartyStateUpdates, generateDmNarrative } from '@/lib/ai/dm'
 import {
   extractCharacterSkillCost,
@@ -346,7 +347,7 @@ export async function getServerTime(): Promise<number> {
   return Date.now()
 }
 
-export async function resolveTurn(tableId: string) {
+export async function resolveTurn(tableId: string, language?: 'th' | 'en') {
   const { supabase, user } = await requireAuthenticatedUser()
 
   // Fetch table and campaign settings
@@ -493,11 +494,15 @@ export async function resolveTurn(tableId: string) {
     if (turnsErr) throw new Error(`Failed to fetch turns history: ${turnsErr.message}`)
 
     // Generate AI Dungeon Master scene narrative
+    const cookieStore = await cookies()
+    const activeLang = (language || cookieStore.get('dnd_language')?.value || 'th') as 'th' | 'en'
+
     const aiNarrative = await generateDmNarrative({
       campaign: table.campaigns,
       loreEntries: loreEntries || [],
       recentTurns: recentTurns || [],
       partyActions,
+      language: activeLang,
     })
 
     // Automatically apply any HP, Skill Cost (SP), Custom Resource, or Condition changes reported by the AI DM
