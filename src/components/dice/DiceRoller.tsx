@@ -5,7 +5,19 @@ import { Dices, Minus, Plus, X } from 'lucide-react'
 import { twMerge } from 'tailwind-merge'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import Die3D, { ROLL_ANIMATION_MS } from './Die3D'
-import { DIE_SIDES, describeRoll, formatModifier, rollDice, rollDie, clampModifier, MIN_DICE_MODIFIER, MAX_DICE_MODIFIER, type DiceRoll, type DieSides, type RollMode } from './dice'
+import {
+  DIE_SIDES,
+  MAX_DICE_MODIFIER,
+  MIN_DICE_MODIFIER,
+  clampModifier,
+  describeRoll,
+  formatModifier,
+  rollDice,
+  rollDie,
+  type DiceRoll,
+  type DieSides,
+  type RollMode,
+} from './dice'
 
 /**
  * Shared dice tray: d4 to d100, several dice at once, a modifier, advantage / disadvantage and an optional DC.
@@ -50,6 +62,9 @@ export type DiceRollerProps = {
 }
 
 const LABEL = 'font-mono text-[10px] uppercase tracking-[0.18em] text-white/45'
+const FIELD_CLASS =
+  'rounded-xl border border-zinc-800/80 bg-black/40 py-1.5 px-2 text-xs text-zinc-100 outline-none focus:border-zinc-600 disabled:opacity-35 transition-all'
+const ROLL_MODES: RollMode[] = ['normal', 'advantage', 'disadvantage']
 
 /** The number on top of the die: it flickers while rolling, then lands on the total. */
 function RollNumber({ roll }: { roll: DiceRoll }) {
@@ -57,7 +72,10 @@ function RollNumber({ roll }: { roll: DiceRoll }) {
   const [flicker, setFlicker] = useState(roll.total)
 
   useEffect(() => {
-    const spin = window.setInterval(() => setFlicker(rollDie(roll.sides) * roll.count + roll.modifier), 60)
+    const spin = window.setInterval(
+      () => setFlicker(rollDie(roll.sides) * roll.count + roll.modifier),
+      60,
+    )
     const stop = window.setTimeout(() => {
       window.clearInterval(spin)
       setSettled(true)
@@ -68,8 +86,13 @@ function RollNumber({ roll }: { roll: DiceRoll }) {
     }
   }, [roll])
 
-  const tone =
-    !settled ? 'text-white/70' : roll.critical === 'hit' ? 'text-amber-300' : roll.critical === 'fail' ? 'text-red-400' : 'text-white'
+  const tone = !settled
+    ? 'text-white/70'
+    : roll.critical === 'hit'
+      ? 'text-amber-300'
+      : roll.critical === 'fail'
+        ? 'text-red-400'
+        : 'text-white'
 
   return (
     <span
@@ -80,7 +103,14 @@ function RollNumber({ roll }: { roll: DiceRoll }) {
   )
 }
 
-function Stepper({ label, value, onChange, min, max, format }: {
+function Stepper({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  format,
+}: {
   label: string
   value: number
   onChange: (value: number) => void
@@ -101,7 +131,9 @@ function Stepper({ label, value, onChange, min, max, format }: {
         >
           <Minus className="h-3 w-3" />
         </button>
-        <span className="w-9 text-center font-mono text-sm tabular-nums text-white">{format ? format(value) : value}</span>
+        <span className="w-9 text-center font-mono text-sm tabular-nums text-white">
+          {format ? format(value) : value}
+        </span>
         <button
           type="button"
           aria-label={`Increase ${label}`}
@@ -134,7 +166,7 @@ export default function DiceRoller({
   hint = 'เลือกลูกเต๋าแล้วกด ROLL',
   className,
 }: DiceRollerProps) {
-  const { t, language } = useLanguage()
+  const { language } = useLanguage()
   const [sides, setSides] = useState<DieSides>(() => actors[0]?.defaultSides ?? 20)
   const [count, setCount] = useState<number>(() => actors[0]?.defaultCount ?? 1)
   const [modifier, setModifier] = useState(0)
@@ -172,8 +204,12 @@ export default function DiceRoller({
     onRoll?.(result)
   }
 
-  const fieldClass =
-    'rounded-xl border border-zinc-800/80 bg-black/40 py-1.5 px-2 text-xs text-zinc-100 outline-none focus:border-zinc-600 disabled:opacity-35 transition-all'
+  const handleActorChange = (nextId: string) => {
+    setActorId(nextId)
+    const picked = actors.find((entry) => entry.id === nextId)
+    if (picked?.defaultSides) setSides(picked.defaultSides)
+    if (picked?.defaultCount) setCount(picked.defaultCount)
+  }
 
   return (
     <div
@@ -187,89 +223,47 @@ export default function DiceRoller({
           <Dices className="h-4 w-4" /> {title}
         </span>
         {onClose && (
-          <button type="button" onClick={onClose} aria-label="Close dice tray" className="text-white/50 hover:text-white cursor-pointer">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dice tray"
+            className="text-white/50 hover:text-white cursor-pointer"
+          >
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      <div className="mt-3 flex items-center gap-3">
-        <div className="relative grid h-33 w-33 shrink-0 place-items-center rounded-lg border border-white/10 bg-black/40">
-          <div className="absolute inset-0">
-            <Die3D sides={shownRoll?.sides ?? sides} rollId={shownRoll?.id ?? null} tone={edgeTone(shownRoll)} />
-          </div>
-          <div className="pointer-events-none relative">
-            {shownRoll ? (
-              <RollNumber key={shownRoll.id} roll={shownRoll} />
-            ) : (
-              <span className="font-mono text-lg font-bold text-white/60">d{sides}</span>
-            )}
-          </div>
-        </div>
-        <div className="min-w-0 flex-1 text-xs">
-          {shownRoll ? (
-            <>
-              <p className="truncate font-semibold text-white">{shownRoll.roller || 'Free roll'}</p>
-              <p className="truncate text-white/60">{shownRoll.label}</p>
-              <p className="mt-1.5 wrap-break-words font-mono text-[11px] leading-relaxed text-white/80">{describeRoll(shownRoll)}</p>
-            </>
-          ) : (
-            <p className="text-white/50">{hint}</p>
-          )}
-        </div>
-      </div>
+      <RollDisplay roll={shownRoll} sides={sides} hint={hint} />
 
-      <div className="mt-3 grid grid-cols-7 gap-1">
-        {DIE_SIDES.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setSides(value)}
-            className={`rounded py-1.5 font-mono text-[11px] transition ${
-              sides === value ? 'bg-amber-500 text-black' : 'border border-white/15 text-white/70 hover:bg-white/10'
-            } cursor-pointer`}
-          >
-            d{value}
-          </button>
-        ))}
-      </div>
+      <DieSidesPicker sides={sides} onChange={setSides} />
 
       <div className="mt-3 space-y-2">
-        <Stepper label={language === 'en' ? 'Dice' : 'เต๋า'} value={count} onChange={setCount} min={1} max={10} />
-        <Stepper label={language === 'en' ? 'Modifier' : 'ตัวบวก'} value={modifier} onChange={setModifier} min={MIN_DICE_MODIFIER} max={MAX_DICE_MODIFIER} format={formatModifier} />
+        <Stepper
+          label={language === 'en' ? 'Dice' : 'เต๋า'}
+          value={count}
+          onChange={setCount}
+          min={1}
+          max={10}
+        />
+        <Stepper
+          label={language === 'en' ? 'Modifier' : 'ตัวบวก'}
+          value={modifier}
+          onChange={setModifier}
+          min={MIN_DICE_MODIFIER}
+          max={MAX_DICE_MODIFIER}
+          format={formatModifier}
+        />
 
-        <div className="flex items-center justify-between gap-2">
-          <span className={LABEL}>{t('dice.mode')}</span>
-          <div className="flex overflow-hidden rounded border border-white/15">
-            {(['normal', 'advantage', 'disadvantage'] as RollMode[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                disabled={!modeAllowed}
-                onClick={() => setMode(value)}
-                className={`px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition disabled:opacity-35 ${
-                  modeAllowed && mode === value ? 'bg-white/20 text-white' : 'text-white/55 hover:bg-white/10'
-                } cursor-pointer`}
-              >
-                {value === 'normal' ? t('dice.normal') : value === 'advantage' ? (language === 'en' ? 'Adv' : 'ได้เปรียบ') : (language === 'en' ? 'Dis' : 'เสียเปรียบ')}
-              </button>
-            ))}
-          </div>
-        </div>
+        <RollModeToggle mode={mode} allowed={modeAllowed} onChange={setMode} />
 
         {actors.length > 0 ? (
           <div className="grid grid-cols-[1fr_auto_auto] gap-1.5">
             <select
               value={actor ? actorId : ''}
-              onChange={(event) => {
-                const nextId = event.target.value
-                setActorId(nextId)
-                const picked = actors.find((entry) => entry.id === nextId)
-                if (picked?.defaultSides) setSides(picked.defaultSides)
-                if (picked?.defaultCount) setCount(picked.defaultCount)
-              }}
+              onChange={(event) => handleActorChange(event.target.value)}
               aria-label="Roll as"
-              className={`min-w-0 px-2 ${fieldClass}`}
+              className={`min-w-0 px-2 ${FIELD_CLASS}`}
             >
               <option value="">{language === 'en' ? 'Free roll' : 'ทอยอิสระ'}</option>
               {actors.map((entry) => (
@@ -283,7 +277,7 @@ export default function DiceRoller({
               onChange={(event) => setBonusKey(event.target.value)}
               disabled={bonusKeys.length === 0}
               aria-label="Bonus"
-              className={`px-1.5 font-mono ${fieldClass}`}
+              className={`px-1.5 font-mono ${FIELD_CLASS}`}
             >
               <option value="">—</option>
               {bonusKeys.map((key) => (
@@ -292,26 +286,12 @@ export default function DiceRoller({
                 </option>
               ))}
             </select>
-            <input
-              value={dc}
-              onChange={(event) => setDc(event.target.value.replace(/\D/g, '').slice(0, 2))}
-              inputMode="numeric"
-              placeholder="DC"
-              aria-label="Difficulty class"
-              className={`w-12 px-2 text-center font-mono placeholder-white/30 ${fieldClass}`}
-            />
+            <DcInput value={dc} onChange={setDc} placeholder="DC" />
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
             <span className={LABEL}>DC (optional)</span>
-            <input
-              value={dc}
-              onChange={(event) => setDc(event.target.value.replace(/\D/g, '').slice(0, 2))}
-              inputMode="numeric"
-              placeholder="—"
-              aria-label="Difficulty class"
-              className={`w-12 px-2 text-center font-mono placeholder-white/30 ${fieldClass}`}
-            />
+            <DcInput value={dc} onChange={setDc} placeholder="—" />
           </div>
         )}
       </div>
@@ -326,18 +306,141 @@ export default function DiceRoller({
         {totalModifier !== 0 ? ` ${formatModifier(totalModifier)}` : ''}
       </button>
 
-      {shownHistory.length > 0 && (
-        <ul className="mt-3 space-y-1 border-t border-white/10 pt-2">
-          {shownHistory.slice(0, 4).map((entry) => (
-            <li key={entry.id} className="flex justify-between gap-2 font-mono text-[10px] text-white/50">
-              <span className="truncate">
-                {entry.roller || 'Free'} · {entry.label}
-              </span>
-              <span className="shrink-0 text-white/80">{entry.total}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {shownHistory.length > 0 && <RollHistory rolls={shownHistory} />}
     </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Tray sections                                                       */
+/* ------------------------------------------------------------------ */
+
+// 3D die with the rolling number on top, plus who rolled and the breakdown
+function RollDisplay({ roll, sides, hint }: { roll: DiceRoll | null; sides: DieSides; hint: string }) {
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <div className="relative grid h-33 w-33 shrink-0 place-items-center rounded-lg border border-white/10 bg-black/40">
+        <div className="absolute inset-0">
+          <Die3D sides={roll?.sides ?? sides} rollId={roll?.id ?? null} tone={edgeTone(roll)} />
+        </div>
+        <div className="pointer-events-none relative">
+          {roll ? (
+            <RollNumber key={roll.id} roll={roll} />
+          ) : (
+            <span className="font-mono text-lg font-bold text-white/60">d{sides}</span>
+          )}
+        </div>
+      </div>
+      <div className="min-w-0 flex-1 text-xs">
+        {roll ? (
+          <>
+            <p className="truncate font-semibold text-white">{roll.roller || 'Free roll'}</p>
+            <p className="truncate text-white/60">{roll.label}</p>
+            <p className="mt-1.5 wrap-break-words font-mono text-[11px] leading-relaxed text-white/80">
+              {describeRoll(roll)}
+            </p>
+          </>
+        ) : (
+          <p className="text-white/50">{hint}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DieSidesPicker({ sides, onChange }: { sides: DieSides; onChange: (sides: DieSides) => void }) {
+  return (
+    <div className="mt-3 grid grid-cols-7 gap-1">
+      {DIE_SIDES.map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onChange(value)}
+          className={`rounded py-1.5 font-mono text-[11px] transition ${
+            sides === value
+              ? 'bg-amber-500 text-black'
+              : 'border border-white/15 text-white/70 hover:bg-white/10'
+          } cursor-pointer`}
+        >
+          d{value}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Advantage / disadvantage only apply to a single d20
+function RollModeToggle({
+  mode,
+  allowed,
+  onChange,
+}: {
+  mode: RollMode
+  allowed: boolean
+  onChange: (mode: RollMode) => void
+}) {
+  const { t, language } = useLanguage()
+  const labelFor = (value: RollMode) => {
+    if (value === 'normal') return t('dice.normal')
+    if (value === 'advantage') return language === 'en' ? 'Adv' : 'ได้เปรียบ'
+    return language === 'en' ? 'Dis' : 'เสียเปรียบ'
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className={LABEL}>{t('dice.mode')}</span>
+      <div className="flex overflow-hidden rounded border border-white/15">
+        {ROLL_MODES.map((value) => (
+          <button
+            key={value}
+            type="button"
+            disabled={!allowed}
+            onClick={() => onChange(value)}
+            className={`px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition disabled:opacity-35 ${
+              allowed && mode === value ? 'bg-white/20 text-white' : 'text-white/55 hover:bg-white/10'
+            } cursor-pointer`}
+          >
+            {labelFor(value)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Two-digit difficulty class; anything that is not a digit is dropped
+function DcInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(event) => onChange(event.target.value.replace(/\D/g, '').slice(0, 2))}
+      inputMode="numeric"
+      placeholder={placeholder}
+      aria-label="Difficulty class"
+      className={`w-12 px-2 text-center font-mono placeholder-white/30 ${FIELD_CLASS}`}
+    />
+  )
+}
+
+function RollHistory({ rolls }: { rolls: DiceRoll[] }) {
+  return (
+    <ul className="mt-3 space-y-1 border-t border-white/10 pt-2">
+      {rolls.slice(0, 4).map((entry) => (
+        <li key={entry.id} className="flex justify-between gap-2 font-mono text-[10px] text-white/50">
+          <span className="truncate">
+            {entry.roller || 'Free'} · {entry.label}
+          </span>
+          <span className="shrink-0 text-white/80">{entry.total}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
