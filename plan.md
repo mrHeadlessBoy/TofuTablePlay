@@ -159,7 +159,7 @@ flowchart TD
 > **Context:** Branch `refactor/code-format` reformatted the codebase and split large components/functions into sub-components and helpers (no intended behavior change). The items below came out of its code review and smoke test. None of them block the merge.
 
 ### 4.1 Fixed on the branch
-- [x] **Hydration mismatch on language-dependent text** (`/`, `/hub` and any page that renders `t(...)`): the server always rendered Thai while the client read the saved language from `localStorage` on its first render. `LanguageProvider` now uses `useSyncExternalStore` (Thai on the server and during hydration, then the stored choice) in `src/lib/i18n/LanguageContext.tsx`.
+- [x] **Hydration mismatch on language-dependent text** (`/`, `/hub` and any page that renders `t(...)`): the server always rendered Thai while the client read the saved language from `localStorage` on its first render. `LanguageProvider` now uses `useSyncExternalStore` in `src/lib/i18n/LanguageContext.tsx`: it reports Thai until the whole document has streamed in (`DOMContentLoaded`), so `<Suspense>` sections that arrive later also hydrate against the same text, then switches to the stored choice. Proper long-term fix: render the right language on the server (read the `tofu_language` cookie inside a `<Suspense>` boundary, since `cacheComponents` is on).
 - [x] **Language cookie name mismatch**: `hub/actions.ts` (`writeOpeningScene`) and `table/actions.ts` (`resolveTurn`) read the cookie `dnd_language`, but the client writes `tofu_language`. Both now read `tofu_language`.
 
 ### 4.2 Housekeeping (small, optional)
@@ -172,6 +172,7 @@ flowchart TD
 ### 4.3 Pre-existing issues (not caused by the refactor)
 - [ ] **Rename `middleware.ts` to `proxy.ts` (Next.js 16)**: the `middleware` file name and export are deprecated in favor of `proxy` (see `node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`; a codemod exists). Re-test the 6-hour session guard afterwards.
 - [ ] **`extractTableIdentifier` can throw on a malformed link** (`src/features/hub/actions.ts`): `decodeURIComponent` runs outside the `try`, so input like `/table/%E0` throws `URIError` instead of returning "table not found". Move it inside the `try` or wrap it.
+- [ ] **Upgrade Next.js 16.4.0**: the dev overlay shows a Security Insight saying 16.4.0 has a known vulnerability and suggests `next upgrade --agent=security`. Do it in its own branch, then rerun `bun run build` and the smoke test below.
 - [ ] **(Info only) Code size grew ~11%** (19,892 → 22,091 lines in `src` + `middleware.ts`), mostly props interfaces and imports for the extracted components. No action needed.
 
 ### 4.4 Smoke test checklist (manual, `bun dev`)

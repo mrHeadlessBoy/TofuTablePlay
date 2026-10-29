@@ -20,14 +20,19 @@ const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 /*
  * Client-side language store.
- * The server cannot read localStorage, so it always renders Thai. useSyncExternalStore renders that
- * same value while hydrating and then switches to the stored choice, so there is no hydration mismatch.
+ * The server cannot read localStorage, so the HTML always comes in Thai. The client keeps reporting Thai
+ * until the whole document has streamed in (DOMContentLoaded), so every part of the page, including
+ * <Suspense> sections that arrive later, hydrates against the same text. Only then does it switch to the
+ * stored choice. Switching earlier caused "server rendered text didn't match the client" errors.
  */
 let clientLanguage: Language | null = null
+let documentReady = false
 const languageListeners = new Set<() => void>()
 
 function getLanguageSnapshot(): Language {
-  if (clientLanguage === null) clientLanguage = readInitialLanguage()
+  if (clientLanguage !== null) return clientLanguage
+  if (!documentReady) return 'th'
+  clientLanguage = readInitialLanguage()
   return clientLanguage
 }
 
@@ -35,23 +40,46 @@ function getServerLanguageSnapshot(): Language {
   return 'th'
 }
 
+function notifyLanguageListeners() {
+  languageListeners.forEach((listener) => listener())
+}
+
 function updateClientLanguage(lang: Language) {
   clientLanguage = lang
-  languageListeners.forEach((listener) => listener())
+  notifyLanguageListeners()
+}
+
+function markDocumentReady() {
+  if (documentReady) return
+  documentReady = true
+  notifyLanguageListeners()
 }
 
 // Also follows changes made in other tabs
 function subscribeToLanguage(listener: () => void) {
   languageListeners.add(listener)
+
   const handleStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY && (e.newValue === 'th' || e.newValue === 'en')) {
       updateClientLanguage(e.newValue)
     }
   }
   window.addEventListener('storage', handleStorage)
+
+  let readyTimer: number | undefined
+  if (!documentReady) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', markDocumentReady, { once: true })
+    } else {
+      readyTimer = window.setTimeout(markDocumentReady, 0)
+    }
+  }
+
   return () => {
     languageListeners.delete(listener)
     window.removeEventListener('storage', handleStorage)
+    document.removeEventListener('DOMContentLoaded', markDocumentReady)
+    window.clearTimeout(readyTimer)
   }
 }
 
