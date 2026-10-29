@@ -7,13 +7,12 @@ import {
   toggleReadyStatus,
   linkCharacterToTable,
   getTableMembers,
-  getServerTime,
   resolveTurn,
   hostOverrideNarrative,
   voteKickMember,
   updateCharacterCombatState,
 } from '../actions'
-import { COUNTDOWN_MS } from '../countdown'
+import { COUNTDOWN_SECONDS, useCountdownSeconds, useServerClockOffset, useTableNotificationSounds } from '../hooks'
 import {
   ABILITY_SCORE_KEYS,
   DEFAULT_ABILITY_SCORES,
@@ -47,6 +46,7 @@ import {
   MAX_PARTY_CHAT_MESSAGES,
   READY_CLAIM_TTL_MS,
   withReadyClaims,
+  type Character,
   type CharacterCombatFormState,
   type ChatMode,
   type Member,
@@ -56,8 +56,6 @@ import {
   type TableData,
   type TablePlaygroundProps,
 } from '../types'
-
-const COUNTDOWN_SECONDS = Math.ceil(COUNTDOWN_MS / 1000)
 
 export default function TablePlayground({
   initialTable,
@@ -77,13 +75,12 @@ export default function TablePlayground({
   const [turns, setTurns] = useState(initialTurns)
   const [draftAction, setDraftAction] = useState('')
   const [attachedRolls, setAttachedRolls] = useState<DiceRoll[]>([])
-  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
   const [diceOpen, setDiceOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([])
 
-  // Server clock minus this device's clock, in ms. countdown_end is stamped by the server,
-  // so a device whose clock is a few seconds off would otherwise count down from another number.
-  const clockOffsetRef = useRef(0)
+  // Server clock minus this device's clock (see useServerClockOffset)
+  const clockOffsetRef = useServerClockOffset()
+  const countdownSeconds = useCountdownSeconds(table.turn_phase, table.countdown_end, clockOffsetRef)
   // Ready clicks the server's roster has not caught up with (this player's own, and ones announced by others)
   const readyClaimsRef = useRef<ReadyClaims>(new Map())
   // Roster refreshes run one at a time (see refreshMembers)
@@ -109,58 +106,12 @@ export default function TablePlayground({
   const [isEditingChar, setIsEditingChar] = useState(false)
   const [isSavingChar, setIsSavingChar] = useState(false)
   const [isSwitchingChar, setIsSwitchingChar] = useState(false)
-  const [charForm, setCharForm] = useState<CharacterCombatFormState>({
-    current_hp: 10,
-    max_hp: 10,
-    armor_class: 10,
-    current_skill_cost: 10,
-    max_skill_cost: 10,
-    status_condition: 'Normal',
-    inventory: [],
-    equipment: [...EMPTY_EQUIPMENT],
-    stats: { ...DEFAULT_ABILITY_SCORES },
-    skills: [],
-  })
+  const [charForm, setCharForm] = useState<CharacterCombatFormState>(createDefaultCombatForm)
 
   // Ref to hold the Supabase channel for broadcasting
   const channelRef = useRef<RealtimeChannel | null>(null)
 
-  // Track known turns and members so sound notifications fire only on new arrivals
-  const knownTurnIdsRef = useRef<Set<string>>(new Set(initialTurns.map((t) => t.id)))
-  const knownMemberIdsRef = useRef<Set<string>>(new Set(initialMembers.map((m) => m.user_id)))
-
-  // Play sound when player enters the table playground page
-  useEffect(() => {
-    playSystemSound('player_enter_table')
-  }, [])
-
-  // Play sound when another player enters the table
-  useEffect(() => {
-    let newPlayerEntered = false
-    for (const m of members) {
-      if (!knownMemberIdsRef.current.has(m.user_id)) {
-        knownMemberIdsRef.current.add(m.user_id)
-        newPlayerEntered = true
-      }
-    }
-    if (newPlayerEntered) {
-      playSystemSound('player_enter_table')
-    }
-  }, [members])
-
-  // Play sound when AI replies with a new turn
-  useEffect(() => {
-    let hasNewTurn = false
-    for (const t of turns) {
-      if (!knownTurnIdsRef.current.has(t.id)) {
-        knownTurnIdsRef.current.add(t.id)
-        hasNewTurn = true
-      }
-    }
-    if (hasNewTurn) {
-      playSystemSound('ai_reply')
-    }
-  }, [turns])
+  useTableNotificationSounds(members, turns)
 
   // Derive the active member and character dynamically from live members state
   const activeMember = members.find((m) => m.user_id === userId) || currentMember
@@ -183,38 +134,7 @@ export default function TablePlayground({
     Boolean(activeMember?.is_ready) || table.turn_phase === 'countdown' || turnResolving
 
   // Let the player roll as their own character, with that sheet's ability bonuses (supporting custom templates)
-  const diceActors: DiceActor[] = activeChar
-    ? (() => {
-        const tpl = readCharacterTemplate(activeChar)
-        const custom = readCustomValues(activeChar)
-        const modifiers =
-          tpl.stats.length > 0
-            ? Object.fromEntries(
-                tpl.stats.map((stat) => {
-                  const raw = isColumnStatId(stat.id)
-                    ? (activeChar.stats?.[stat.id] ?? stat.default)
-                    : (custom.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
-                  const bonusKey = isColumnStatId(stat.id) ? stat.id : stat.label || stat.id
-                  return [bonusKey, abilityModifier(raw, tpl.mechanics.statModifier)]
-                })
-              )
-            : Object.fromEntries(
-                ABILITY_SCORE_KEYS.map((key) => [
-                  key,
-                  abilityModifier(activeChar.stats?.[key], tpl.mechanics.statModifier),
-                ])
-              )
-        return [
-          {
-            id: activeChar.id,
-            name: activeChar.name,
-            modifiers,
-            defaultSides: (tpl.mechanics.dice === '2d6' ? 6 : tpl.mechanics.dice === 'd100' ? 100 : 20) as DieSides,
-            defaultCount: tpl.mechanics.dice === '2d6' ? 2 : 1,
-          },
-        ]
-      })()
-    : []
+  const diceActors = buildDiceActors(activeChar)
 
   // Attach the roll as a read-only badge instead of appending text into the draft input.
   // The badges are combined with the typed action when the player clicks Ready.
@@ -232,56 +152,10 @@ export default function TablePlayground({
 
   const handleOpenEdit = () => {
     if (activeChar) {
-      const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(activeChar)
-      const tpl = readCharacterTemplate(activeChar)
-      const custom = readCustomValues(activeChar)
-      setCharForm({
-        current_hp: activeChar.current_hp ?? 10,
-        max_hp: activeChar.max_hp ?? 10,
-        armor_class: currentSkillCost,
-        current_skill_cost: currentSkillCost,
-        max_skill_cost: maxSkillCost,
-        status_condition: activeChar.status_condition || 'Normal',
-        inventory: extractCharacterInventory(activeChar),
-        equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)],
-        stats: {
-          ...sanitizeAbilityScores(activeChar.stats, 0),
-          ...custom.stats,
-        },
-        skills: extractCharacterSkills(activeChar),
-        sheet_template: tpl,
-        sheet_custom: custom,
-      })
+      setCharForm(buildCombatFormFromCharacter(activeChar))
     }
     setIsEditingChar(true)
   }
-
-  // Ask the server what time it is, so the countdown below does not depend on this device's clock.
-  useEffect(() => {
-    let cancelled = false
-
-    const syncClock = async () => {
-      let bestRoundTrip = Infinity
-      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
-        const sentAt = Date.now()
-        try {
-          const serverNow = await getServerTime()
-          const roundTrip = Date.now() - sentAt
-          if (!cancelled && roundTrip < bestRoundTrip) {
-            bestRoundTrip = roundTrip
-            clockOffsetRef.current = serverNow - (sentAt + roundTrip / 2)
-          }
-        } catch {
-          // Keep the offset we already have
-        }
-      }
-    }
-
-    void syncClock()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   // Reload the roster from the server, running at most one request at a time.
   const refreshMembers = useCallback(async () => {
@@ -387,33 +261,11 @@ export default function TablePlayground({
         fetchTurns()
       })
       .on('broadcast', { event: 'party_chat' }, ({ payload }) => {
-        if (!payload || typeof payload !== 'object') return
-        const msg = payload as Partial<PartyChatMessage>
-        if (
-          typeof msg.id !== 'string' ||
-          typeof msg.userId !== 'string' ||
-          typeof msg.text !== 'string' ||
-          msg.userId === userId
-        ) {
-          return
-        }
-        const incoming: PartyChatMessage = {
-          id: msg.id,
-          userId: msg.userId,
-          senderName: typeof msg.senderName === 'string' && msg.senderName ? msg.senderName : 'Adventurer',
-          characterClass: typeof msg.characterClass === 'string' ? msg.characterClass : null,
-          isHost: Boolean(msg.isHost),
-          mode: msg.mode === 'ic' ? 'ic' : 'ooc',
-          text: msg.text.slice(0, 400),
-          timestamp: typeof msg.timestamp === 'number' ? msg.timestamp : Date.now(),
-        }
-        setChatMessages((prev) => {
-          if (prev.some((existing) => existing.id === incoming.id)) return prev
-          const next = [...prev, incoming]
-          return next.length > MAX_PARTY_CHAT_MESSAGES
-            ? next.slice(next.length - MAX_PARTY_CHAT_MESSAGES)
-            : next
-        })
+        const incoming = parseIncomingChatMessage(payload, userId)
+        if (!incoming) return
+        setChatMessages((prev) =>
+          prev.some((existing) => existing.id === incoming.id) ? prev : appendChatMessage(prev, incoming),
+        )
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -506,38 +358,6 @@ export default function TablePlayground({
     }
   }, [table.id, broadcastSync, showAlert, refreshMembers, language])
 
-  // Synchronized countdown timer
-  useEffect(() => {
-    if (table.turn_phase !== 'countdown' || !table.countdown_end) {
-      const resetId = window.setTimeout(() => {
-        setCountdownSeconds(null)
-      }, 0)
-      return () => window.clearTimeout(resetId)
-    }
-
-    const countdownEnd = new Date(table.countdown_end)
-
-    if (Number.isNaN(countdownEnd.getTime())) {
-      const resetId = window.setTimeout(() => {
-        setCountdownSeconds(null)
-      }, 0)
-      return () => window.clearTimeout(resetId)
-    }
-
-    const interval = setInterval(() => {
-      const serverNow = Date.now() + clockOffsetRef.current
-      const remaining = Math.min(
-        COUNTDOWN_SECONDS,
-        Math.max(0, Math.ceil((countdownEnd.getTime() - serverNow) / 1000))
-      )
-      setCountdownSeconds(remaining)
-      if (remaining <= 0) {
-        clearInterval(interval)
-      }
-    }, 250)
-    return () => clearInterval(interval)
-  }, [table.turn_phase, table.countdown_end])
-
   // Automatic turn resolution once the countdown reaches 0 (invoked by Head Table)
   useEffect(() => {
     if (
@@ -574,13 +394,7 @@ export default function TablePlayground({
     }
 
     // Combine typed action text with attached dice roll badges into a single submission string
-    const rollTexts = attachedRolls.map((roll) => {
-      const result = describeRoll(roll)
-      return result.startsWith(roll.label)
-        ? `[ทอยเต๋า ${result}]`
-        : `[ทอยเต๋า ${roll.label}: ${result}]`
-    })
-    const combinedAction = [draftAction.trim(), ...rollTexts].filter(Boolean).join(' ')
+    const combinedAction = combineActionWithRolls(draftAction, attachedRolls)
 
     // Client validation: Action length check
     if (nextState && combinedAction.length > 2500) {
@@ -664,50 +478,7 @@ export default function TablePlayground({
     if (!activeChar) return
     setIsSavingChar(true)
     try {
-      const tpl = charForm.sheet_template ?? readCharacterTemplate(activeChar)
-      const baseCustom = charForm.sheet_custom ?? readCustomValues(activeChar)
-      const nextCustomStats = { ...baseCustom.stats }
-      for (const stat of tpl.stats) {
-        if (!isColumnStatId(stat.id)) {
-          const raw = charForm.stats[stat.id] ?? baseCustom.stats[stat.id] ?? stat.default
-          const num = Number(raw)
-          nextCustomStats[stat.id] = Number.isFinite(num) ? num : stat.default
-        }
-      }
-      const nextCustom = {
-        ...baseCustom,
-        stats: nextCustomStats,
-      }
-      const tplPayload = templateStatsPayload(tpl, nextCustom)
-
-      const sanitizedStats = sanitizeAbilityScores(charForm.stats, 0)
-      const sanitizedSkills = sanitizeCharacterSkills(charForm.skills)
-      const sanitizedInventory = sanitizeInventoryItems(charForm.inventory)
-      const { currentHp, maxHp } = clampHpValues(charForm.current_hp, charForm.max_hp)
-      const { currentSkillCost, maxSkillCost } = clampSkillCostValues(
-        charForm.current_skill_cost,
-        charForm.max_skill_cost
-      )
-      const formToSave = {
-        ...charForm,
-        current_hp: currentHp,
-        max_hp: maxHp,
-        armor_class: currentSkillCost,
-        current_skill_cost: currentSkillCost,
-        max_skill_cost: maxSkillCost,
-        inventory: sanitizedInventory,
-        stats: {
-          ...sanitizedStats,
-          ...nextCustomStats,
-          current_skill_cost: currentSkillCost,
-          max_skill_cost: maxSkillCost,
-          skills: sanitizedSkills,
-          ...tplPayload,
-        },
-        skills: sanitizedSkills,
-        sheet_template: tpl,
-        sheet_custom: nextCustom,
-      }
+      const formToSave = buildCombatSavePayload(charForm, activeChar)
 
       await updateCharacterCombatState(table.id, activeChar.id, formToSave)
 
@@ -791,12 +562,7 @@ export default function TablePlayground({
         timestamp: Date.now(),
       }
 
-      setChatMessages((prev) => {
-        const next = [...prev, newMsg]
-        return next.length > MAX_PARTY_CHAT_MESSAGES
-          ? next.slice(next.length - MAX_PARTY_CHAT_MESSAGES)
-          : next
-      })
+      setChatMessages((prev) => appendChatMessage(prev, newMsg))
 
       try {
         void channelRef.current?.send({
@@ -899,4 +665,174 @@ export default function TablePlayground({
       />
     </div>
   )
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Pure helpers                                                        */
+/* ------------------------------------------------------------------ */
+
+function createDefaultCombatForm(): CharacterCombatFormState {
+  return {
+    current_hp: 10,
+    max_hp: 10,
+    armor_class: 10,
+    current_skill_cost: 10,
+    max_skill_cost: 10,
+    status_condition: 'Normal',
+    inventory: [],
+    equipment: [...EMPTY_EQUIPMENT],
+    stats: { ...DEFAULT_ABILITY_SCORES },
+    skills: [],
+  }
+}
+
+// Let the player roll as their own character, with that sheet's ability bonuses (supporting custom templates)
+function buildDiceActors(activeChar: Character | null | undefined): DiceActor[] {
+  if (!activeChar) return []
+
+  const tpl = readCharacterTemplate(activeChar)
+  const custom = readCustomValues(activeChar)
+  const modifiers =
+    tpl.stats.length > 0
+      ? Object.fromEntries(
+          tpl.stats.map((stat) => {
+            const raw = isColumnStatId(stat.id)
+              ? (activeChar.stats?.[stat.id] ?? stat.default)
+              : (custom.stats[stat.id] ?? activeChar.stats?.[stat.id] ?? stat.default)
+            const bonusKey = isColumnStatId(stat.id) ? stat.id : stat.label || stat.id
+            return [bonusKey, abilityModifier(raw, tpl.mechanics.statModifier)]
+          }),
+        )
+      : Object.fromEntries(
+          ABILITY_SCORE_KEYS.map((key) => [
+            key,
+            abilityModifier(activeChar.stats?.[key], tpl.mechanics.statModifier),
+          ]),
+        )
+  const dice = tpl.mechanics.dice
+
+  return [
+    {
+      id: activeChar.id,
+      name: activeChar.name,
+      modifiers,
+      defaultSides: (dice === '2d6' ? 6 : dice === 'd100' ? 100 : 20) as DieSides,
+      defaultCount: dice === '2d6' ? 2 : 1,
+    },
+  ]
+}
+
+// Snapshot of the live sheet that the inline combat editor starts from
+function buildCombatFormFromCharacter(activeChar: Character): CharacterCombatFormState {
+  const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(activeChar)
+  const tpl = readCharacterTemplate(activeChar)
+  const custom = readCustomValues(activeChar)
+  return {
+    current_hp: activeChar.current_hp ?? 10,
+    max_hp: activeChar.max_hp ?? 10,
+    armor_class: currentSkillCost,
+    current_skill_cost: currentSkillCost,
+    max_skill_cost: maxSkillCost,
+    status_condition: activeChar.status_condition || 'Normal',
+    inventory: extractCharacterInventory(activeChar),
+    equipment: [...(activeChar.equipment ?? EMPTY_EQUIPMENT)],
+    stats: {
+      ...sanitizeAbilityScores(activeChar.stats, 0),
+      ...custom.stats,
+    },
+    skills: extractCharacterSkills(activeChar),
+    sheet_template: tpl,
+    sheet_custom: custom,
+  }
+}
+
+// Clamp and sanitize the combat editor form into what updateCharacterCombatState stores
+function buildCombatSavePayload(charForm: CharacterCombatFormState, activeChar: Character) {
+  const tpl = charForm.sheet_template ?? readCharacterTemplate(activeChar)
+  const baseCustom = charForm.sheet_custom ?? readCustomValues(activeChar)
+  const nextCustomStats = { ...baseCustom.stats }
+  for (const stat of tpl.stats) {
+    if (!isColumnStatId(stat.id)) {
+      const raw = charForm.stats[stat.id] ?? baseCustom.stats[stat.id] ?? stat.default
+      const num = Number(raw)
+      nextCustomStats[stat.id] = Number.isFinite(num) ? num : stat.default
+    }
+  }
+  const nextCustom = {
+    ...baseCustom,
+    stats: nextCustomStats,
+  }
+  const tplPayload = templateStatsPayload(tpl, nextCustom)
+
+  const sanitizedStats = sanitizeAbilityScores(charForm.stats, 0)
+  const sanitizedSkills = sanitizeCharacterSkills(charForm.skills)
+  const sanitizedInventory = sanitizeInventoryItems(charForm.inventory)
+  const { currentHp, maxHp } = clampHpValues(charForm.current_hp, charForm.max_hp)
+  const { currentSkillCost, maxSkillCost } = clampSkillCostValues(
+    charForm.current_skill_cost,
+    charForm.max_skill_cost,
+  )
+
+  return {
+    ...charForm,
+    current_hp: currentHp,
+    max_hp: maxHp,
+    armor_class: currentSkillCost,
+    current_skill_cost: currentSkillCost,
+    max_skill_cost: maxSkillCost,
+    inventory: sanitizedInventory,
+    stats: {
+      ...sanitizedStats,
+      ...nextCustomStats,
+      current_skill_cost: currentSkillCost,
+      max_skill_cost: maxSkillCost,
+      skills: sanitizedSkills,
+      ...tplPayload,
+    },
+    skills: sanitizedSkills,
+    sheet_template: tpl,
+    sheet_custom: nextCustom,
+  }
+}
+
+// Typed action plus one "[ทอยเต๋า ...]" tag per attached roll
+function combineActionWithRolls(draftAction: string, rolls: DiceRoll[]): string {
+  const rollTexts = rolls.map((roll) => {
+    const result = describeRoll(roll)
+    return result.startsWith(roll.label) ? `[ทอยเต๋า ${result}]` : `[ทอยเต๋า ${roll.label}: ${result}]`
+  })
+  return [draftAction.trim(), ...rollTexts].filter(Boolean).join(' ')
+}
+
+// Keep only the newest MAX_PARTY_CHAT_MESSAGES messages
+function appendChatMessage(prev: PartyChatMessage[], message: PartyChatMessage): PartyChatMessage[] {
+  const next = [...prev, message]
+  return next.length > MAX_PARTY_CHAT_MESSAGES
+    ? next.slice(next.length - MAX_PARTY_CHAT_MESSAGES)
+    : next
+}
+
+// Validate a party_chat broadcast from another player; returns null for malformed or own messages
+function parseIncomingChatMessage(payload: unknown, userId: string): PartyChatMessage | null {
+  if (!payload || typeof payload !== 'object') return null
+  const msg = payload as Partial<PartyChatMessage>
+  if (
+    typeof msg.id !== 'string' ||
+    typeof msg.userId !== 'string' ||
+    typeof msg.text !== 'string' ||
+    msg.userId === userId
+  ) {
+    return null
+  }
+  return {
+    id: msg.id,
+    userId: msg.userId,
+    senderName: typeof msg.senderName === 'string' && msg.senderName ? msg.senderName : 'Adventurer',
+    characterClass: typeof msg.characterClass === 'string' ? msg.characterClass : null,
+    isHost: Boolean(msg.isHost),
+    mode: msg.mode === 'ic' ? 'ic' : 'ooc',
+    text: msg.text.slice(0, 400),
+    timestamp: typeof msg.timestamp === 'number' ? msg.timestamp : Date.now(),
+  }
 }
