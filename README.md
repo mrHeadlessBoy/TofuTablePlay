@@ -113,7 +113,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **Resilient Dual-Language State Extraction:** `extractPartyStateUpdates` regex dynamically matches both Thai (`สถานะปาร์ตี้ :`) and English (`Party Status :`) overview blocks, ensuring automated HP, Skill Cost (SP), and custom resource syncing works flawlessly in both languages.
 
 ### 9. 🛡️ Authentication, Security & Room Governance
-* **Supabase Auth & 6-Hour Session Guard:** Email/password authentication with middleware-enforced 6-hour session expiration (`dnd_session_start` cookie) and post-login route restoration (`?next=...`).
+* **Supabase Auth & 6-Hour Idle Session:** Email/password authentication. Supabase auth cookies expire 6 hours after their last refresh, so an idle session ends after 6 hours. `src/middleware.ts` redirects signed-out users from protected routes to `/login` with post-login route restoration (`?next=...`).
 * **Room & Campaign Governance:** Head Table member kick controls, player `Leave Table` support, custom confirmation/status modals (`AlertModal`), and cascading cleanup when deleting tables or campaigns.
 
 ---
@@ -269,7 +269,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 ├── public/
 │   └── assets/sound/                     # WAV sound notifications (dice roll tiers, enter, AI reply, error)
 └── src/
-    ├── middleware.ts                     # Auth route protection & 6-hour session timeout guard (must live in src/)
+    ├── middleware.ts                     # Auth route protection & /login redirects (must live in src/)
     ├── app/                              # Pure Routing Layer (Pages, Layouts & Route Handlers only)
     │   ├── layout.tsx                    # Root layout with Geist fonts & global AlertProvider
     │   ├── page.tsx                      # Landing page

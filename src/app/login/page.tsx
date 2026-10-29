@@ -78,17 +78,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
-  const [errorMsg, setErrorMsg] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      if (params.get('reason') === 'session-expired') {
-        return isThai
-          ? 'เซสชันของคุณหมดอายุแล้ว (จำกัด 6 ชั่วโมง) กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
-          : 'Your session has expired (6-hour limit). Please log in again.'
-      }
-    }
-    return ''
-  })
+  const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -124,7 +114,6 @@ export default function LoginPage() {
       if (error) {
         setErrorMsg(localizeAuthError(error.message, isThai))
       } else {
-        document.cookie = `dnd_session_start=${Date.now()}; path=/; max-age=21600; SameSite=Lax`
         router.push(targetPath)
         router.refresh()
       }

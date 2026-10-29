@@ -276,11 +276,5 @@ export async function deleteCampaign(campaignId: string) {
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  try {
-    const cookieStore = await cookies()
-    cookieStore.set('dnd_session_start', '', { path: '/', maxAge: 0 })
-  } catch {
-    // Ignore if running where cookies cannot be directly set
-  }
   redirect('/login')
 }
