@@ -266,10 +266,10 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 ## 📁 Project Architecture
 
 ```text
-├── middleware.ts                         # Auth route protection & 6-hour session timeout guard
 ├── public/
 │   └── assets/sound/                     # WAV sound notifications (dice roll tiers, enter, AI reply, error)
 └── src/
+    ├── middleware.ts                     # Auth route protection & 6-hour session timeout guard (must live in src/)
     ├── app/                              # Pure Routing Layer (Pages, Layouts & Route Handlers only)
     │   ├── layout.tsx                    # Root layout with Geist fonts & global AlertProvider
     │   ├── page.tsx                      # Landing page
