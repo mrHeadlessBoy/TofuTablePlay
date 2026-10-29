@@ -19,7 +19,7 @@ import {
   type TemplateResource,
 } from '@/features/character/template'
 import { abilityModifier, formatModifier } from '@/components/dice/dice'
-import { SaoDualSemicircleDial } from './SaoCharacterOrb'
+import { SaoDualSemicircleDial } from './SaoDualSemicircleDial'
 import type { Character } from '../types'
 
 const CUSTOM_RESOURCE_BAR_COLOR: Record<

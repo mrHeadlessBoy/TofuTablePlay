@@ -300,7 +300,12 @@ function ResourcesSection({ template, onChange }: TemplateBuilderTabProps) {
           </EmptyBuilderNote>
         )}
         {template.resources.map((res, idx) => (
-          <BuilderCard key={res.id} id={res.id} removeTitle="ลบหลอดพลังนี้" onRemove={() => handleRemove(idx)}>
+          <BuilderCard
+            key={res.id}
+            id={res.id}
+            removeTitle="ลบหลอดพลังนี้"
+            onRemove={() => handleRemove(idx)}
+          >
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
                 <label className={CARD_LABEL_CLASS}>Label</label>
@@ -381,7 +386,12 @@ function StatsSection({ template, onChange }: TemplateBuilderTabProps) {
           <EmptyBuilderNote>ไม่มีค่าสถานะแยกย่อย (0 Stats)</EmptyBuilderNote>
         )}
         {template.stats.map((stat, idx) => (
-          <BuilderCard key={stat.id} id={stat.id} removeTitle="ลบค่าสถานะนี้" onRemove={() => handleRemove(idx)}>
+          <BuilderCard
+            key={stat.id}
+            id={stat.id}
+            removeTitle="ลบค่าสถานะนี้"
+            onRemove={() => handleRemove(idx)}
+          >
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
                 <label className={CARD_LABEL_CLASS}>Label</label>
