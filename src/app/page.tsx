@@ -2,9 +2,39 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Scroll, Users, Play, BookOpen, Crown, ChevronRight } from 'lucide-react'
+import { Scroll, Users, Play, BookOpen, Crown, ChevronRight, type LucideIcon } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { LanguageToggle } from '@/components/ui/LanguageToggle'
+
+type LocalizedText = { th: string; en: string }
+
+// The 3 core pillars shown under the hero
+const FEATURE_PILLARS: { icon: LucideIcon; title: LocalizedText; body: LocalizedText }[] = [
+  {
+    icon: Users,
+    title: { th: 'ดราฟต์พร้อมกัน (Gartic Phone Loop)', en: 'Synchronized Action Draft' },
+    body: {
+      th: 'ทุกคนพิมพ์แอ็กชันส่วนตัวแบบซ่อน แล้วเปิดเผยพร้อมกัน ป้องกันการแก้ทางแบบ Meta-gaming และสร้างความสนุกไม่คาดฝัน',
+      en: 'Secret drafting phases with simultaneous reveals prevent meta-gaming and ensure spontaneous tactical moments.',
+    },
+  },
+  {
+    icon: BookOpen,
+    title: { th: 'คลังตำนานชาญฉลาด (Dynamic Lorebooks)', en: 'Dynamic Lorebooks' },
+    body: {
+      th: 'แทรกข้อมูลโลกและเงื่อนไขลับเข้ามาเฉพาะเมื่อคำสำคัญตรงกับบทสนทนา ประหยัด Token และคงความแม่นยำของ Lore',
+      en: 'Inject world knowledge only when narrative hooks trigger, preserving context tokens while deepening lore accuracy.',
+    },
+  },
+  {
+    icon: Crown,
+    title: { th: 'หัวหน้าโต๊ะปรับแต่งได้ (Host Authority)', en: 'Host Narrative Override' },
+    body: {
+      th: 'Head Table สามารถปรับแต่งข้อความบรรยายของ AI ได้แบบเรียลไทม์ พร้อมระบบสลับภาษา (TH/EN) ได้อิสระ',
+      en: 'Head Table hosts can fine-tune narration in real time to steer plot twists and maintain campaign integrity.',
+    },
+  },
+]
 
 export default function LandingPage() {
   const { language } = useLanguage()
@@ -87,47 +117,14 @@ export default function LandingPage() {
 
         {/* Feature Grid (3 Core Pillars) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-left w-full pt-4">
-          <div className="surface-panel surface-panel-hover rounded-xl p-5 space-y-2.5">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center">
-              <Users className="w-4 h-4 text-amber-400/90" />
-            </div>
-            <h3 className="font-semibold text-zinc-100 text-sm">
-              {isThai ? 'ดราฟต์พร้อมกัน (Gartic Phone Loop)' : 'Synchronized Action Draft'}
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              {isThai
-                ? 'ทุกคนพิมพ์แอ็กชันส่วนตัวแบบซ่อน แล้วเปิดเผยพร้อมกัน ป้องกันการแก้ทางแบบ Meta-gaming และสร้างความสนุกไม่คาดฝัน'
-                : 'Secret drafting phases with simultaneous reveals prevent meta-gaming and ensure spontaneous tactical moments.'}
-            </p>
-          </div>
-
-          <div className="surface-panel surface-panel-hover rounded-xl p-5 space-y-2.5">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-amber-400/90" />
-            </div>
-            <h3 className="font-semibold text-zinc-100 text-sm">
-              {isThai ? 'คลังตำนานชาญฉลาด (Dynamic Lorebooks)' : 'Dynamic Lorebooks'}
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              {isThai
-                ? 'แทรกข้อมูลโลกและเงื่อนไขลับเข้ามาเฉพาะเมื่อคำสำคัญตรงกับบทสนทนา ประหยัด Token และคงความแม่นยำของ Lore'
-                : 'Inject world knowledge only when narrative hooks trigger, preserving context tokens while deepening lore accuracy.'}
-            </p>
-          </div>
-
-          <div className="surface-panel surface-panel-hover rounded-xl p-5 space-y-2.5">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center">
-              <Crown className="w-4 h-4 text-amber-400/90" />
-            </div>
-            <h3 className="font-semibold text-zinc-100 text-sm">
-              {isThai ? 'หัวหน้าโต๊ะปรับแต่งได้ (Host Authority)' : 'Host Narrative Override'}
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              {isThai
-                ? 'Head Table สามารถปรับแต่งข้อความบรรยายของ AI ได้แบบเรียลไทม์ พร้อมระบบสลับภาษา (TH/EN) ได้อิสระ'
-                : 'Head Table hosts can fine-tune narration in real time to steer plot twists and maintain campaign integrity.'}
-            </p>
-          </div>
+          {FEATURE_PILLARS.map((pillar) => (
+            <FeatureCard
+              key={pillar.title.en}
+              icon={pillar.icon}
+              title={isThai ? pillar.title.th : pillar.title.en}
+              body={isThai ? pillar.body.th : pillar.body.en}
+            />
+          ))}
         </div>
       </main>
 
@@ -137,6 +134,18 @@ export default function LandingPage() {
           <p>TofuTablePlay &copy; 2026 &mdash; Pure text tabletop RPG engine.</p>
         </div>
       </footer>
+    </div>
+  )
+}
+
+function FeatureCard({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
+  return (
+    <div className="surface-panel surface-panel-hover rounded-xl p-5 space-y-2.5">
+      <div className="w-8 h-8 rounded-lg bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center">
+        <Icon className="w-4 h-4 text-amber-400/90" />
+      </div>
+      <h3 className="font-semibold text-zinc-100 text-sm">{title}</h3>
+      <p className="text-xs text-zinc-400 leading-relaxed">{body}</p>
     </div>
   )
 }

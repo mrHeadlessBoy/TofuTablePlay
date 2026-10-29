@@ -426,59 +426,15 @@ export function newTemplateId(): string {
   return `tpl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
-
 export function sanitizeMechanics(
   rawMech: unknown,
   resources: TemplateResource[],
   name: string
 ): TemplateMechanics {
   const m = asRecord(rawMech)
-  const normName = name.toLowerCase()
 
-  let mode: TemplateMode
-  if ((TEMPLATE_MODES as readonly string[]).includes(m.mode as string)) {
-    mode = m.mode as TemplateMode
-  } else if (
-    resources.length === 0 ||
-    normName.includes('drama') ||
-    normName.includes('mystery') ||
-    normName.includes('ดราม่า') ||
-    normName.includes('สืบสวน')
-  ) {
-    mode = 'narrative'
-  } else if (
-    normName.includes('romance') ||
-    normName.includes('slice of life') ||
-    normName.includes('cozy') ||
-    normName.includes('love') ||
-    normName.includes('รัก')
-  ) {
-    mode = 'social'
-  } else if (normName.includes('horror') || normName.includes('สยองขวัญ') || normName.includes('เอาชีวิตรอด')) {
-    mode = 'horror'
-  } else {
-    mode = 'combat'
-  }
-
-  let vitalityResourceId: string | null = null
-  if (typeof m.vitalityResourceId === 'string' && isValidFieldId(m.vitalityResourceId)) {
-    vitalityResourceId = m.vitalityResourceId
-  } else if (m.vitalityResourceId === null) {
-    vitalityResourceId = null
-  } else {
-    const hasHp = resources.find((r) => r.id === 'hp')
-    if (hasHp) {
-      vitalityResourceId = 'hp'
-    } else if (mode === 'narrative' || resources.length === 0) {
-      vitalityResourceId = null
-    } else {
-      vitalityResourceId = resources[0]?.id ?? null
-    }
-  }
-
-  if (vitalityResourceId && !resources.some((r) => r.id === vitalityResourceId)) {
-    vitalityResourceId = null
-  }
+  const mode = resolveTemplateMode(m.mode, resources, name.toLowerCase())
+  const vitalityResourceId = resolveVitalityResourceId(m.vitalityResourceId, resources, mode)
 
   let dice: TemplateDice = 'd20'
   if ((TEMPLATE_DICE as readonly string[]).includes(m.dice as string)) {
@@ -500,6 +456,65 @@ export function sanitizeMechanics(
     dice,
     statModifier,
   }
+}
+
+// An explicit valid mode wins; otherwise guess from the resources and the template name (EN/TH keywords)
+function resolveTemplateMode(
+  rawMode: unknown,
+  resources: TemplateResource[],
+  normName: string
+): TemplateMode {
+  if ((TEMPLATE_MODES as readonly string[]).includes(rawMode as string)) {
+    return rawMode as TemplateMode
+  }
+  if (
+    resources.length === 0 ||
+    normName.includes('drama') ||
+    normName.includes('mystery') ||
+    normName.includes('ดราม่า') ||
+    normName.includes('สืบสวน')
+  ) {
+    return 'narrative'
+  }
+  if (
+    normName.includes('romance') ||
+    normName.includes('slice of life') ||
+    normName.includes('cozy') ||
+    normName.includes('love') ||
+    normName.includes('รัก')
+  ) {
+    return 'social'
+  }
+  if (normName.includes('horror') || normName.includes('สยองขวัญ') || normName.includes('เอาชีวิตรอด')) {
+    return 'horror'
+  }
+  return 'combat'
+}
+
+// The resource that acts as "health": explicit choice, else `hp`, else the first resource (none for narrative).
+// Always null when it does not point at an existing resource.
+function resolveVitalityResourceId(
+  rawId: unknown,
+  resources: TemplateResource[],
+  mode: TemplateMode
+): string | null {
+  let vitalityResourceId: string | null = null
+  if (typeof rawId === 'string' && isValidFieldId(rawId)) {
+    vitalityResourceId = rawId
+  } else if (rawId === null) {
+    vitalityResourceId = null
+  } else if (resources.some((r) => r.id === 'hp')) {
+    vitalityResourceId = 'hp'
+  } else if (mode === 'narrative' || resources.length === 0) {
+    vitalityResourceId = null
+  } else {
+    vitalityResourceId = resources[0]?.id ?? null
+  }
+
+  if (vitalityResourceId && !resources.some((r) => r.id === vitalityResourceId)) {
+    return null
+  }
+  return vitalityResourceId
 }
 
 export function sanitizeTemplate(raw: unknown): CharacterTemplate | null {
@@ -815,4 +830,3 @@ export async function decodeTemplateKey(input: string): Promise<CharacterTemplat
   if (!template) throw new Error('ไม่พบโครงสร้างแผ่นตัวละครในคีย์นี้ (No sheet structure in this template key)')
   return { ...template, id: newTemplateId() }
 }
-

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -33,6 +33,44 @@ function localizeAuthError(msg: string, isThai: boolean): string {
   return msg
 }
 
+// Only same-site paths are allowed as the post-login destination (no "//evil.com")
+function getSafeNextPath(): string {
+  const nextParam = new URLSearchParams(window.location.search).get('next')
+  return nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/hub'
+}
+
+// Headline, subtitle, submit label and mode-switch link for the two auth modes
+const AUTH_COPY = {
+  signIn: {
+    th: {
+      title: 'เข้าสู่อาณาจักร',
+      subtitle: 'เข้าสู่ระบบเพื่อดำเนินเรื่องราวการผจญภัยต่อ',
+      submit: 'เข้าสู่ระบบ',
+      switchMode: 'ยังไม่มีบัญชีผู้เล่น? สมัครสมาชิก',
+    },
+    en: {
+      title: 'Enter the Realm',
+      subtitle: 'Log in to continue your tabletop adventure',
+      submit: 'Log In',
+      switchMode: "Don't have an account? Sign up",
+    },
+  },
+  signUp: {
+    th: {
+      title: 'สร้างบัญชีผู้เล่นใหม่',
+      subtitle: 'ลงทะเบียนเพื่อสร้างและเข้าร่วมแคมเปญบทบาทสมมติ',
+      submit: 'ลงทะเบียน',
+      switchMode: 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ',
+    },
+    en: {
+      title: 'Create Table Account',
+      subtitle: 'Sign up to create and join tabletop campaigns',
+      submit: 'Sign Up',
+      switchMode: 'Already have an account? Log in',
+    },
+  },
+} as const
+
 export default function LoginPage() {
   const { language } = useLanguage()
   const isThai = language === 'th'
@@ -40,31 +78,19 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
-  const [errorMsg, setErrorMsg] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      if (params.get('reason') === 'session-expired') {
-        return isThai
-          ? 'เซสชันของคุณหมดอายุแล้ว (จำกัด 6 ชั่วโมง) กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
-          : 'Your session has expired (6-hour limit). Please log in again.'
-      }
-    }
-    return ''
-  })
+  const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const copy = AUTH_COPY[isSignUp ? 'signUp' : 'signIn'][isThai ? 'th' : 'en']
+
+  const handleAuth = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg('')
 
     const supabase = createClient()
-
-    const params = new URLSearchParams(window.location.search)
-    const nextParam = params.get('next')
-    const targetPath =
-      nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/hub'
+    const targetPath = getSafeNextPath()
 
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({
@@ -88,7 +114,6 @@ export default function LoginPage() {
       if (error) {
         setErrorMsg(localizeAuthError(error.message, isThai))
       } else {
-        document.cookie = `dnd_session_start=${Date.now()}; path=/; max-age=21600; SameSite=Lax`
         router.push(targetPath)
         router.refresh()
       }
@@ -125,24 +150,10 @@ export default function LoginPage() {
                 priority
               />
             </div>
-            <h1 className="text-xl text-center sm:text-2xl font-bold tracking-tight text-zinc-100">
-              {isSignUp
-                ? isThai
-                  ? 'สร้างบัญชีผู้เล่นใหม่'
-                  : 'Create Table Account'
-                : isThai
-                ? 'เข้าสู่อาณาจักร'
-                : 'Enter the Realm'}
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+              {copy.title}
             </h1>
-            <p className="text-xs text-center text-zinc-400 leading-relaxed">
-              {isSignUp
-                ? isThai
-                  ? 'ลงทะเบียนเพื่อสร้างและเข้าร่วมแคมเปญบทบาทสมมติ'
-                  : 'Sign up to create and join tabletop campaigns'
-                : isThai
-                ? 'เข้าสู่ระบบเพื่อดำเนินเรื่องราวการผจญภัยต่อ'
-                : 'Log in to continue your tabletop adventure'}
-            </p>
+            <p className="text-xs text-zinc-400 leading-relaxed">{copy.subtitle}</p>
           </div>
 
           {/* Error Message Box */}
@@ -154,33 +165,20 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleAuth} className="space-y-4 text-left">
-            <div className="space-y-1.5">
-              <label className="block text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-                {isThai ? 'อีเมล (Email)' : 'Email'}
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="player@example.com"
-                className="w-full rounded-xl border border-zinc-800/80 bg-black/40 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-                {isThai ? 'รหัสผ่าน (Password)' : 'Password'}
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-zinc-800/80 bg-black/40 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
-              />
-            </div>
+            <AuthField
+              label={isThai ? 'อีเมล (Email)' : 'Email'}
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="player@example.com"
+            />
+            <AuthField
+              label={isThai ? 'รหัสผ่าน (Password)' : 'Password'}
+              type="password"
+              value={password}
+              onChange={setPassword}
+              placeholder="••••••••"
+            />
 
             <button
               type="submit"
@@ -192,10 +190,8 @@ export default function LoginPage() {
                   <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
                   <span>{isThai ? 'กำลังดำเนินการ...' : 'Processing...'}</span>
                 </>
-              ) : isSignUp ? (
-                isThai ? 'ลงทะเบียน' : 'Sign Up'
               ) : (
-                isThai ? 'เข้าสู่ระบบ' : 'Log In'
+                copy.submit
               )}
             </button>
           </form>
@@ -210,13 +206,7 @@ export default function LoginPage() {
               }}
               className="hover:text-zinc-300 transition-colors cursor-pointer"
             >
-              {isSignUp
-                ? isThai
-                  ? 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ'
-                  : 'Already have an account? Log in'
-                : isThai
-                ? 'ยังไม่มีบัญชีผู้เล่น? สมัครสมาชิก'
-                : "Don't have an account? Sign up"}
+              {copy.switchMode}
             </button>
           </div>
         </div>
@@ -226,6 +216,36 @@ export default function LoginPage() {
       <footer className="py-6 text-center text-[11px] text-zinc-600">
         TofuTablePlay &copy; 2026
       </footer>
+    </div>
+  )
+}
+
+function AuthField({
+  label,
+  type,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  type: 'email' | 'password'
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
+        {label}
+      </label>
+      <input
+        type={type}
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-zinc-800/80 bg-black/40 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-black/60 outline-none transition-all"
+      />
     </div>
   )
 }

@@ -72,8 +72,6 @@ function sanitise(input: DmTurnInput): DmTurnInput {
 export async function narrateBoardTurn(input: DmTurnInput): Promise<DmTurnResult> {
   const { supabase } = await requireAuthenticatedUser()
 
-
-
   const turn = sanitise(input)
 
   let campaign: BoardCampaign | null = null

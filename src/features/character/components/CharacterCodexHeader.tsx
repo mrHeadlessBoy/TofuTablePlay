@@ -1,13 +1,13 @@
-'use client';
+'use client'
 
-import React from 'react';
-import Link from 'next/link';
-import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
-import { Users, ArrowLeft } from 'lucide-react';
+import React from 'react'
+import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { LanguageToggle } from '@/components/ui/LanguageToggle'
+import { Users, ArrowLeft } from 'lucide-react'
 
 export function CharacterCodexHeader() {
-  const { t, language } = useLanguage();
+  const { t, language } = useLanguage()
 
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-800/40 pb-5">
@@ -37,7 +37,7 @@ export function CharacterCodexHeader() {
         </Link>
       </div>
     </div>
-  );
+  )
 }
 
-export default CharacterCodexHeader;
+export default CharacterCodexHeader

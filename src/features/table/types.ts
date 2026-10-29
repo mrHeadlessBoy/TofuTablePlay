@@ -122,7 +122,6 @@ export function withReadyClaims(list: Member[], claims: ReadyClaims, reloadStart
   })
 }
 
-
 export type ChatMode = 'ic' | 'ooc'
 
 export type PartyChatMessage = {
@@ -137,7 +136,6 @@ export type PartyChatMessage = {
 }
 
 export const MAX_PARTY_CHAT_MESSAGES = 80
-
 
 export const PLAYER_NAME_COLORS = [
   'text-amber-300',

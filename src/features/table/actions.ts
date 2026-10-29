@@ -84,18 +84,101 @@ export async function linkCharacterToTable(tableId: string, characterId: string)
   revalidatePath(`/table/${tableId}`)
 }
 
-export async function getTableMembers(tableId: string) {
-  const { supabase, user } = await requireAuthenticatedUser()
-
+// Throws unless the signed-in user has a seat at this table
+async function assertOwnSeat(supabase: SessionClient, tableId: string, userId: string) {
   const { data: ownSeat, error: ownSeatErr } = await supabase
     .from('table_members')
     .select('id')
     .eq('table_id', tableId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle()
 
   if (ownSeatErr) throw new Error(ownSeatErr.message)
   if (!ownSeat) throw new Error('You are not a member of this table')
+}
+
+// member id -> draft text for the table's current turn
+async function loadCurrentTurnDrafts(
+  admin: DbClient,
+  tableId: string,
+  currentTurn: unknown,
+): Promise<Map<string, string>> {
+  const draftByMemberId = new Map<string, string>()
+  if (typeof currentTurn !== 'number') return draftByMemberId
+
+  const { data: turn } = await admin
+    .from('turns')
+    .select('id')
+    .eq('table_id', tableId)
+    .eq('turn_number', currentTurn)
+    .maybeSingle()
+
+  if (turn?.id) {
+    const { data: actions } = await admin
+      .from('turn_actions')
+      .select('member_id, action_text')
+      .eq('turn_id', turn.id)
+
+    for (const act of actions ?? []) {
+      if (act.action_text) {
+        draftByMemberId.set(act.member_id, act.action_text)
+      }
+    }
+  }
+
+  return draftByMemberId
+}
+
+// Public sheet columns for every seated character, plus the full row for the caller's own sheet
+async function loadPartyCharacters(
+  admin: DbClient,
+  supabase: SessionClient,
+  members: { user_id: string; character_id: string | null }[],
+  userId: string,
+) {
+  const charactersById = new Map()
+  const characterIds = [
+    ...new Set(members.flatMap((member) => (member.character_id ? [member.character_id] : []))),
+  ]
+  if (characterIds.length === 0) return charactersById
+
+  const { data: partyCharacters, error: charactersErr } = await admin
+    .from('characters')
+    .select(
+      'id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, stats, appearance, inventory, equipment, strengths, weaknesses, backstory',
+    )
+    .in('id', characterIds)
+
+  if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
+
+  for (const character of partyCharacters ?? []) {
+    charactersById.set(character.id, character)
+  }
+
+  const ownCharacterIds = members
+    .filter((member) => member.user_id === userId && member.character_id)
+    .map((member) => member.character_id)
+
+  if (ownCharacterIds.length > 0) {
+    const { data: ownCharacters, error: ownCharactersErr } = await supabase
+      .from('characters')
+      .select('*')
+      .in('id', ownCharacterIds)
+      .eq('user_id', userId)
+
+    if (ownCharactersErr) throw new Error(`Failed to fetch your character sheet: ${ownCharactersErr.message}`)
+
+    for (const character of ownCharacters ?? []) {
+      charactersById.set(character.id, character)
+    }
+  }
+
+  return charactersById
+}
+
+export async function getTableMembers(tableId: string) {
+  const { supabase, user } = await requireAuthenticatedUser()
+  await assertOwnSeat(supabase, tableId, user.id)
 
   const admin = createAdminClient()
   if (!admin) {
@@ -108,76 +191,14 @@ export async function getTableMembers(tableId: string) {
       .select('id, user_id, is_ready, character_id')
       .eq('table_id', tableId)
       .order('joined_at', { ascending: true }),
-    admin
-      .from('tables')
-      .select('current_turn')
-      .eq('id', tableId)
-      .single(),
+    admin.from('tables').select('current_turn').eq('id', tableId).single(),
   ])
 
   if (membersRes.error) throw new Error(`Failed to fetch table members: ${membersRes.error.message}`)
   const members = membersRes.data ?? []
 
-  const draftByMemberId = new Map<string, string>()
-  const currentTurn = tableRes.data?.current_turn
-  if (typeof currentTurn === 'number') {
-    const { data: turn } = await admin
-      .from('turns')
-      .select('id')
-      .eq('table_id', tableId)
-      .eq('turn_number', currentTurn)
-      .maybeSingle()
-
-    if (turn?.id) {
-      const { data: actions } = await admin
-        .from('turn_actions')
-        .select('member_id, action_text')
-        .eq('turn_id', turn.id)
-
-      for (const act of actions ?? []) {
-        if (act.action_text) {
-          draftByMemberId.set(act.member_id, act.action_text)
-        }
-      }
-    }
-  }
-
-  const characterIds = [...new Set(members.flatMap((member) => (
-    member.character_id ? [member.character_id] : []
-  )))]
-
-  const charactersById = new Map()
-
-  if (characterIds.length > 0) {
-    const { data: partyCharacters, error: charactersErr } = await admin
-      .from('characters')
-      .select('id, name, class_archetype, current_hp, max_hp, armor_class, status_condition, stats, appearance, inventory, equipment, strengths, weaknesses, backstory')
-      .in('id', characterIds)
-
-    if (charactersErr) throw new Error(`Failed to fetch party character names: ${charactersErr.message}`)
-
-    for (const character of partyCharacters ?? []) {
-      charactersById.set(character.id, character)
-    }
-
-    const ownCharacterIds = members
-      .filter((member) => member.user_id === user.id && member.character_id)
-      .map((member) => member.character_id)
-
-    if (ownCharacterIds.length > 0) {
-      const { data: ownCharacters, error: ownCharactersErr } = await supabase
-        .from('characters')
-        .select('*')
-        .in('id', ownCharacterIds)
-        .eq('user_id', user.id)
-
-      if (ownCharactersErr) throw new Error(`Failed to fetch your character sheet: ${ownCharactersErr.message}`)
-
-      for (const character of ownCharacters ?? []) {
-        charactersById.set(character.id, character)
-      }
-    }
-  }
+  const draftByMemberId = await loadCurrentTurnDrafts(admin, tableId, tableRes.data?.current_turn)
+  const charactersById = await loadPartyCharacters(admin, supabase, members, user.id)
 
   return members.map((member) => ({
     id: member.id,
@@ -347,6 +368,229 @@ export async function getServerTime(): Promise<number> {
   return Date.now()
 }
 
+/* ------------------------------------------------------------------ */
+/* Turn resolution                                                     */
+/* ------------------------------------------------------------------ */
+
+type PartyMemberAction = Parameters<typeof generateDmNarrative>[0]['partyActions'][number]
+type PartyStateUpdate = ReturnType<typeof extractPartyStateUpdates>[number]
+type CharacterRow = Record<string, unknown>
+
+// One AI DM party entry from a seated character (or a spectator who still wrote a draft)
+function buildPartyMemberAction(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped Supabase row
+  character: any,
+  action: string | null,
+  index: number,
+): PartyMemberAction {
+  const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(character)
+
+  return {
+    characterId: character?.id,
+    characterName: character?.name || `Unknown Adventurer ${index + 1}`,
+    classType: character?.class_archetype || 'Wanderer',
+    currentHp: character?.current_hp ?? 10,
+    maxHp: character?.max_hp ?? 10,
+    currentSkillCost,
+    maxSkillCost,
+    condition: character?.status_condition || 'Normal',
+    stats: sanitizeAbilityScores(
+      character?.stats && typeof character.stats === 'object'
+        ? (character.stats as Record<string, unknown>)
+        : undefined,
+      0,
+    ),
+    appearance: character?.appearance || '',
+    inventory: formatInventoryForPrompt(character?.inventory),
+    equipment: Array.isArray(character?.equipment) ? character.equipment : [],
+    strengths: character?.strengths || '',
+    weaknesses: character?.weaknesses || '',
+    backstory: character?.backstory || '',
+    skills: extractCharacterSkills(character),
+    sheetTemplate: readCharacterTemplate(character),
+    sheetCustom: readCustomValues(character),
+    action,
+  }
+}
+
+// Every seat in join order with its draft for the current turn. The party size is whatever the table holds;
+// a seat with neither a character nor a draft is a spectator and is left out.
+async function loadPartyActions(
+  db: DbClient,
+  supabase: SessionClient,
+  tableId: string,
+  currentTurn: number,
+): Promise<{ partyActions: PartyMemberAction[]; characterRowById: Map<string, CharacterRow> }> {
+  const { data: currentTurnRecord, error: turnRecErr } = await supabase
+    .from('turns')
+    .select('id, turn_number')
+    .eq('table_id', tableId)
+    .eq('turn_number', currentTurn)
+    .single()
+
+  if (turnRecErr || !currentTurnRecord) {
+    throw new Error(`Failed to locate turn record: ${turnRecErr?.message ?? 'not found'}`)
+  }
+
+  const { data: seats, error: seatsErr } = await db
+    .from('table_members')
+    .select('id, joined_at, characters(*)')
+    .eq('table_id', tableId)
+    .order('joined_at', { ascending: true })
+
+  if (seatsErr) throw new Error(`Failed to fetch party members: ${seatsErr.message}`)
+
+  const { data: actions, error: actErr } = await db
+    .from('turn_actions')
+    .select('member_id, action_text')
+    .eq('turn_id', currentTurnRecord.id)
+
+  if (actErr) throw new Error(`Failed to fetch player actions: ${actErr.message}`)
+
+  const draftByMember = new Map<string, string>()
+  for (const act of actions || []) {
+    const text = (act.action_text || '').trim()
+    if (text) draftByMember.set(act.member_id, text)
+  }
+
+  const characterRowById = new Map<string, CharacterRow>()
+  const partyActions = (seats || []).flatMap((seat, index) => {
+    const character = Array.isArray(seat.characters) ? seat.characters[0] : seat.characters
+    const action = draftByMember.get(seat.id) ?? null
+    if (!character && !action) return []
+
+    if (character?.id) {
+      characterRowById.set(character.id, character as CharacterRow)
+    }
+    return [buildPartyMemberAction(character, action, index)]
+  })
+
+  return { partyActions, characterRowById }
+}
+
+// Lorebook (service-role db so DM-only lore is always included) and the turn history
+async function loadDmContext(
+  db: DbClient,
+  supabase: SessionClient,
+  tableId: string,
+  campaignId: string,
+) {
+  const { data: loreEntries, error: loreErr } = await db
+    .from('lorebook_entries')
+    .select('*')
+    .eq('campaign_id', campaignId)
+
+  if (loreErr) throw new Error(`Failed to fetch lorebook entries: ${loreErr.message}`)
+
+  const { data: recentTurns, error: turnsErr } = await supabase
+    .from('turns')
+    .select('turn_number, narrative_output')
+    .eq('table_id', tableId)
+    .order('turn_number', { ascending: true })
+
+  if (turnsErr) throw new Error(`Failed to fetch turns history: ${turnsErr.message}`)
+
+  return { loreEntries: loreEntries || [], recentTurns: recentTurns || [] }
+}
+
+// The character row columns to write for one AI-reported state change (custom resources merged in)
+function buildCharacterStateRow(existingChar: CharacterRow | undefined, stateUpdate: PartyStateUpdate) {
+  const existingStats =
+    existingChar?.stats && typeof existingChar.stats === 'object'
+      ? (existingChar.stats as Record<string, unknown>)
+      : {}
+  const existingCustom = readCustomValues(existingChar)
+  const mergedCustomResources = {
+    ...existingCustom.resources,
+    ...stateUpdate.customResources,
+  }
+  const hasCustomData =
+    Object.keys(existingCustom.stats).length > 0 ||
+    Object.keys(mergedCustomResources).length > 0 ||
+    Object.keys(existingCustom.fields).length > 0 ||
+    Object.keys(existingCustom.equipment).length > 0
+
+  const nextStats: Record<string, unknown> = {
+    ...existingStats,
+    current_skill_cost: stateUpdate.currentSkillCost,
+    max_skill_cost: stateUpdate.maxSkillCost,
+  }
+  if (hasCustomData) {
+    nextStats.sheet_custom = {
+      ...existingCustom,
+      resources: mergedCustomResources,
+    }
+  }
+
+  return {
+    current_hp: stateUpdate.currentHp,
+    armor_class: stateUpdate.currentSkillCost,
+    status_condition: stateUpdate.condition,
+    stats: nextStats,
+  }
+}
+
+// Automatically apply any HP, Skill Cost (SP), Custom Resource, or Condition changes reported by the AI DM.
+// A failed row is logged and skipped so one bad sheet never blocks the turn.
+async function applyPartyStateUpdates(
+  db: DbClient,
+  partyStateUpdates: PartyStateUpdate[],
+  characterRowById: Map<string, CharacterRow>,
+) {
+  await Promise.all(
+    partyStateUpdates.map(async (stateUpdate) => {
+      const { error: charUpdateErr } = await db
+        .from('characters')
+        .update(buildCharacterStateRow(characterRowById.get(stateUpdate.characterId), stateUpdate))
+        .eq('id', stateUpdate.characterId)
+
+      if (charUpdateErr) {
+        console.error(
+          `[resolveTurn] Failed to auto-update combat state for character ${stateUpdate.characterId}:`,
+          charUpdateErr.message,
+        )
+      }
+    }),
+  )
+}
+
+// Persist the new narrative turn, reset every seat's Ready flag and move the table to the next turn
+async function advanceToNextTurn(
+  db: DbClient,
+  supabase: SessionClient,
+  tableId: string,
+  nextTurnNumber: number,
+  aiNarrative: string,
+) {
+  const { error: insertTurnErr } = await supabase.from('turns').insert({
+    table_id: tableId,
+    turn_number: nextTurnNumber,
+    narrative_output: aiNarrative,
+    edited_by_host: false,
+  })
+
+  if (insertTurnErr) throw new Error(`Failed to persist new turn: ${insertTurnErr.message}`)
+
+  // Reset ready statuses for every seat (not just the caller's) and bump turn counter
+  const { error: resetMembersErr } = await db
+    .from('table_members')
+    .update({ is_ready: false })
+    .eq('table_id', tableId)
+
+  if (resetMembersErr) throw new Error(`Failed to reset members ready state: ${resetMembersErr.message}`)
+
+  const { error: updateTableErr } = await supabase
+    .from('tables')
+    .update({
+      current_turn: nextTurnNumber,
+      turn_phase: 'drafting',
+      countdown_end: null,
+    })
+    .eq('id', tableId)
+
+  if (updateTableErr) throw new Error(`Failed to update table turn state: ${updateTableErr.message}`)
+}
+
 export async function resolveTurn(tableId: string, language?: 'th' | 'en') {
   const { supabase, user } = await requireAuthenticatedUser()
 
@@ -394,200 +638,37 @@ export async function resolveTurn(tableId: string, language?: 'th' | 'en') {
     const db = admin ?? supabase
     if (!admin) {
       console.warn(
-        '[resolveTurn] SUPABASE_SERVICE_ROLE_KEY is not set — other players\' drafts may be hidden by RLS.'
+        '[resolveTurn] SUPABASE_SERVICE_ROLE_KEY is not set — other players\' drafts may be hidden by RLS.',
       )
     }
 
-    // Fetch every seat at the table and the drafts submitted for the current turn
-    const { data: currentTurnRecord, error: turnRecErr } = await supabase
-      .from('turns')
-      .select('id, turn_number')
-      .eq('table_id', tableId)
-      .eq('turn_number', table.current_turn)
-      .single()
-
-    if (turnRecErr || !currentTurnRecord) {
-      throw new Error(`Failed to locate turn record: ${turnRecErr?.message ?? 'not found'}`)
-    }
-
-    const { data: seats, error: seatsErr } = await db
-      .from('table_members')
-      .select('id, joined_at, characters(*)')
-      .eq('table_id', tableId)
-      .order('joined_at', { ascending: true })
-
-    if (seatsErr) throw new Error(`Failed to fetch party members: ${seatsErr.message}`)
-
-    const { data: actions, error: actErr } = await db
-      .from('turn_actions')
-      .select('member_id, action_text')
-      .eq('turn_id', currentTurnRecord.id)
-
-    if (actErr) throw new Error(`Failed to fetch player actions: ${actErr.message}`)
-
-    const draftByMember = new Map<string, string>()
-    for (const act of actions || []) {
-      const text = (act.action_text || '').trim()
-      if (text) draftByMember.set(act.member_id, text)
-    }
-
-    const characterRowById = new Map<string, Record<string, unknown>>()
-
-    // One entry per seated player, in join order — the party size is whatever the table holds.
-    // A seat with neither a character nor a draft is a spectator and is left out.
-    const partyActions = (seats || []).flatMap((seat, index) => {
-      const character = Array.isArray(seat.characters) ? seat.characters[0] : seat.characters
-      const action = draftByMember.get(seat.id) ?? null
-      if (!character && !action) return []
-
-      if (character?.id) {
-        characterRowById.set(character.id, character as Record<string, unknown>)
-      }
-
-      const { currentSkillCost, maxSkillCost } = extractCharacterSkillCost(character)
-
-      return [
-        {
-          characterId: character?.id,
-          characterName: character?.name || `Unknown Adventurer ${index + 1}`,
-          classType: character?.class_archetype || 'Wanderer',
-          currentHp: character?.current_hp ?? 10,
-          maxHp: character?.max_hp ?? 10,
-          currentSkillCost,
-          maxSkillCost,
-          condition: character?.status_condition || 'Normal',
-          stats: sanitizeAbilityScores(
-            character?.stats && typeof character.stats === 'object'
-              ? (character.stats as Record<string, unknown>)
-              : undefined,
-            0
-          ),
-          appearance: character?.appearance || '',
-          inventory: formatInventoryForPrompt(character?.inventory),
-          equipment: Array.isArray(character?.equipment) ? character.equipment : [],
-          strengths: character?.strengths || '',
-          weaknesses: character?.weaknesses || '',
-          backstory: character?.backstory || '',
-          skills: extractCharacterSkills(character),
-          sheetTemplate: readCharacterTemplate(character),
-          sheetCustom: readCustomValues(character),
-          action,
-        },
-      ]
-    })
-
-    // Fetch lorebook entries for dynamic scanning (use service-role db so DM-only lore is always included)
-    const { data: loreEntries, error: loreErr } = await db
-      .from('lorebook_entries')
-      .select('*')
-      .eq('campaign_id', table.campaign_id)
-
-    if (loreErr) throw new Error(`Failed to fetch lorebook entries: ${loreErr.message}`)
-
-    // Fetch recent turn history
-    const { data: recentTurns, error: turnsErr } = await supabase
-      .from('turns')
-      .select('turn_number, narrative_output')
-      .eq('table_id', tableId)
-      .order('turn_number', { ascending: true })
-
-    if (turnsErr) throw new Error(`Failed to fetch turns history: ${turnsErr.message}`)
+    const { partyActions, characterRowById } = await loadPartyActions(
+      db,
+      supabase,
+      tableId,
+      table.current_turn,
+    )
+    const { loreEntries, recentTurns } = await loadDmContext(db, supabase, tableId, table.campaign_id)
 
     // Generate AI Dungeon Master scene narrative
     const cookieStore = await cookies()
-    const activeLang = (language || cookieStore.get('dnd_language')?.value || 'th') as 'th' | 'en'
+    const activeLang = (language || cookieStore.get('tofu_language')?.value || 'th') as 'th' | 'en'
 
     const aiNarrative = await generateDmNarrative({
       campaign: table.campaigns,
-      loreEntries: loreEntries || [],
-      recentTurns: recentTurns || [],
+      loreEntries,
+      recentTurns,
       partyActions,
       language: activeLang,
     })
 
-    // Automatically apply any HP, Skill Cost (SP), Custom Resource, or Condition changes reported by the AI DM
     const partyStateUpdates = extractPartyStateUpdates(aiNarrative, partyActions)
     if (partyStateUpdates.length > 0) {
-      await Promise.all(
-        partyStateUpdates.map(async (stateUpdate) => {
-          const existingChar = characterRowById.get(stateUpdate.characterId)
-          const existingStats =
-            existingChar?.stats && typeof existingChar.stats === 'object'
-              ? (existingChar.stats as Record<string, unknown>)
-              : {}
-          const existingCustom = readCustomValues(existingChar)
-          const mergedCustomResources = {
-            ...existingCustom.resources,
-            ...stateUpdate.customResources,
-          }
-          const hasCustomData =
-            Object.keys(existingCustom.stats).length > 0 ||
-            Object.keys(mergedCustomResources).length > 0 ||
-            Object.keys(existingCustom.fields).length > 0 ||
-            Object.keys(existingCustom.equipment).length > 0
-
-          const nextStats: Record<string, unknown> = {
-            ...existingStats,
-            current_skill_cost: stateUpdate.currentSkillCost,
-            max_skill_cost: stateUpdate.maxSkillCost,
-          }
-          if (hasCustomData) {
-            nextStats.sheet_custom = {
-              ...existingCustom,
-              resources: mergedCustomResources,
-            }
-          }
-
-          const { error: charUpdateErr } = await db
-            .from('characters')
-            .update({
-              current_hp: stateUpdate.currentHp,
-              armor_class: stateUpdate.currentSkillCost,
-              status_condition: stateUpdate.condition,
-              stats: nextStats,
-            })
-            .eq('id', stateUpdate.characterId)
-
-          if (charUpdateErr) {
-            console.error(
-              `[resolveTurn] Failed to auto-update combat state for character ${stateUpdate.characterId}:`,
-              charUpdateErr.message
-            )
-          }
-        })
-      )
+      await applyPartyStateUpdates(db, partyStateUpdates, characterRowById)
     }
 
     const nextTurnNumber = table.current_turn + 1
-
-    // Persist new narrative turn
-    const { error: insertTurnErr } = await supabase.from('turns').insert({
-      table_id: tableId,
-      turn_number: nextTurnNumber,
-      narrative_output: aiNarrative,
-      edited_by_host: false,
-    })
-
-    if (insertTurnErr) throw new Error(`Failed to persist new turn: ${insertTurnErr.message}`)
-
-    // Reset ready statuses for every seat (not just the caller's) and bump turn counter
-    const { error: resetMembersErr } = await db
-      .from('table_members')
-      .update({ is_ready: false })
-      .eq('table_id', tableId)
-
-    if (resetMembersErr) throw new Error(`Failed to reset members ready state: ${resetMembersErr.message}`)
-
-    const { error: updateTableErr } = await supabase
-      .from('tables')
-      .update({
-        current_turn: nextTurnNumber,
-        turn_phase: 'drafting',
-        countdown_end: null,
-      })
-      .eq('id', tableId)
-
-    if (updateTableErr) throw new Error(`Failed to update table turn state: ${updateTableErr.message}`)
+    await advanceToNextTurn(db, supabase, tableId, nextTurnNumber, aiNarrative)
 
     revalidatePath(`/table/${tableId}`)
     return { resolved: true, turnNumber: nextTurnNumber }

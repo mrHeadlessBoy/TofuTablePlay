@@ -153,3 +153,42 @@ flowchart TD
 - [x] **Smooth Transitions**: All hover and interactive states use `transition-all duration-200 ease-out` or `transition-opacity`.
 - [x] **Accessibility & Contrast**: All body text retains high contrast against dark surfaces (meeting WCAG AA standards).
 - [x] **Clean Codebase**: 0 TypeScript compilation errors, 0 ESLint warnings.
+---
+
+## 4. Follow-ups from the `refactor/code-format` Review
+
+> **Context:** Branch `refactor/code-format` reformatted the codebase and split large components/functions into sub-components and helpers (no intended behavior change). The items below came out of its code review and smoke test. None of them block the merge.
+
+### 4.1 Fixed on the branch
+- [x] **Hydration mismatch on language-dependent text** (`/`, `/hub` and any page that renders `t(...)`): the server always rendered Thai while the client read the saved language from `localStorage` on its first render. `useLanguage()` now reads the language through `useSyncExternalStore` in every component (`src/lib/i18n/LanguageContext.tsx`): each component hydrates with Thai, the same as the server HTML, and switches to the stored choice right after. This also covers `<Suspense>` sections that stream in later. Proper long-term fix: render the right language on the server (read the `tofu_language` cookie inside a `<Suspense>` boundary, since `cacheComponents` is on).
+- [x] **Auth middleware never ran**: `middleware.ts` sat in the project root, but with a `src/` folder Next.js only picks it up from `src/` (see `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/src-folder.md`). Since the prototype commit, `/hub`, `/characters` and `/campaigns/new` opened for signed-out users. Moved to `src/middleware.ts`; signed-out requests to protected routes now return 307 to `/login`.
+- [x] **Removed the absolute 6-hour session limit** (team decision): the 6-hour idle timeout from the Supabase cookie `maxAge` (`src/lib/supabase/client.ts`, `server.ts`, `src/middleware.ts`) is enough. Dropped the `dnd_session_start` cookie and its checks from `src/middleware.ts`, `src/app/auth/callback/route.ts`, `src/app/login/page.tsx` (also the `?reason=session-expired` message) and `signOut` in `src/features/hub/actions.ts`.
+- [x] **Language cookie name mismatch**: `hub/actions.ts` (`writeOpeningScene`) and `table/actions.ts` (`resolveTurn`) read the cookie `dnd_language`, but the client writes `tofu_language`. Both now read `tofu_language`.
+
+### 4.2 Housekeeping (small, optional)
+- [ ] **Ignore the format-only commit in `git blame`**: add `.git-blame-ignore-revs` containing `afb9d646fa21950e35cf63910b5cb2326d99c59b` (GitHub reads it automatically; locally run `git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+- [ ] **Update `website_ui.md` (line 114)**: the Quick Join Bar now lives in `src/features/hub/components/QuickJoinBar.tsx`, not `HubClient.tsx`.
+- [ ] **Add Prettier in a separate PR**: trailing commas in function arguments are mixed across files. Suggested config: `{ "semi": false, "singleQuote": true, "trailingComma": "es5" }` (matches the current style: commas in objects/arrays, none in call arguments). Run it in its own commit and add that commit to `.git-blame-ignore-revs` too.
+- [ ] **Quick Join subtitle duplicates the Hub subtitle**: `QuickJoinBar.tsx` shows `t('hub.subtitle')`, the same text as `HubHeader.tsx`. Add a dedicated key (e.g. `hub.quickJoinSubtitle`) in `th.ts` / `en.ts` / `types.ts`.
+
+### 4.3 Pre-existing issues (not caused by the refactor)
+- [ ] **Rename `src/middleware.ts` to `src/proxy.ts` (Next.js 16)**: the `middleware` file name and export are deprecated in favor of `proxy` (see `node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`; a codemod exists). Re-test the `/login` redirects afterwards.
+- [ ] **`extractTableIdentifier` can throw on a malformed link** (`src/features/hub/actions.ts`): `decodeURIComponent` runs outside the `try`, so input like `/table/%E0` throws `URIError` instead of returning "table not found". Move it inside the `try` or wrap it.
+- [ ] **Upgrade Next.js 16.4.0**: the dev overlay shows a Security Insight saying 16.4.0 has a known vulnerability and suggests `next upgrade --agent=security`. Do it in its own branch, then rerun `bun run build` and the smoke test below.
+- [ ] **SP badge does not render for some AI phrasings** (`STATUS_BADGE_RULES` in `src/features/table/components/NarrativeFormatting.tsx`): the AI sometimes writes `(Vincente — Skill Cost (SP): 10/10 → 8/10 -2 SP)`. The nested `(SP)` ends the token at the first `)`, so the cyan badge is not shown (the SP value itself still syncs to the sheet). Allow an optional `(SP)` after `Skill Cost` and `→` as an arrow in both `INLINE_TOKEN_REGEX` and the SP badge rule, and/or tell the AI DM prompt (`src/lib/ai/dmPrompt.ts`) to use the exact `(Name — Skill Cost: 10/10 -> 8/10 [-2 SP])` format.
+- [ ] **README claims a 2-100 character campaign title, the code only checks 1-100**: `README.md` (Campaign Studio validation) says 2-100, but `validateCampaignForm` in `src/features/campaign/components/CampaignForm.tsx` and `validateCampaignPayload` in `src/features/campaign/actions.ts` only reject an empty title and titles over 100 characters, so a 1-character title is accepted. Either fix the README or add a minimum length in both places.
+- [ ] **Campaign form shows hard-coded English while TH is selected**: the subtitle in `CampaignForm.tsx` ("Author your campaign universe..."), the placeholders and empty-rules note in `CampaignFoundationSection.tsx` ("Brief summary of the overarching journey...", "Geographic layout, political tensions...", "No custom rule mechanics added yet..."), and the description in `CampaignTemplatePicker.tsx` ("Every player joining this campaign...") bypass `t()`. Move them into `th.ts` / `en.ts` / `types.ts`.
+- [ ] **Opening-scene fallback is English only**: when Gemini does not answer within `OPENING_TIMEOUT_MS` (15 s, `src/lib/ai/dm.ts`), `writeOpeningScene` in `src/features/hub/actions.ts` returns `OPENING_FALLBACK` ("The journey begins...") even for Thai tables. Pick the fallback by `activeLang` (compute the language before the `try`), and consider a longer timeout since the fallback showed up during testing.
+- [ ] **(Info only) Code size grew ~11%** (19,892 → 22,091 lines in `src` + `middleware.ts`), mostly props interfaces and imports for the extracted components. No action needed.
+
+### 4.4 Smoke test checklist (manual, `bun dev`)
+- [x] `/hub` renders in TH and EN
+- [x] `/table/[id]` loads: enter-table sound, SAO orb, Party Roster, Lorebook
+- [x] `/table/[id]`: open inspector from the orb, edit HP/condition and save, switch character (mismatch modal for an incompatible template)
+- [x] `/table/[id]`: Dice Roller attaches a roll to the action, READY UP → 5 s countdown → AI reply with sound, badges (HP red, SP cyan, DC amber) and coloured player names
+- [x] `/table/[id]`: Party Chat IC/OOC, unread counter
+- [x] `/characters`: create, edit, save, delete a sheet; TemplateModal Builder / Export (`CST1.`) / Import tabs
+- [x] `/campaigns/new` and `/campaigns/[id]/edit`: genre, rule builder, template picker + customize, add/remove lore entries, validation error on a 1-character title
+- [x] `/campaigns/[id]`: required-template card, launch table
+- [x] `/hub`: Quick Join by code and by `/table/...` link, copy Invite Link, collapse Public Worlds
+- [x] `/login` and `/`: redirect to `/login?next=...` when signed out and back after sign-in, Sign in / Sign up toggle, language switch, no hydration issue in the Next.js dev overlay

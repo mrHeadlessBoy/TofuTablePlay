@@ -1,29 +1,25 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { AlertProvider } from "@/components/ui/AlertModal";
-import { LanguageProvider } from "@/lib/i18n/LanguageContext";
+import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import './globals.css'
+import { AlertProvider } from '@/components/ui/AlertModal'
+import { LanguageProvider } from '@/lib/i18n/LanguageContext'
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+})
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: "TofuTablePlay | AI-Powered Tabletop RPG",
-  description: "Synchronized tabletop roleplay with private turn drafting and an intelligent AI Dungeon Master.",
-};
+  title: 'TofuTablePlay | AI-Powered Tabletop RPG',
+  description: 'Synchronized tabletop roleplay with private turn drafting and an intelligent AI Dungeon Master.',
+}
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="th"
@@ -36,5 +32,5 @@ export default function RootLayout({
         </LanguageProvider>
       </body>
     </html>
-  );
+  )
 }

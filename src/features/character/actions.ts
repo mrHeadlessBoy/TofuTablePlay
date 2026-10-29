@@ -57,13 +57,37 @@ export interface CharacterFormData {
 export async function saveCharacter(data: CharacterFormData) {
   const { supabase, user } = await requireAuthenticatedUser()
 
-  if (!data.name || !data.name.trim()) {
-    throw new Error('กรุณากรอกชื่อตัวละคร (Character name is required)')
-  }
-  if (data.name.trim().length > 60) {
-    throw new Error('ชื่อตัวละครต้องมีความยาวไม่เกิน 60 ตัวอักษร (Character name cannot exceed 60 characters)')
+  validateCharacterName(data.name)
+  const payload = buildCharacterRow(data, user.id)
+
+  if (data.id) {
+    const { error } = await supabase
+      .from('characters')
+      .update(payload)
+      .eq('id', data.id)
+      .eq('user_id', user.id)
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from('characters')
+      .insert(payload)
+    if (error) throw new Error(error.message)
   }
 
+  revalidatePath('/characters')
+}
+
+function validateCharacterName(name: string) {
+  if (!name || !name.trim()) {
+    throw new Error('กรุณากรอกชื่อตัวละคร (Character name is required)')
+  }
+  if (name.trim().length > 60) {
+    throw new Error('ชื่อตัวละครต้องมีความยาวไม่เกิน 60 ตัวอักษร (Character name cannot exceed 60 characters)')
+  }
+}
+
+// Normalize the form into a `characters` row: clean skills/scores, clamp HP, serialize inventory
+function buildCharacterRow(data: CharacterFormData, userId: string) {
   const sanitizedSkills =
     data.skills !== undefined
       ? sanitizeCharacterSkills(data.skills)
@@ -88,8 +112,8 @@ export async function saveCharacter(data: CharacterFormData) {
   const maxHp = Number(data.max_hp) || 1
   const currentHp = Math.min(maxHp, Number(data.current_hp) || 0)
 
-  const payload = {
-    user_id: user.id,
+  return {
+    user_id: userId,
     name: data.name,
     class_archetype: data.class_archetype,
     current_hp: currentHp,
@@ -104,22 +128,6 @@ export async function saveCharacter(data: CharacterFormData) {
     status_condition: data.status_condition || 'Normal',
     equipment: data.equipment,
   }
-
-  if (data.id) {
-    const { error } = await supabase
-      .from('characters')
-      .update(payload)
-      .eq('id', data.id)
-      .eq('user_id', user.id)
-    if (error) throw new Error(error.message)
-  } else {
-    const { error } = await supabase
-      .from('characters')
-      .insert(payload)
-    if (error) throw new Error(error.message)
-  }
-
-  revalidatePath('/characters')
 }
 
 export async function deleteCharacter(characterId: string) {

@@ -1,138 +1,165 @@
-'use client';
+'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Language, Translations } from './types';
-import { th } from './locales/th';
-import { en } from './locales/en';
+import React, { createContext, useContext, useSyncExternalStore, useMemo } from 'react'
+import { Language, Translations } from './types'
+import { th } from './locales/th'
+import { en } from './locales/en'
 
-const STORAGE_KEY = 'tofu_language';
+const STORAGE_KEY = 'tofu_language'
 
 interface LanguageContextValue {
-  language: Language;
-  setLanguage: (lang: Language) => void;
-  translations: Translations;
-  t: (path: string, params?: Record<string, string | number>) => string;
+  language: Language
+  setLanguage: (lang: Language) => void
+  translations: Translations
+  t: (path: string, params?: Record<string, string | number>) => string
 }
 
-const dictionaries: Record<Language, Translations> = { th, en };
+const dictionaries: Record<Language, Translations> = { th, en }
 
-const LanguageContext = createContext<LanguageContextValue | null>(null);
+type TranslateFn = LanguageContextValue['t']
 
-export function LanguageProvider({
-  children,
-  initialLanguage = 'th',
-}: {
-  children: React.ReactNode;
-  initialLanguage?: Language;
-}) {
-  const [language, setLanguageState] = useState<Language>(initialLanguage);
+const LanguageContext = createContext<{ setLanguage: (lang: Language) => void } | null>(null)
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-        if (stored === 'th' || stored === 'en') {
-          if (stored !== language) {
-            setLanguageState(stored);
-            document.cookie = `${STORAGE_KEY}=${stored}; path=/; max-age=31536000; SameSite=Lax`;
-          }
-        } else {
-          const browserLang = navigator.language?.toLowerCase() || '';
-          if (browserLang.startsWith('en') && language !== 'en') {
-            setLanguageState('en');
-            localStorage.setItem(STORAGE_KEY, 'en');
-            document.cookie = `${STORAGE_KEY}=en; path=/; max-age=31536000; SameSite=Lax`;
-          }
-        }
-      } catch {
-        // Ignore storage errors
-      }
-    }, 0);
+/*
+ * Client-side language store.
+ * The server cannot read localStorage, so the HTML always comes in Thai. Every component reads the language
+ * through useSyncExternalStore (in useLanguage): while that component hydrates, React uses the server value
+ * (Thai) and switches to the stored choice right after. It has to happen per component, not once in the
+ * provider, because <Suspense> sections stream in and hydrate later than the provider does.
+ */
+let clientLanguage: Language | null = null
+const languageListeners = new Set<() => void>()
 
-    return () => clearTimeout(timer);
-  }, [language]);
+function getLanguageSnapshot(): Language {
+  if (clientLanguage === null) clientLanguage = readInitialLanguage()
+  return clientLanguage
+}
 
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && (e.newValue === 'th' || e.newValue === 'en')) {
-        setLanguageState(e.newValue);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+function getServerLanguageSnapshot(): Language {
+  return 'th'
+}
 
-  const setLanguage = useCallback((newLang: Language) => {
-    setLanguageState(newLang);
-    try {
-      localStorage.setItem(STORAGE_KEY, newLang);
-      document.cookie = `${STORAGE_KEY}=${newLang}; path=/; max-age=31536000; SameSite=Lax`;
-    } catch {
-      // Ignore storage errors
+function updateClientLanguage(lang: Language) {
+  clientLanguage = lang
+  languageListeners.forEach((listener) => listener())
+}
+
+// Follow changes made in other tabs
+function handleStorage(e: StorageEvent) {
+  if (e.key === STORAGE_KEY && (e.newValue === 'th' || e.newValue === 'en')) {
+    updateClientLanguage(e.newValue)
+  }
+}
+
+function subscribeToLanguage(listener: () => void) {
+  if (languageListeners.size === 0) window.addEventListener('storage', handleStorage)
+  languageListeners.add(listener)
+  return () => {
+    languageListeners.delete(listener)
+    if (languageListeners.size === 0) window.removeEventListener('storage', handleStorage)
+  }
+}
+
+function setLanguage(newLang: Language) {
+  updateClientLanguage(newLang)
+  try {
+    localStorage.setItem(STORAGE_KEY, newLang)
+    document.cookie = `${STORAGE_KEY}=${newLang}; path=/; max-age=31536000; SameSite=Lax`
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+const LANGUAGE_ACTIONS = { setLanguage }
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  return <LanguageContext.Provider value={LANGUAGE_ACTIONS}>{children}</LanguageContext.Provider>
+}
+
+// Stored choice first, then the browser language, defaulting to Thai (also on the server)
+function readInitialLanguage(): Language {
+  if (typeof window === 'undefined') return 'th'
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY) as Language | null
+    if (stored === 'th' || stored === 'en') {
+      return stored
     }
-  }, []);
+    const browserLang = navigator.language?.toLowerCase() || ''
+    if (browserLang.startsWith('en')) {
+      return 'en'
+    }
+  } catch {
+    // Ignore if localStorage unavailable
+  }
+  return 'th'
+}
 
-  const currentTranslations = useMemo(() => {
-    return dictionaries[language] || th;
-  }, [language]);
+const MISSING = Symbol('missing')
 
-  const t = useCallback(
-    (path: string, params?: Record<string, string | number>): string => {
-      const keys = path.split('.');
-      let current: unknown = currentTranslations;
+// Walk a dotted key path through a dictionary; MISSING when any segment is absent
+function lookupPath(dictionary: unknown, keys: string[]): unknown {
+  let current = dictionary
+  for (const key of keys) {
+    if (current && typeof current === 'object' && key in current) {
+      current = (current as Record<string, unknown>)[key]
+    } else {
+      return MISSING
+    }
+  }
+  return current
+}
 
-      for (const key of keys) {
-        if (current && typeof current === 'object' && key in current) {
-          current = (current as Record<string, unknown>)[key];
-        } else {
-          // Fallback to Thai dictionary if key not found in current language
-          let fallback: unknown = th;
-          for (const fbKey of keys) {
-            if (fallback && typeof fallback === 'object' && fbKey in fallback) {
-              fallback = (fallback as Record<string, unknown>)[fbKey];
-            } else {
-              fallback = null;
-              break;
-            }
-          }
-          current = fallback ?? path;
-          break;
-        }
-      }
+// Replace every {param} placeholder with its value
+function interpolate(template: string, params?: Record<string, string | number>): string {
+  let result = template
+  if (params) {
+    for (const [pKey, pVal] of Object.entries(params)) {
+      result = result.replaceAll(`{${pKey}}`, String(pVal))
+    }
+  }
+  return result
+}
 
-      if (typeof current !== 'string') {
-        return path;
-      }
+// t() for one dictionary, falling back to the Thai dictionary, then to the key itself
+function createTranslator(translations: Translations): TranslateFn {
+  return (path, params) => {
+    const keys = path.split('.')
+    let found = lookupPath(translations, keys)
+    if (found === MISSING) {
+      // Fallback to Thai dictionary if key not found in current language
+      const fallback = lookupPath(th, keys)
+      found = fallback === MISSING ? path : (fallback ?? path)
+    }
 
-      let result = current;
-      if (params) {
-        for (const [pKey, pVal] of Object.entries(params)) {
-          result = result.replaceAll(`{${pKey}}`, String(pVal));
-        }
-      }
+    if (typeof found !== 'string') {
+      return path
+    }
 
-      return result;
-    },
-    [currentTranslations]
-  );
+    return interpolate(found, params)
+  }
+}
+
+const translators: Record<Language, TranslateFn> = {
+  th: createTranslator(dictionaries.th),
+  en: createTranslator(dictionaries.en),
+}
+
+export function useLanguage(): LanguageContextValue {
+  const context = useContext(LanguageContext)
+  const language = useSyncExternalStore(subscribeToLanguage, getLanguageSnapshot, getServerLanguageSnapshot)
 
   const value = useMemo(
     () => ({
       language,
       setLanguage,
-      translations: currentTranslations,
-      t,
+      translations: dictionaries[language] || th,
+      t: translators[language] || translators.th,
     }),
-    [language, setLanguage, currentTranslations, t]
-  );
+    [language]
+  )
 
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
-}
-
-export function useLanguage(): LanguageContextValue {
-  const context = useContext(LanguageContext);
   if (!context) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
+    throw new Error('useLanguage must be used within a LanguageProvider')
   }
-  return context;
+  return value
 }

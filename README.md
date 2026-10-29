@@ -113,7 +113,7 @@ An intelligent, real-time tabletop roleplaying platform combining **synchronized
   * **Resilient Dual-Language State Extraction:** `extractPartyStateUpdates` regex dynamically matches both Thai (`สถานะปาร์ตี้ :`) and English (`Party Status :`) overview blocks, ensuring automated HP, Skill Cost (SP), and custom resource syncing works flawlessly in both languages.
 
 ### 9. 🛡️ Authentication, Security & Room Governance
-* **Supabase Auth & 6-Hour Session Guard:** Email/password authentication with middleware-enforced 6-hour session expiration (`dnd_session_start` cookie) and post-login route restoration (`?next=...`).
+* **Supabase Auth & 6-Hour Idle Session:** Email/password authentication. Supabase auth cookies expire 6 hours after their last refresh, so an idle session ends after 6 hours. `src/middleware.ts` redirects signed-out users from protected routes to `/login` with post-login route restoration (`?next=...`).
 * **Room & Campaign Governance:** Head Table member kick controls, player `Leave Table` support, custom confirmation/status modals (`AlertModal`), and cascading cleanup when deleting tables or campaigns.
 
 ---
@@ -266,10 +266,10 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 ## 📁 Project Architecture
 
 ```text
-├── middleware.ts                         # Auth route protection & 6-hour session timeout guard
 ├── public/
 │   └── assets/sound/                     # WAV sound notifications (dice roll tiers, enter, AI reply, error)
 └── src/
+    ├── middleware.ts                     # Auth route protection & /login redirects (must live in src/)
     ├── app/                              # Pure Routing Layer (Pages, Layouts & Route Handlers only)
     │   ├── layout.tsx                    # Root layout with Geist fonts & global AlertProvider
     │   ├── page.tsx                      # Landing page
@@ -289,11 +289,17 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   ├── actions.ts                # Ready barrier, atomic AI turn resolution, combat sheet updates, kick
     │   │   ├── countdown.ts              # Synchronized ready countdown constants (COUNTDOWN_MS = 5000)
     │   │   ├── types.ts                  # Domain types, 12-color player palette, optimistic ready claims & FNV-1a hashing
+    │   │   ├── hooks.ts                  # TablePlayground hooks (notification sounds, server clock offset, ready countdown)
     │   │   └── components/
     │   │       ├── TablePlayground.tsx         # Realtime sync coordinator, clock offset & turn lifecycle
     │   │       ├── NarrativeFeedPanel.tsx      # Rich-formatted turn chronicle, player colors, action input & DiceRoller
+    │   │       ├── NarrativeFormatting.tsx     # Formatted narrative output & player-name highlighting
     │   │       ├── SaoCharacterOrb.tsx         # Responsive 2-part semicircle SAO status orb with curved SVG text & +/- resize
+    │   │       ├── SaoDualSemicircleDial.tsx   # SVG dual semicircle dial used by the SAO orb
     │   │       ├── CharacterInspectorPanel.tsx # Expandable SAO character window, template-aware combat editor & switcher
+    │   │       ├── CharacterSheetView.tsx      # Read-only sheet sections inside the inspector
+    │   │       ├── CharacterCombatEditor.tsx   # Inline HP / resource / condition editor
+    │   │       ├── CharacterSelectorList.tsx   # Character switcher with template-compatibility flags
     │   │       ├── PartyRosterSidebar.tsx      # Floating top-right in-game HUD (transparent BG) for party status & campaign lore
     │   │       └── PartyChatWidget.tsx         # Floating IC/OOC realtime party chat with audio ping (80-msg buffer)
     │   ├── character/                    # Character Codex & Shared Character Domain
@@ -303,18 +309,29 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
     │   │   └── components/
     │   │       ├── CharacterCodexHeader.tsx # Character Codex header with LanguageToggle & navigation
     │   │       ├── CharacterEditor.tsx   # Template-driven sheet editor (auto-forking presets, async campaign loader, dynamic stats & equipment)
-    │   │       └── TemplateModal.tsx     # Visual template customizer, preset-to-custom forking, blank reset, CST1. exporter & importer
+    │   │       ├── CharacterRoster.tsx   # Saved-sheet list sidebar
+    │   │       ├── CharacterSheetSections.tsx # Editor sections (identity, resources, stats, equipment, skills, inventory)
+    │   │       ├── TemplateModal.tsx     # Visual template customizer, preset-to-custom forking, blank reset, CST1. exporter & importer
+    │   │       ├── TemplateBuilderTab.tsx # Template builder tab (stats, resources, text fields, equipment slots, mechanics)
+    │   │       └── TemplateKeyTabs.tsx   # CST1. export / import tabs
     │   ├── campaign/                     # Campaign Studio & Lorebook Authoring
     │   │   ├── actions.ts                # Create & update campaigns (with strict template binding validation) and lorebook entries
     │   │   ├── rules.ts                  # Structured rule mechanics parser, JSON serializer & AI prompt formatter
     │   │   └── components/
     │   │       ├── CampaignDetailsClient.tsx # Localized campaign details view, requirements & table launcher
-    │   │       └── CampaignForm.tsx      # Shared campaign authoring form (structured rule builder, preset customization & lorebook registry)
+    │   │       ├── CampaignForm.tsx      # Shared campaign authoring form (state, submit & section layout)
+    │   │       ├── CampaignFoundationSection.tsx # Title, genre, world setting & structured rule builder
+    │   │       ├── CampaignTemplatePicker.tsx    # Required character template picker & preset customization
+    │   │       └── CampaignLorebookEditor.tsx    # Lorebook registry editor (useLorebookDraft)
     │   ├── hub/                          # Campaign Hub & Session Management
     │   │   ├── actions.ts                # Launch table (with AI opening scene), join, leave, delete, sign out
+    │   │   ├── types.ts                  # Hub view types (PublicCampaign, ActiveTable)
     │   │   └── components/
     │   │       ├── HubHeader.tsx         # Hub navigation header with LanguageToggle & brand
-    │   │       └── HubClient.tsx         # Quick Join (Code/Invite Link), Active Tables & Campaign carousel
+    │   │       ├── HubClient.tsx         # Hub page layout & state
+    │   │       ├── QuickJoinBar.tsx      # Quick Join by table code or invite link
+    │   │       ├── HubCards.tsx          # Active table & campaign cards
+    │   │       └── CampaignCarousel.tsx  # Campaign carousel
     │   └── board/                        # Solo 3D Tactical Battle Board (NOT IN ACTIVE DEV)
     │       ├── actions.ts                # Server Action bridging board turns & lorebooks to Gemini
     │       ├── lib/                      # Seeded map generator (maps.ts), session.ts, turn.ts, types.ts, utils.ts
@@ -338,7 +355,11 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
         │   ├── LanguageContext.tsx       # Reactive language context, localStorage & cookie sync
         │   └── locales/                  # Localized dictionaries (th.ts, en.ts)
         ├── ai/
-        │   ├── dm.ts                     # Multiplayer AI DM: prompt builder, dynamic combat/zero-resource modes & parser
+        │   ├── dm.ts                     # Multiplayer AI DM orchestrator (turn & opening scene generation, re-exports)
+        │   ├── dmTypes.ts                # DM turn input, party member & state-update types
+        │   ├── dmParty.ts                # Party sheet prompt formatting, resource descriptors & damage benchmark
+        │   ├── dmPrompt.ts               # System instruction rule modules, [ Overview ] / [ Decision ] schemas & turn messages
+        │   ├── dmStateExtraction.ts      # extractPartyStateUpdates: parse resource/condition changes from narration
         │   ├── boardDm.ts                # Battle Board JSON AI DM: prompt builder & safe reply parser
         │   └── lorebook.ts               # Multilingual keyword/title scanner & DM-only lore filter
         └── supabase/

@@ -1,15 +1,15 @@
-'use client';
+'use client'
 
-import React from 'react';
-import Link from 'next/link';
-import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
-import { signOut } from '@/features/hub/actions';
-import Image from 'next/image';
-import { LogOut, Plus, Users } from 'lucide-react';
+import React from 'react'
+import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { LanguageToggle } from '@/components/ui/LanguageToggle'
+import { signOut } from '@/features/hub/actions'
+import Image from 'next/image'
+import { LogOut, Plus, Users } from 'lucide-react'
 
 export function HubHeader() {
-  const { t } = useLanguage();
+  const { t } = useLanguage()
 
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800/40 pb-5">
@@ -64,7 +64,7 @@ export function HubHeader() {
         </form>
       </div>
     </div>
-  );
+  )
 }
 
-export default HubHeader;
+export default HubHeader

@@ -103,4 +103,3 @@ export function formatRuleMechanicsForPrompt(raw: string | null | undefined): st
     })
     .join('\n')
 }
-
