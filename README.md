@@ -353,7 +353,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Route | Auth | Description |
 | :--- | :--- | :--- |
-| `/` | ✗ | Landing page with official brand logo, hero section, CTA buttons, and 3-pillar feature grid |
+| `/` | ✗ | Landing page with Hero brand logo, headline, CTA buttons, and 3-pillar feature grid |
 | `/login` | ✗ | Sign In / Sign Up (floating frosted glass card with language switch) |
 | `/auth/callback` | ✗ | Supabase OAuth / email confirmation handler |
 | `/hub` | ✓ | Campaign Hub — browse campaigns, manage active tables, Quick Join |
@@ -368,6 +368,8 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🎨 UI & Design System
 
-The application features a modern, distraction-free **Swiss Dark / Minimalist Dark** design system utilizing layered opacity surfaces (`backdrop-blur-md`, subtle alpha channels), smooth fade micro-interactions, matte amber accents, and zero glare/neon bloom.
+The application features a modern, distraction-free **Swiss Dark / Minimalist Dark** design system utilizing layered opacity surfaces (`backdrop-blur-md`, subtle alpha channels), smooth fade micro-interactions, matte amber accents, and zero glare/neon bloom:
+* **Brand Identity & Hero Display:** Official logo (`logo_tofutableplay.png`) prominently presented atop the Landing Page Hero section, in the Campaign Hub header, and on the authentication card.
+* **Surface Hierarchy:** Deep neutral base canvas (`#09090b`), frosted glass container panels (`.surface-panel`), and recessed text inputs.
 
 👉 See [website_ui.md](website_ui.md) for full design system tokens, surface hierarchy, and component specifications.

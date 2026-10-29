@@ -14,17 +14,16 @@ export default function LandingPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-zinc-800 selection:text-amber-200">
       {/* Top Header */}
       <header className="border-b border-zinc-800/40 bg-zinc-950/70 backdrop-blur-xl sticky top-0 z-50 transition-colors">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center">
+        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+          <Link href="/" className="flex items-center transition-opacity hover:opacity-85" title="TofuTablePlay">
             <Image
-              src="/assets/pictures/logo.png"
+              src="/assets/pictures/logo_tofutableplay.png"
               alt="TofuTablePlay"
-              width={140}
-              height={48}
-              className="h-8 w-auto object-contain"
-              priority
+              width={120}
+              height={120}
+              className="h-12 sm:h-16 w-auto object-contain"
             />
-          </div>
+          </Link>
 
           <div className="flex items-center gap-3 sm:gap-4">
             <LanguageToggle />
@@ -39,7 +38,8 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main className="max-w-5xl mx-auto px-6 pt-16 pb-24 text-center space-y-12 flex-1 flex flex-col justify-center items-center">
+      <main className="max-w-5xl mx-auto px-6 pt-10 sm:pt-14 pb-24 text-center space-y-8 sm:space-y-10 flex-1 flex flex-col justify-center items-center">
+
         {/* Hero Headline & Subtitle */}
         <div className="space-y-4 max-w-3xl">
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-zinc-100 leading-[1.15]">

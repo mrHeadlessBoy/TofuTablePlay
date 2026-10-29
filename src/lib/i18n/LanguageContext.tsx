@@ -18,23 +18,39 @@ const dictionaries: Record<Language, Translations> = { th, en };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'th';
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-      if (stored === 'th' || stored === 'en') {
-        return stored;
+export function LanguageProvider({
+  children,
+  initialLanguage = 'th',
+}: {
+  children: React.ReactNode;
+  initialLanguage?: Language;
+}) {
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
+        if (stored === 'th' || stored === 'en') {
+          if (stored !== language) {
+            setLanguageState(stored);
+            document.cookie = `${STORAGE_KEY}=${stored}; path=/; max-age=31536000; SameSite=Lax`;
+          }
+        } else {
+          const browserLang = navigator.language?.toLowerCase() || '';
+          if (browserLang.startsWith('en') && language !== 'en') {
+            setLanguageState('en');
+            localStorage.setItem(STORAGE_KEY, 'en');
+            document.cookie = `${STORAGE_KEY}=en; path=/; max-age=31536000; SameSite=Lax`;
+          }
+        }
+      } catch {
+        // Ignore storage errors
       }
-      const browserLang = navigator.language?.toLowerCase() || '';
-      if (browserLang.startsWith('en')) {
-        return 'en';
-      }
-    } catch {
-      // Ignore if localStorage unavailable
-    }
-    return 'th';
-  });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [language]);
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {

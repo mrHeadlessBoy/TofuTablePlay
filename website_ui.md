@@ -34,13 +34,17 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 - **Metadata / Timestamps**: `text-zinc-500 text-xs font-mono`
 
 ### 1.4 Brand Identity & Visual Assets
-- **Official Brand Logo (`public/assets/pictures/logo.png`)**:
-  - Horizontal lockup with character emblem + stylized typography on transparent alpha background.
-  - Rendered with Next.js `<Image>` component (`h-8` in Top Nav & Hub Header, `h-10` in Login Card, `w-auto`, `priority` on above-the-fold views).
+- **Official Brand Logo (`public/assets/pictures/logo_tofutableplay.png`)**:
+  - Horizontal lockup with character emblem + stylized typography on transparent alpha background (trimmed of excessive whitespace for true-to-scale rendering).
+  - Rendered with Next.js `<Image>` component:
+    - **Hero Centerpiece (`src/app/page.tsx`)**: `h-20 sm:h-28 md:h-32 w-auto` (prominently centered atop the main headline)
+    - **Top Navigation (`src/app/page.tsx`)**: `h-8 sm:h-9 w-auto` (compact clickable home link)
+    - **Hub Header (`HubHeader.tsx`)**: `h-10 sm:h-12 w-auto`
+    - **Login Card (`src/app/login/page.tsx`)**: `h-14 sm:h-16 w-auto`
   - Replaces all legacy generic shield icons (`lucide-shield`) sitewide.
 - **Asset Directory Structure**:
-  - `public/assets/pictures/logo.png`: Active primary brand logo.
-  - `public/assets/pictures/unused/`: Archived concept graphics and exploratory logos.
+  - `public/assets/pictures/logo_tofutableplay.png`: Active primary brand logo.
+  - `public/assets/pictures/unused/`: Archived concept graphics, exploratory logos, and original untrimmed source images.
 - **Active Table Geometric Indicator**:
   - Replaces traditional blinking online/offline status dots with a minimalist rotating amber triangle (`animate-[spin_6s_linear_infinite]`), matching the tabletop polyhedral aesthetic.
 
@@ -95,8 +99,9 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 ## 4. Implemented Screens & Components
 
 ### 4.1 Landing Page (`src/app/page.tsx`)
-- **Brand Logo Navigation**: Frosted glass sticky header with official brand logo (`logo.png`), language toggle (`LanguageToggle`), and clean Sign In link (distraction-free without duplicate enter hub buttons).
-- **Hero & Typography**: Focused typography without colored glow blobs or cluttered pill tags, utilizing clean leading and tracking.
+- **Brand Logo Navigation**: Frosted glass sticky header with compact official brand logo (`logo_tofutableplay.png`), language toggle (`LanguageToggle`), and clean Sign In link (distraction-free without duplicate enter hub buttons).
+- **Hero Centerpiece Logo**: Grand, high-resolution official brand logo (`h-20 sm:h-28 md:h-32`) placed directly above the main headline, delivering an atmospheric tabletop RPG portal welcome.
+- **Hero & Typography**: Focused headline and storytelling subtitle without colored glow blobs or cluttered pill tags, utilizing clean leading and tracking.
 - **Streamlined Direct Flow**: Connects the Hero call-to-action buttons directly into the 3-pillar feature grid, eliminating extraneous preview mockups for maximum focus, speed, and elegance.
 - **Pillar Feature Grid**: 3-column card grid explaining Synchronized Action Drafting, Dynamic Lorebooks, and Host Authority using `.surface-panel .surface-panel-hover`.
 - **Bilingual Support**: Dynamic Thai/English switching seamlessly applied to all landing page copy.
@@ -146,7 +151,7 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 ## 6. การแก้ไขที่ต้องการ (Completed Edits)
 
 ### 1. หน้าแรก (`src/app/page.tsx`)
-- [x] **ใช้อันนี้เป็น logo แทน lucide-shield `dnd-playground\public\assets\pictures\logo.png`**: ติดตั้ง `<Image src="/assets/pictures/logo.png">` แสดงผลโลโก้แบรนด์อย่างคมชัดบน Navbar
+- [x] **ใช้อันนี้เป็น logo แทน lucide-shield `dnd-playground\public\assets\pictures\logo_tofutableplay.png`**: ติดตั้ง `<Image src="/assets/pictures/logo_tofutableplay.png">` แสดงผลโลโก้แบรนด์อย่างคมชัดบน Navbar และขยายขนาดให้โดดเด่นเหมาะสมทุกหน้า (`h-10 sm:h-12` บน Navbar/Hub, `h-14 sm:h-16` บน Login)
 - [x] **AI-Orchestrated Tabletop Engine ลบตรงนี้ออก**: ลบ Pill Tag ในส่วน Hero ออกเรียบร้อยแล้ว
 - [x] **ไม่ว่าที่ไหนที่มีการใช้ lucide-shield เอาออกให้หมด ไม่ว่าจะเป็นหน้าแรก หน้า login หรือหน้าอื่น ๆ**: ปลด Shield ออกจากทั้งระบบ (`page.tsx`, `login/page.tsx`, `HubHeader.tsx`, `TemplateModal.tsx`, `CharacterInspectorPanel.tsx`, `NarrativeFeedPanel.tsx`, `BoardPanels.tsx`) ทั้งหมด 100%
 - [x] **ตัดส่วน {/* DM Chronicle Passage */} และกล่อง Preview ออก**: ลบกล่อง Live Story Preview Mockup ออกทั้งหมดตามที่ผู้ใช้ปรับแต่ง เพื่อให้หน้าแรกเรียบง่าย กระชับ และมุ่งเน้นการเริ่มต้นเล่นทันที

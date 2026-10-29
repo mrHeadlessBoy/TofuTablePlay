@@ -115,17 +115,17 @@ export default function LoginPage() {
         <div className="w-full max-w-md surface-panel rounded-2xl p-7 sm:p-8 shadow-2xl space-y-6">
           {/* Logo & Headline */}
           <div className="space-y-2 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start mb-2">
+            <div className="flex items-center justify-center sm:justify-center mb-3">
               <Image
-                src="/assets/pictures/logo.png"
+                src="/assets/pictures/logo_tofutableplay.png"
                 alt="TofuTablePlay"
-                width={150}
-                height={50}
-                className="h-10 w-auto object-contain"
+                width={600}
+                height={300}
+                className="h-14 sm:h-16 w-auto center object-contain"
                 priority
               />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+            <h1 className="text-xl text-center sm:text-2xl font-bold tracking-tight text-zinc-100">
               {isSignUp
                 ? isThai
                   ? 'สร้างบัญชีผู้เล่นใหม่'
@@ -134,7 +134,7 @@ export default function LoginPage() {
                 ? 'เข้าสู่อาณาจักร'
                 : 'Enter the Realm'}
             </h1>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-center text-zinc-400 leading-relaxed">
               {isSignUp
                 ? isThai
                   ? 'ลงทะเบียนเพื่อสร้างและเข้าร่วมแคมเปญบทบาทสมมติ'

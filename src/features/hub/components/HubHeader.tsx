@@ -14,14 +14,14 @@ export function HubHeader() {
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800/40 pb-5">
       <div className="space-y-1">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center" title="TofuTablePlay">
+        <div className="flex items-center gap-3.5">
+          <Link href="/" className="flex items-center transition-opacity hover:opacity-90" title="TofuTablePlay">
             <Image
-              src="/assets/pictures/logo.png"
+              src="/assets/pictures/logo_tofutableplay.png"
               alt="TofuTablePlay"
-              width={130}
-              height={44}
-              className="h-8 w-auto object-contain"
+              width={900}
+              height={600}
+              className="h-10 sm:h-12 w-auto object-contain"
             />
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
