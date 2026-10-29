@@ -73,6 +73,7 @@ flowchart TD
   - Replace stark black layout with a sleek layered opacity hero.
   - Add `LanguageToggle` directly to Landing header.
   - Refactor feature cards into clean `.surface-panel` frosted panels with smooth hover transitions.
+  - Integrated grand brand logo centerpiece (`logo_tofutableplay.png`) prominently atop the Hero section.
   - Streamlined direct flow connecting Hero actions straight into the 3-pillar feature grid without preview mockups.
   - Added bilingual EN/TH support across the landing page.
 - [x] **2.2 Login & Registration Screen** (`src/app/login/page.tsx`):
