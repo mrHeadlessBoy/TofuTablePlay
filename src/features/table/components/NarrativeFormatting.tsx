@@ -5,7 +5,7 @@ import { Compass } from 'lucide-react'
 import { buildPlayerColorMap, getPlayerNameColor, type Turn } from '../types'
 
 const INLINE_TOKEN_REGEX =
-  /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|~~[^~\n]+?~~|\((?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?HP:\s*[^)\n]+\)|\((?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?(?:Skill\s*Cost|SP):\s*[^)\n]+\)|\((?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?[^():\n]{1,40}:\s*\d+\s*\/\s*\d+\s*(?:->|→|=>)\s*\d+\s*\/\s*\d+[^)\n]*\)|\[(?:d20[^\]]*|DC\s*\d+[^\]]*)\]|\[[^\]\n]{1,40}\])/gi
+  /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|~~[^~\n]+?~~|\((?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?HP:\s*[^)\n]+\)|\((?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?(?:Skill\s*Cost(?:\s*\(\s*SP\s*\))?|SP):\s*(?:[^()\n]|\([^()\n]*\))+\)|\((?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?[^():\n]{1,40}:\s*\d+\s*\/\s*\d+\s*(?:->|→|=>)\s*\d+\s*\/\s*\d+[^)\n]*\)|\[(?:d20[^\]]*|DC\s*\d+[^\]]*)\]|\[[^\]\n]{1,40}\])/gi
 
 // Optional "Name —" / "Name:" prefix inside a status badge, e.g. "(Shacco — HP: 80/100)"
 const BADGE_NAME_PREFIX = String.raw`(?:[^()\n—–\-:]{1,40}?\s*(?:—|–|-|:)\s*)?`
@@ -20,7 +20,7 @@ const STATUS_BADGE_RULES: { pattern: RegExp; className: string }[] = [
     className: 'bg-red-950/60 border-red-800/60 text-[0.75em] text-red-300',
   },
   {
-    pattern: new RegExp(String.raw`^\(${BADGE_NAME_PREFIX}(?:Skill\s*Cost|SP):\s*[^)\n]+\)$`, 'i'),
+    pattern: new RegExp(String.raw`^\(${BADGE_NAME_PREFIX}(?:Skill\s*Cost(?:\s*\(\s*SP\s*\))?|SP):\s*(?:[^()\n]|\([^()\n]*\))+\)$`, 'i'),
     className: 'bg-cyan-950/60 border-cyan-800/60 text-[0.75em] text-cyan-300',
   },
   {

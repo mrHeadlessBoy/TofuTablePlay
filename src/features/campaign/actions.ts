@@ -27,8 +27,8 @@ export interface CampaignPayload {
 
 // Server-side checks shared by create and update. Returns the custom genre name (null unless "Custom").
 function validateCampaignPayload(payload: CampaignPayload): string | null {
-  if (!payload.title?.trim()) {
-    throw new Error('กรุณากรอกชื่อแคมเปญ (Campaign title is required)')
+  if (!payload.title?.trim() || payload.title.trim().length < 2) {
+    throw new Error('ชื่อแคมเปญต้องมีความยาวอย่างน้อย 2 ตัวอักษร (Campaign title must be at least 2 characters)')
   }
   if (payload.title.trim().length > 100) {
     throw new Error('ชื่อแคมเปญต้องมีความยาวไม่เกิน 100 ตัวอักษร (Campaign title cannot exceed 100 characters)')

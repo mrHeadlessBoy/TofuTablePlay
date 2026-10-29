@@ -25,7 +25,7 @@ const ai = new GoogleGenAI()
 
 // One model for every Dungeon Master call (turn narration and the opening scene)
 const DM_MODEL = 'gemini-3.5-flash-lite'
-const OPENING_TIMEOUT_MS = 15000
+const OPENING_TIMEOUT_MS = 25000
 
 export async function generateDmNarrative(input: DmTurnInput): Promise<string> {
   const { campaign, loreEntries, recentTurns, partyActions, language = 'th' } = input

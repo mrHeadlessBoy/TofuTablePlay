@@ -51,11 +51,11 @@ function validateCampaignForm(
   isLoreDraftIncomplete: boolean,
 ): ValidationAlert | null {
   const title = values.title.trim()
-  if (!title) {
+  if (!title || title.length < 2) {
     return {
-      title: 'กรุณากรอกชื่อแคมเปญ',
-      badge: 'Campaign Title Required',
-      message: 'กรุณาระบุชื่อสำหรับแคมเปญของคุณก่อนบันทึกข้อมูล',
+      title: 'ชื่อแคมเปญสั้นเกินไป',
+      badge: 'Title Too Short',
+      message: 'ชื่อแคมเปญต้องมีความยาวระหว่าง 2 ถึง 100 ตัวอักษร',
     }
   }
   if (title.length > 100) {
@@ -248,7 +248,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
               {isEdit ? t('campaign.editTitle') : t('campaign.newTitle')}
             </h1>
             <p className="text-zinc-400 text-xs sm:text-sm">
-              Author your campaign universe and configure context triggers for the AI DM.
+              {t('campaign.campaignSubtitle')}
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">

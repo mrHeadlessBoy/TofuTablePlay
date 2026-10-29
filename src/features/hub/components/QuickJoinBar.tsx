@@ -144,7 +144,7 @@ export default function QuickJoinBar() {
       <div className="surface-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
         <div>
           <h2 className="text-base font-semibold text-zinc-100 tracking-tight">{t('hub.quickJoin')}</h2>
-          <p className="text-xs text-zinc-400 mt-1">{t('hub.subtitle')}</p>
+          <p className="text-xs text-zinc-400 mt-1">{t('hub.quickJoinSubtitle')}</p>
         </div>
         <form onSubmit={handleJoin} className="flex gap-2 w-full sm:w-auto">
           <input

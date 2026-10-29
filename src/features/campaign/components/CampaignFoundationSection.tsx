@@ -57,7 +57,7 @@ export default function CampaignFoundationSection({
           <input
             type="text"
             required
-            placeholder="The Citadel of Ash"
+            placeholder={t('campaign.campaignTitlePlaceholder')}
             value={values.title}
             onChange={(e) => onChange({ title: e.target.value })}
             className={FIELD_INPUT_CLASS}
@@ -98,7 +98,7 @@ export default function CampaignFoundationSection({
         <textarea
           required
           rows={3}
-          placeholder="Brief summary of the overarching journey and party objectives..."
+          placeholder={t('campaign.coreBriefPlaceholder')}
           value={values.coreDescription}
           onChange={(e) => onChange({ coreDescription: e.target.value })}
           className={FIELD_INPUT_CLASS}
@@ -110,7 +110,7 @@ export default function CampaignFoundationSection({
         <textarea
           required
           rows={3}
-          placeholder="Geographic layout, political tensions, environmental tone..."
+          placeholder={t('campaign.worldSettingPlaceholder')}
           value={values.worldSetting}
           onChange={(e) => onChange({ worldSetting: e.target.value })}
           className={FIELD_INPUT_CLASS}
@@ -170,7 +170,7 @@ function RuleMechanicsEditor({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <div className="md:col-span-2">
-                <label className={RULE_LABEL_CLASS}>Rule Name :</label>
+                <label className={RULE_LABEL_CLASS}>{t('campaign.ruleTitle')} :</label>
                 <input
                   type="text"
                   placeholder="e.g., Sanity Meter, Perma-death..."
@@ -180,7 +180,7 @@ function RuleMechanicsEditor({
                 />
               </div>
               <div className="md:col-span-1">
-                <label className={RULE_LABEL_CLASS}>Category / Tag :</label>
+                <label className={RULE_LABEL_CLASS}>{t('campaign.ruleCategory')} :</label>
                 <input
                   type="text"
                   placeholder="e.g., Survival, Combat..."
@@ -190,7 +190,7 @@ function RuleMechanicsEditor({
                 />
               </div>
               <div className="md:col-span-2">
-                <label className={RULE_LABEL_CLASS}>Description :</label>
+                <label className={RULE_LABEL_CLASS}>{t('campaign.ruleDescription')} :</label>
                 <input
                   type="text"
                   placeholder="Describe how this rule works..."
@@ -205,8 +205,7 @@ function RuleMechanicsEditor({
 
         {rules.length === 0 && (
           <p className="text-xs text-zinc-500 italic">
-            No custom rule mechanics added yet. Standard tabletop RPG rules apply. Click &quot;Add Rule
-            Mechanic&quot; below to add custom rules.
+            {t('campaign.noRulesNote')}
           </p>
         )}
       </div>

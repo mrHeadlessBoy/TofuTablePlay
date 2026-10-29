@@ -9,7 +9,8 @@ import { generateOpeningNarrative } from '@/lib/ai/dm'
 import { OPENING_TURN_NUMBER } from '@/lib/turns'
 
 // Used as the opening narration only when the AI could not write one
-const OPENING_FALLBACK = 'The journey begins. Review your character sheet and submit your opening moves.'
+const OPENING_FALLBACK_EN = 'The journey begins. Review your character sheet and submit your opening moves.'
+const OPENING_FALLBACK_TH = 'การผจญภัยเริ่มต้นขึ้นแล้ว ตรวจสอบแผ่นตัวละครของคุณและร่างการกระทำแรกเพื่อเปิดฉากเรื่องราว'
 
 function generateTableCode(length = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -27,16 +28,22 @@ async function writeOpeningScene(
   campaignId: string,
   language?: 'th' | 'en'
 ): Promise<string> {
+  let activeLang: 'th' | 'en' = language || 'th'
+  try {
+    const cookieStore = await cookies()
+    activeLang = (language || cookieStore.get('tofu_language')?.value || 'th') as 'th' | 'en'
+  } catch {
+    // Ignore cookie read error
+  }
+  const fallback = activeLang === 'th' ? OPENING_FALLBACK_TH : OPENING_FALLBACK_EN
+
   try {
     const db = createAdminClient() || supabase
     const [{ data: campaign }, { data: loreEntries }] = await Promise.all([
       db.from('campaigns').select('*').eq('id', campaignId).single(),
       db.from('lorebook_entries').select('*').eq('campaign_id', campaignId),
     ])
-    if (!campaign) return OPENING_FALLBACK
-
-    const cookieStore = await cookies()
-    const activeLang = (language || cookieStore.get('tofu_language')?.value || 'th') as 'th' | 'en'
+    if (!campaign) return fallback
 
     return await generateOpeningNarrative({
       campaign,
@@ -45,7 +52,7 @@ async function writeOpeningScene(
     })
   } catch (err) {
     console.error('[launchTable] Opening scene generation failed:', err)
-    return OPENING_FALLBACK
+    return fallback
   }
 }
 
@@ -92,19 +99,19 @@ function extractTableIdentifier(rawInput: string): string {
   const trimmed = rawInput.trim()
   if (!trimmed) return ''
 
-  const tablePathMatch = trimmed.match(/\/table\/([^/?#\s]+)/i)
-  if (tablePathMatch?.[1]) {
-    return decodeURIComponent(tablePathMatch[1]).trim()
-  }
-
   try {
+    const tablePathMatch = trimmed.match(/\/table\/([^/?#\s]+)/i)
+    if (tablePathMatch?.[1]) {
+      return decodeURIComponent(tablePathMatch[1]).trim()
+    }
+
     if (trimmed.includes('://') || trimmed.startsWith('?')) {
       const url = new URL(trimmed.startsWith('?') ? `http://localhost/${trimmed}` : trimmed)
       const paramCode = url.searchParams.get('code') || url.searchParams.get('invite')
       if (paramCode) return paramCode.trim()
     }
   } catch {
-    // Fall back to raw input
+    // Fall back to raw input if decoding or URL parsing fails (e.g. malformed % sequence)
   }
 
   return trimmed

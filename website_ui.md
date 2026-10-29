@@ -116,7 +116,7 @@ Surfaces are built from translucent zinc layers over a deep neutral canvas:
 
 ### 4.3 Hub & Campaign Management (`src/features/hub/...`, `src/features/campaign/...`)
 - **Hub Header (`HubHeader.tsx`)**: Frosted navigation bar with brand logo (`logo.png`), character codex shortcut, and campaign authoring trigger with smooth hover micro-lifts.
-- **Quick Join Bar (`HubClient.tsx`)**: Low-profile frosted container with monospace uppercase table code input and tactile join button.
+- **Quick Join Bar (`QuickJoinBar.tsx`)**: Low-profile frosted container with monospace uppercase table code input and tactile join button.
 - **Active Table Cards**: Real-time table cards with rotating geometric amber triangle accents, monospace code pills, and copyable invite link chips.
 - **Public Campaign Cards**: Streamlined card deck with category badges, author chips, 2-line story preview (`line-clamp-2`), removed sheet format tags, and smooth slide navigation with indicator dots.
 - **Campaign Studio (`CampaignForm.tsx` & `CampaignDetailsClient.tsx`)**: Refined layered opacity sections, recessed form inputs, structured rule builder tiles, and lorebook keyword tags without harsh glare.

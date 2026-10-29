@@ -39,8 +39,7 @@ export default function CampaignTemplatePicker({
         </span>
       </div>
       <p className="text-xs text-zinc-400">
-        Every player joining this campaign will play using this character sheet format. Choose a
-        built-in genre preset or design your own custom sheet template.
+        {t('campaign.templateDescription')}
       </p>
 
       {/* Built-in Presets Grid */}
