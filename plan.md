@@ -175,6 +175,9 @@ flowchart TD
 - [ ] **`extractTableIdentifier` can throw on a malformed link** (`src/features/hub/actions.ts`): `decodeURIComponent` runs outside the `try`, so input like `/table/%E0` throws `URIError` instead of returning "table not found". Move it inside the `try` or wrap it.
 - [ ] **Upgrade Next.js 16.4.0**: the dev overlay shows a Security Insight saying 16.4.0 has a known vulnerability and suggests `next upgrade --agent=security`. Do it in its own branch, then rerun `bun run build` and the smoke test below.
 - [ ] **SP badge does not render for some AI phrasings** (`STATUS_BADGE_RULES` in `src/features/table/components/NarrativeFormatting.tsx`): the AI sometimes writes `(Vincente — Skill Cost (SP): 10/10 → 8/10 -2 SP)`. The nested `(SP)` ends the token at the first `)`, so the cyan badge is not shown (the SP value itself still syncs to the sheet). Allow an optional `(SP)` after `Skill Cost` and `→` as an arrow in both `INLINE_TOKEN_REGEX` and the SP badge rule, and/or tell the AI DM prompt (`src/lib/ai/dmPrompt.ts`) to use the exact `(Name — Skill Cost: 10/10 -> 8/10 [-2 SP])` format.
+- [ ] **README claims a 2-100 character campaign title, the code only checks 1-100**: `README.md` (Campaign Studio validation) says 2-100, but `validateCampaignForm` in `src/features/campaign/components/CampaignForm.tsx` and `validateCampaignPayload` in `src/features/campaign/actions.ts` only reject an empty title and titles over 100 characters, so a 1-character title is accepted. Either fix the README or add a minimum length in both places.
+- [ ] **Campaign form shows hard-coded English while TH is selected**: the subtitle in `CampaignForm.tsx` ("Author your campaign universe..."), the placeholders and empty-rules note in `CampaignFoundationSection.tsx` ("Brief summary of the overarching journey...", "Geographic layout, political tensions...", "No custom rule mechanics added yet..."), and the description in `CampaignTemplatePicker.tsx` ("Every player joining this campaign...") bypass `t()`. Move them into `th.ts` / `en.ts` / `types.ts`.
+- [ ] **Opening-scene fallback is English only**: when Gemini does not answer within `OPENING_TIMEOUT_MS` (15 s, `src/lib/ai/dm.ts`), `writeOpeningScene` in `src/features/hub/actions.ts` returns `OPENING_FALLBACK` ("The journey begins...") even for Thai tables. Pick the fallback by `activeLang` (compute the language before the `try`), and consider a longer timeout since the fallback showed up during testing.
 - [ ] **(Info only) Code size grew ~11%** (19,892 → 22,091 lines in `src` + `middleware.ts`), mostly props interfaces and imports for the extracted components. No action needed.
 
 ### 4.4 Smoke test checklist (manual, `bun dev`)
@@ -184,7 +187,7 @@ flowchart TD
 - [x] `/table/[id]`: Dice Roller attaches a roll to the action, READY UP → 5 s countdown → AI reply with sound, badges (HP red, SP cyan, DC amber) and coloured player names
 - [x] `/table/[id]`: Party Chat IC/OOC, unread counter
 - [x] `/characters`: create, edit, save, delete a sheet; TemplateModal Builder / Export (`CST1.`) / Import tabs
-- [ ] `/campaigns/new` and `/campaigns/[id]/edit`: genre, rule builder, template picker + customize, add/remove lore entries, validation error on a 1-character title
-- [ ] `/campaigns/[id]`: required-template card, launch table
+- [x] `/campaigns/new` and `/campaigns/[id]/edit`: genre, rule builder, template picker + customize, add/remove lore entries, validation error on a 1-character title
+- [x] `/campaigns/[id]`: required-template card, launch table
 - [x] `/hub`: Quick Join by code and by `/table/...` link, copy Invite Link, collapse Public Worlds
 - [x] `/login` and `/`: redirect to `/login?next=...` when signed out and back after sign-in, Sign in / Sign up toggle, language switch, no hydration issue in the Next.js dev overlay
