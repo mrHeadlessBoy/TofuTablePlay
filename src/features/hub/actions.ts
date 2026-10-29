@@ -22,7 +22,11 @@ function generateTableCode(length = 6): string {
 
 // The opening narration of a new table: ask the AI Dungeon Master to open the story from the campaign sheet.
 // A failed or slow AI call must never stop a table from opening, so any error ends in the fallback line.
-async function writeOpeningScene(supabase: SessionClient, campaignId: string, language?: 'th' | 'en'): Promise<string> {
+async function writeOpeningScene(
+  supabase: SessionClient,
+  campaignId: string,
+  language?: 'th' | 'en'
+): Promise<string> {
   try {
     const db = createAdminClient() || supabase
     const [{ data: campaign }, { data: loreEntries }] = await Promise.all([
@@ -34,7 +38,11 @@ async function writeOpeningScene(supabase: SessionClient, campaignId: string, la
     const cookieStore = await cookies()
     const activeLang = (language || cookieStore.get('dnd_language')?.value || 'th') as 'th' | 'en'
 
-    return await generateOpeningNarrative({ campaign, loreEntries: loreEntries || [], language: activeLang })
+    return await generateOpeningNarrative({
+      campaign,
+      loreEntries: loreEntries || [],
+      language: activeLang,
+    })
   } catch (err) {
     console.error('[launchTable] Opening scene generation failed:', err)
     return OPENING_FALLBACK
@@ -79,6 +87,7 @@ export async function launchTable(campaignId: string, languageOrFormData?: 'th' 
   redirect(`/table/${table.id}`)
 }
 
+// Accepts a bare code, a /table/<code-or-uuid> link, or a URL with ?code= / ?invite=
 function extractTableIdentifier(rawInput: string): string {
   const trimmed = rawInput.trim()
   if (!trimmed) return ''
