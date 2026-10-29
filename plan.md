@@ -174,16 +174,17 @@ flowchart TD
 - [ ] **Rename `src/middleware.ts` to `src/proxy.ts` (Next.js 16)**: the `middleware` file name and export are deprecated in favor of `proxy` (see `node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`; a codemod exists). Re-test the `/login` redirects afterwards.
 - [ ] **`extractTableIdentifier` can throw on a malformed link** (`src/features/hub/actions.ts`): `decodeURIComponent` runs outside the `try`, so input like `/table/%E0` throws `URIError` instead of returning "table not found". Move it inside the `try` or wrap it.
 - [ ] **Upgrade Next.js 16.4.0**: the dev overlay shows a Security Insight saying 16.4.0 has a known vulnerability and suggests `next upgrade --agent=security`. Do it in its own branch, then rerun `bun run build` and the smoke test below.
+- [ ] **SP badge does not render for some AI phrasings** (`STATUS_BADGE_RULES` in `src/features/table/components/NarrativeFormatting.tsx`): the AI sometimes writes `(Vincente — Skill Cost (SP): 10/10 → 8/10 -2 SP)`. The nested `(SP)` ends the token at the first `)`, so the cyan badge is not shown (the SP value itself still syncs to the sheet). Allow an optional `(SP)` after `Skill Cost` and `→` as an arrow in both `INLINE_TOKEN_REGEX` and the SP badge rule, and/or tell the AI DM prompt (`src/lib/ai/dmPrompt.ts`) to use the exact `(Name — Skill Cost: 10/10 -> 8/10 [-2 SP])` format.
 - [ ] **(Info only) Code size grew ~11%** (19,892 → 22,091 lines in `src` + `middleware.ts`), mostly props interfaces and imports for the extracted components. No action needed.
 
 ### 4.4 Smoke test checklist (manual, `bun dev`)
 - [x] `/hub` renders in TH and EN
 - [x] `/table/[id]` loads: enter-table sound, SAO orb, Party Roster, Lorebook
-- [ ] `/table/[id]`: open inspector from the orb, edit HP/condition and save, switch character (mismatch modal for an incompatible template)
-- [ ] `/table/[id]`: Dice Roller attaches a roll to the action, READY UP → 5 s countdown → AI reply with sound, badges (HP red, SP cyan, DC amber) and coloured player names
-- [ ] `/table/[id]`: Party Chat IC/OOC, unread counter
-- [ ] `/characters`: create, edit, save, delete a sheet; TemplateModal Builder / Export (`CST1.`) / Import tabs
+- [x] `/table/[id]`: open inspector from the orb, edit HP/condition and save, switch character (mismatch modal for an incompatible template)
+- [x] `/table/[id]`: Dice Roller attaches a roll to the action, READY UP → 5 s countdown → AI reply with sound, badges (HP red, SP cyan, DC amber) and coloured player names
+- [x] `/table/[id]`: Party Chat IC/OOC, unread counter
+- [x] `/characters`: create, edit, save, delete a sheet; TemplateModal Builder / Export (`CST1.`) / Import tabs
 - [ ] `/campaigns/new` and `/campaigns/[id]/edit`: genre, rule builder, template picker + customize, add/remove lore entries, validation error on a 1-character title
 - [ ] `/campaigns/[id]`: required-template card, launch table
-- [ ] `/hub`: Quick Join by code and by `/table/...` link, copy Invite Link, collapse Public Worlds
-- [ ] `/login` and `/`: Sign in / Sign up toggle, language switch, no hydration issue in the Next.js dev overlay
+- [x] `/hub`: Quick Join by code and by `/table/...` link, copy Invite Link, collapse Public Worlds
+- [x] `/login` and `/`: redirect to `/login?next=...` when signed out and back after sign-in, Sign in / Sign up toggle, language switch, no hydration issue in the Next.js dev overlay
