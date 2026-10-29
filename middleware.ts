@@ -5,6 +5,16 @@ const SIX_HOURS_IN_SECONDS = 6 * 60 * 60 // 21,600 seconds (6 hours)
 const SIX_HOURS_IN_MS = SIX_HOURS_IN_SECONDS * 1000
 const SESSION_START_COOKIE = 'dnd_session_start'
 
+// Pages that need a signed-in user
+const PROTECTED_PREFIXES = ['/characters', '/campaigns', '/table', '/hub', '/board']
+
+const SESSION_START_COOKIE_OPTIONS = {
+  path: '/',
+  maxAge: SIX_HOURS_IN_SECONDS,
+  httpOnly: true,
+  sameSite: 'lax',
+} as const
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -38,88 +48,33 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Guard protected routes
-  const protectedPrefixes = ['/characters', '/campaigns', '/table', '/hub', '/board']
-  const isProtected = protectedPrefixes.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  )
+  const { pathname, search } = request.nextUrl
+  const isProtected = PROTECTED_PREFIXES.some((path) => pathname.startsWith(path))
+  const nextPath = `${pathname}${search}`
 
-  // 6-hour session expiration enforcement
   if (user) {
-    const sessionStartStr = request.cookies.get(SESSION_START_COOKIE)?.value
-    let isExpired = false
-
-    if (sessionStartStr) {
-      const sessionStart = parseInt(sessionStartStr, 10)
-      if (isNaN(sessionStart) || Date.now() - sessionStart > SIX_HOURS_IN_MS) {
-        isExpired = true
-      }
-    } else if (user.last_sign_in_at) {
-      const lastSignIn = new Date(user.last_sign_in_at).getTime()
-      if (!isNaN(lastSignIn) && Date.now() - lastSignIn > SIX_HOURS_IN_MS) {
-        isExpired = true
-      } else {
-        // Stamp session start time cookie if not already set
-        supabaseResponse.cookies.set(SESSION_START_COOKIE, (lastSignIn || Date.now()).toString(), {
-          path: '/',
-          maxAge: SIX_HOURS_IN_SECONDS,
-          httpOnly: true,
-          sameSite: 'lax',
-        })
-      }
-    } else {
-      supabaseResponse.cookies.set(SESSION_START_COOKIE, Date.now().toString(), {
-        path: '/',
-        maxAge: SIX_HOURS_IN_SECONDS,
-        httpOnly: true,
-        sameSite: 'lax',
-      })
-    }
-
-    if (isExpired) {
+    // 6-hour session expiration enforcement
+    if (isSessionExpired(request, user, supabaseResponse)) {
       await supabase.auth.signOut()
-      const url = request.nextUrl.clone()
-      const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
-      url.pathname = '/login'
-      url.search = ''
-      url.searchParams.set('reason', 'session-expired')
-      if (isProtected && nextPath !== '/hub') {
-        url.searchParams.set('next', nextPath)
-      }
-
-      const redirectResponse = NextResponse.redirect(url)
-      redirectResponse.cookies.set(SESSION_START_COOKIE, '', { path: '/', maxAge: 0 })
-      supabaseResponse.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie.name, cookie.value)
+      return redirectToLogin(request, supabaseResponse, {
+        reason: 'session-expired',
+        nextPath: isProtected && nextPath !== '/hub' ? nextPath : null,
+        clearSessionCookie: true,
       })
-      return redirectResponse
     }
-  } else {
+  } else if (request.cookies.get(SESSION_START_COOKIE)) {
     // If no authenticated user, ensure session cookie is cleared
-    if (request.cookies.get(SESSION_START_COOKIE)) {
-      supabaseResponse.cookies.set(SESSION_START_COOKIE, '', { path: '/', maxAge: 0 })
-    }
+    supabaseResponse.cookies.set(SESSION_START_COOKIE, '', { path: '/', maxAge: 0 })
   }
 
   if (!user && isProtected) {
-    const url = request.nextUrl.clone()
-    const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
-    url.pathname = '/login'
-    url.search = ''
-    if (nextPath && nextPath !== '/hub') {
-      url.searchParams.set('next', nextPath)
-    }
-
-    // Create redirect response while transferring any refreshed cookies
-    const redirectResponse = NextResponse.redirect(url)
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value)
+    return redirectToLogin(request, supabaseResponse, {
+      nextPath: nextPath && nextPath !== '/hub' ? nextPath : null,
     })
-    return redirectResponse
   }
 
   // If user is already logged in and visits /login, send them to next or /hub
-  if (user && request.nextUrl.pathname === '/login') {
+  if (user && pathname === '/login') {
     const nextParam = request.nextUrl.searchParams.get('next')
     const targetPath =
       nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/hub'
@@ -127,6 +82,60 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse
+}
+
+// True once the session is older than 6 hours (from our own start cookie, else Supabase's last sign-in).
+// Stamps the start cookie on `response` when it is missing and the session is still valid.
+function isSessionExpired(
+  request: NextRequest,
+  user: { last_sign_in_at?: string },
+  response: NextResponse
+): boolean {
+  const sessionStartStr = request.cookies.get(SESSION_START_COOKIE)?.value
+
+  if (sessionStartStr) {
+    const sessionStart = parseInt(sessionStartStr, 10)
+    return isNaN(sessionStart) || Date.now() - sessionStart > SIX_HOURS_IN_MS
+  }
+
+  if (user.last_sign_in_at) {
+    const lastSignIn = new Date(user.last_sign_in_at).getTime()
+    if (!isNaN(lastSignIn) && Date.now() - lastSignIn > SIX_HOURS_IN_MS) {
+      return true
+    }
+    // Stamp session start time cookie if not already set
+    response.cookies.set(
+      SESSION_START_COOKIE,
+      (lastSignIn || Date.now()).toString(),
+      SESSION_START_COOKIE_OPTIONS
+    )
+    return false
+  }
+
+  response.cookies.set(SESSION_START_COOKIE, Date.now().toString(), SESSION_START_COOKIE_OPTIONS)
+  return false
+}
+
+// Redirect to /login while transferring any refreshed Supabase cookies
+function redirectToLogin(
+  request: NextRequest,
+  supabaseResponse: NextResponse,
+  options: { nextPath: string | null; reason?: string; clearSessionCookie?: boolean }
+): NextResponse {
+  const url = request.nextUrl.clone()
+  url.pathname = '/login'
+  url.search = ''
+  if (options.reason) url.searchParams.set('reason', options.reason)
+  if (options.nextPath) url.searchParams.set('next', options.nextPath)
+
+  const redirectResponse = NextResponse.redirect(url)
+  if (options.clearSessionCookie) {
+    redirectResponse.cookies.set(SESSION_START_COOKIE, '', { path: '/', maxAge: 0 })
+  }
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    redirectResponse.cookies.set(cookie.name, cookie.value)
+  })
+  return redirectResponse
 }
 
 export const config = {
