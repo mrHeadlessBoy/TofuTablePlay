@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useSyncExternalStore, useCallback, useMemo } from 'react'
 import { Language, Translations } from './types'
 import { th } from './locales/th'
 import { en } from './locales/en'
@@ -18,21 +18,48 @@ const dictionaries: Record<Language, Translations> = { th, en }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(readInitialLanguage)
+/*
+ * Client-side language store.
+ * The server cannot read localStorage, so it always renders Thai. useSyncExternalStore renders that
+ * same value while hydrating and then switches to the stored choice, so there is no hydration mismatch.
+ */
+let clientLanguage: Language | null = null
+const languageListeners = new Set<() => void>()
 
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && (e.newValue === 'th' || e.newValue === 'en')) {
-        setLanguageState(e.newValue)
-      }
+function getLanguageSnapshot(): Language {
+  if (clientLanguage === null) clientLanguage = readInitialLanguage()
+  return clientLanguage
+}
+
+function getServerLanguageSnapshot(): Language {
+  return 'th'
+}
+
+function updateClientLanguage(lang: Language) {
+  clientLanguage = lang
+  languageListeners.forEach((listener) => listener())
+}
+
+// Also follows changes made in other tabs
+function subscribeToLanguage(listener: () => void) {
+  languageListeners.add(listener)
+  const handleStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY && (e.newValue === 'th' || e.newValue === 'en')) {
+      updateClientLanguage(e.newValue)
     }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [])
+  }
+  window.addEventListener('storage', handleStorage)
+  return () => {
+    languageListeners.delete(listener)
+    window.removeEventListener('storage', handleStorage)
+  }
+}
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const language = useSyncExternalStore(subscribeToLanguage, getLanguageSnapshot, getServerLanguageSnapshot)
 
   const setLanguage = useCallback((newLang: Language) => {
-    setLanguageState(newLang)
+    updateClientLanguage(newLang)
     try {
       localStorage.setItem(STORAGE_KEY, newLang)
       document.cookie = `${STORAGE_KEY}=${newLang}; path=/; max-age=31536000; SameSite=Lax`

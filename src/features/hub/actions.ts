@@ -36,7 +36,7 @@ async function writeOpeningScene(
     if (!campaign) return OPENING_FALLBACK
 
     const cookieStore = await cookies()
-    const activeLang = (language || cookieStore.get('dnd_language')?.value || 'th') as 'th' | 'en'
+    const activeLang = (language || cookieStore.get('tofu_language')?.value || 'th') as 'th' | 'en'
 
     return await generateOpeningNarrative({
       campaign,

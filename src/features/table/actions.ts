@@ -652,7 +652,7 @@ export async function resolveTurn(tableId: string, language?: 'th' | 'en') {
 
     // Generate AI Dungeon Master scene narrative
     const cookieStore = await cookies()
-    const activeLang = (language || cookieStore.get('dnd_language')?.value || 'th') as 'th' | 'en'
+    const activeLang = (language || cookieStore.get('tofu_language')?.value || 'th') as 'th' | 'en'
 
     const aiNarrative = await generateDmNarrative({
       campaign: table.campaigns,
