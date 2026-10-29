@@ -152,3 +152,36 @@ flowchart TD
 - [x] **Smooth Transitions**: All hover and interactive states use `transition-all duration-200 ease-out` or `transition-opacity`.
 - [x] **Accessibility & Contrast**: All body text retains high contrast against dark surfaces (meeting WCAG AA standards).
 - [x] **Clean Codebase**: 0 TypeScript compilation errors, 0 ESLint warnings.
+---
+
+## 4. Follow-ups from the `refactor/code-format` Review
+
+> **Context:** Branch `refactor/code-format` reformatted the codebase and split large components/functions into sub-components and helpers (no intended behavior change). The items below came out of its code review and smoke test. None of them block the merge.
+
+### 4.1 Fixed on the branch
+- [x] **Hydration mismatch on language-dependent text** (`/`, `/hub` and any page that renders `t(...)`): the server always rendered Thai while the client read the saved language from `localStorage` on its first render. `LanguageProvider` now uses `useSyncExternalStore` (Thai on the server and during hydration, then the stored choice) in `src/lib/i18n/LanguageContext.tsx`.
+- [x] **Language cookie name mismatch**: `hub/actions.ts` (`writeOpeningScene`) and `table/actions.ts` (`resolveTurn`) read the cookie `dnd_language`, but the client writes `tofu_language`. Both now read `tofu_language`.
+
+### 4.2 Housekeeping (small, optional)
+- [ ] **Ignore the format-only commit in `git blame`**: add `.git-blame-ignore-revs` containing `afb9d646fa21950e35cf63910b5cb2326d99c59b` (GitHub reads it automatically; locally run `git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+- [ ] **Rename `isSessionExpired` in `middleware.ts`**: it also stamps the `dnd_session_start` cookie when missing, so a name like `checkSessionExpiry` (with a comment on the side effect) is clearer. Behavior stays the same.
+- [ ] **Update `website_ui.md` (line 114)**: the Quick Join Bar now lives in `src/features/hub/components/QuickJoinBar.tsx`, not `HubClient.tsx`.
+- [ ] **Add Prettier in a separate PR**: trailing commas in function arguments are mixed across files. Suggested config: `{ "semi": false, "singleQuote": true, "trailingComma": "es5" }` (matches the current style: commas in objects/arrays, none in call arguments). Run it in its own commit and add that commit to `.git-blame-ignore-revs` too.
+- [ ] **Quick Join subtitle duplicates the Hub subtitle**: `QuickJoinBar.tsx` shows `t('hub.subtitle')`, the same text as `HubHeader.tsx`. Add a dedicated key (e.g. `hub.quickJoinSubtitle`) in `th.ts` / `en.ts` / `types.ts`.
+
+### 4.3 Pre-existing issues (not caused by the refactor)
+- [ ] **Rename `middleware.ts` to `proxy.ts` (Next.js 16)**: the `middleware` file name and export are deprecated in favor of `proxy` (see `node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`; a codemod exists). Re-test the 6-hour session guard afterwards.
+- [ ] **`extractTableIdentifier` can throw on a malformed link** (`src/features/hub/actions.ts`): `decodeURIComponent` runs outside the `try`, so input like `/table/%E0` throws `URIError` instead of returning "table not found". Move it inside the `try` or wrap it.
+- [ ] **(Info only) Code size grew ~11%** (19,892 → 22,091 lines in `src` + `middleware.ts`), mostly props interfaces and imports for the extracted components. No action needed.
+
+### 4.4 Smoke test checklist (manual, `bun dev`)
+- [x] `/hub` renders in TH and EN
+- [x] `/table/[id]` loads: enter-table sound, SAO orb, Party Roster, Lorebook
+- [ ] `/table/[id]`: open inspector from the orb, edit HP/condition and save, switch character (mismatch modal for an incompatible template)
+- [ ] `/table/[id]`: Dice Roller attaches a roll to the action, READY UP → 5 s countdown → AI reply with sound, badges (HP red, SP cyan, DC amber) and coloured player names
+- [ ] `/table/[id]`: Party Chat IC/OOC, unread counter
+- [ ] `/characters`: create, edit, save, delete a sheet; TemplateModal Builder / Export (`CST1.`) / Import tabs
+- [ ] `/campaigns/new` and `/campaigns/[id]/edit`: genre, rule builder, template picker + customize, add/remove lore entries, validation error on a 1-character title
+- [ ] `/campaigns/[id]`: required-template card, launch table
+- [ ] `/hub`: Quick Join by code and by `/table/...` link, copy Invite Link, collapse Public Worlds
+- [ ] `/login` and `/`: Sign in / Sign up toggle, language switch, no hydration issue in the Next.js dev overlay
