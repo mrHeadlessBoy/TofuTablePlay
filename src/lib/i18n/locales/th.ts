@@ -1,4 +1,4 @@
-import { Translations } from '../types';
+import { Translations } from '../types'
 
 export const th: Translations = {
   common: {
@@ -207,4 +207,4 @@ export const th: Translations = {
     success: 'สำเร็จ! (Success)',
     failure: 'ไม่สำเร็จ (Failure)',
   },
-};
+}

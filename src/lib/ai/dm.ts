@@ -766,7 +766,7 @@ ${overviewMiddleSection}
 *(เงื่อนไขสำคัญ: แสดงหมวดนี้เฉพาะเมื่อมีตัวละครต้องตัดสินใจหรือรับมือเหตุการณ์ในเทิร์นถัดไปเท่านั้น! หากไม่มี ให้ตัดหัวข้อ [ Decision ] ทิ้งทันที)*
 (ระบุ 1 บรรทัดต่อ 1 คน โดยเลือกใช้ชื่อค่าสถานะที่มีอยู่จริงในชีทของตัวละครคนนั้น เช่น ${dynamicStatsSummary}):
 ${decisionDiceInstructions.join('\n')}`
-  
+
   // 4. CONSTRUCT MULTI-TURN CONTENTS (Sliding Window 4 เทิร์นล่าสุด)
   const turnsWindow = recentTurns.slice(-4)
   const contents: { role: 'user' | 'model'; parts: [{ text: string }] }[] = []

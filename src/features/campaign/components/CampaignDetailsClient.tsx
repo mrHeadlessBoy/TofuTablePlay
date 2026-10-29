@@ -1,37 +1,37 @@
-'use client';
+'use client'
 
-import React from 'react';
-import Link from 'next/link';
-import { BookOpen, Lock, Play, Sliders, Plus, User, ArrowLeft } from 'lucide-react';
-import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
-import { launchTable } from '@/features/hub/actions';
-import type { CharacterTemplate } from '@/features/character/template';
-import type { CampaignRuleMechanic } from '@/features/campaign/rules';
+import React from 'react'
+import Link from 'next/link'
+import { BookOpen, Lock, Play, Sliders, Plus, User, ArrowLeft } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { LanguageToggle } from '@/components/ui/LanguageToggle'
+import { launchTable } from '@/features/hub/actions'
+import type { CharacterTemplate } from '@/features/character/template'
+import type { CampaignRuleMechanic } from '@/features/campaign/rules'
 
 type LoreEntry = {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  activation_mode: string;
-  trigger_keys: string[] | null;
-};
+  id: string
+  title: string
+  content: string
+  category: string
+  activation_mode: string
+  trigger_keys: string[] | null
+}
 
 interface CampaignDetailsClientProps {
   campaign: {
-    id: string | number;
-    title: string;
-    category: string;
-    custom_category?: string | null;
-    core_description: string;
-    world_setting: string;
-    creator_id?: string | null;
-  };
-  creatorDisplayName: string;
-  campaignTemplate: CharacterTemplate;
-  parsedRules: CampaignRuleMechanic[];
-  loreEntries: LoreEntry[];
+    id: string | number
+    title: string
+    category: string
+    custom_category?: string | null
+    core_description: string
+    world_setting: string
+    creator_id?: string | null
+  }
+  creatorDisplayName: string
+  campaignTemplate: CharacterTemplate
+  parsedRules: CampaignRuleMechanic[]
+  loreEntries: LoreEntry[]
 }
 
 export default function CampaignDetailsClient({
@@ -41,12 +41,12 @@ export default function CampaignDetailsClient({
   parsedRules,
   loreEntries,
 }: CampaignDetailsClientProps) {
-  const { t, language } = useLanguage();
+  const { t, language } = useLanguage()
 
   const categoryLabel =
     campaign.category === 'Custom' && campaign.custom_category
       ? campaign.custom_category
-      : campaign.category;
+      : campaign.category
 
   return (
     <>
@@ -274,5 +274,5 @@ export default function CampaignDetailsClient({
         )}
       </section>
     </>
-  );
+  )
 }

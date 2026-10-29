@@ -67,4 +67,3 @@ async function EditCampaignContent({ params }: { params: Promise<{ id: string }>
     />
   )
 }
-

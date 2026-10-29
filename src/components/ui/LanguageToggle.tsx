@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { Globe } from 'lucide-react';
+import React from 'react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { Globe } from 'lucide-react'
 
 export function LanguageToggle({ className = '' }: { className?: string }) {
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage } = useLanguage()
 
   return (
     <div
@@ -41,7 +41,7 @@ export function LanguageToggle({ className = '' }: { className?: string }) {
         <span>EN</span>
       </button>
     </div>
-  );
+  )
 }
 
-export default LanguageToggle;
+export default LanguageToggle

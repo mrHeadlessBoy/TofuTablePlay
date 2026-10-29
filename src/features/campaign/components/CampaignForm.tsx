@@ -716,7 +716,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
             {/* Add New Lore Entry Draft */}
             <div className="border border-dashed border-zinc-800 rounded-lg p-4 space-y-4 bg-zinc-950/40">
               <span className="text-xs font-semibold uppercase text-zinc-400">Add Lore Entry</span>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <input
@@ -772,7 +772,7 @@ export default function CampaignForm({ mode, campaignId, initial }: CampaignForm
                       }
                       value={triggerInput}
                       onChange={(e) => setTriggerInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTriggerKey(); } }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTriggerKey() } }}
                       className="flex-1 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-white"
                     />
                     <button

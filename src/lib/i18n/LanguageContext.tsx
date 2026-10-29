@@ -1,104 +1,104 @@
-'use client';
+'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Language, Translations } from './types';
-import { th } from './locales/th';
-import { en } from './locales/en';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { Language, Translations } from './types'
+import { th } from './locales/th'
+import { en } from './locales/en'
 
-const STORAGE_KEY = 'tofu_language';
+const STORAGE_KEY = 'tofu_language'
 
 interface LanguageContextValue {
-  language: Language;
-  setLanguage: (lang: Language) => void;
-  translations: Translations;
-  t: (path: string, params?: Record<string, string | number>) => string;
+  language: Language
+  setLanguage: (lang: Language) => void
+  translations: Translations
+  t: (path: string, params?: Record<string, string | number>) => string
 }
 
-const dictionaries: Record<Language, Translations> = { th, en };
+const dictionaries: Record<Language, Translations> = { th, en }
 
-const LanguageContext = createContext<LanguageContextValue | null>(null);
+const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'th';
+    if (typeof window === 'undefined') return 'th'
     try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
+      const stored = localStorage.getItem(STORAGE_KEY) as Language | null
       if (stored === 'th' || stored === 'en') {
-        return stored;
+        return stored
       }
-      const browserLang = navigator.language?.toLowerCase() || '';
+      const browserLang = navigator.language?.toLowerCase() || ''
       if (browserLang.startsWith('en')) {
-        return 'en';
+        return 'en'
       }
     } catch {
       // Ignore if localStorage unavailable
     }
-    return 'th';
-  });
+    return 'th'
+  })
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && (e.newValue === 'th' || e.newValue === 'en')) {
-        setLanguageState(e.newValue);
+        setLanguageState(e.newValue)
       }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
 
   const setLanguage = useCallback((newLang: Language) => {
-    setLanguageState(newLang);
+    setLanguageState(newLang)
     try {
-      localStorage.setItem(STORAGE_KEY, newLang);
-      document.cookie = `${STORAGE_KEY}=${newLang}; path=/; max-age=31536000; SameSite=Lax`;
+      localStorage.setItem(STORAGE_KEY, newLang)
+      document.cookie = `${STORAGE_KEY}=${newLang}; path=/; max-age=31536000; SameSite=Lax`
     } catch {
       // Ignore storage errors
     }
-  }, []);
+  }, [])
 
   const currentTranslations = useMemo(() => {
-    return dictionaries[language] || th;
-  }, [language]);
+    return dictionaries[language] || th
+  }, [language])
 
   const t = useCallback(
     (path: string, params?: Record<string, string | number>): string => {
-      const keys = path.split('.');
-      let current: unknown = currentTranslations;
+      const keys = path.split('.')
+      let current: unknown = currentTranslations
 
       for (const key of keys) {
         if (current && typeof current === 'object' && key in current) {
-          current = (current as Record<string, unknown>)[key];
+          current = (current as Record<string, unknown>)[key]
         } else {
           // Fallback to Thai dictionary if key not found in current language
-          let fallback: unknown = th;
+          let fallback: unknown = th
           for (const fbKey of keys) {
             if (fallback && typeof fallback === 'object' && fbKey in fallback) {
-              fallback = (fallback as Record<string, unknown>)[fbKey];
+              fallback = (fallback as Record<string, unknown>)[fbKey]
             } else {
-              fallback = null;
-              break;
+              fallback = null
+              break
             }
           }
-          current = fallback ?? path;
-          break;
+          current = fallback ?? path
+          break
         }
       }
 
       if (typeof current !== 'string') {
-        return path;
+        return path
       }
 
-      let result = current;
+      let result = current
       if (params) {
         for (const [pKey, pVal] of Object.entries(params)) {
-          result = result.replaceAll(`{${pKey}}`, String(pVal));
+          result = result.replaceAll(`{${pKey}}`, String(pVal))
         }
       }
 
-      return result;
+      return result
     },
     [currentTranslations]
-  );
+  )
 
   const value = useMemo(
     () => ({
@@ -108,15 +108,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       t,
     }),
     [language, setLanguage, currentTranslations, t]
-  );
+  )
 
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
 }
 
 export function useLanguage(): LanguageContextValue {
-  const context = useContext(LanguageContext);
+  const context = useContext(LanguageContext)
   if (!context) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
+    throw new Error('useLanguage must be used within a LanguageProvider')
   }
-  return context;
+  return context
 }

@@ -426,7 +426,6 @@ export function newTemplateId(): string {
   return `tpl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
-
 export function sanitizeMechanics(
   rawMech: unknown,
   resources: TemplateResource[],
@@ -815,4 +814,3 @@ export async function decodeTemplateKey(input: string): Promise<CharacterTemplat
   if (!template) throw new Error('ไม่พบโครงสร้างแผ่นตัวละครในคีย์นี้ (No sheet structure in this template key)')
   return { ...template, id: newTemplateId() }
 }
-

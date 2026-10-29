@@ -355,7 +355,6 @@ type NarrativeFeedPanelProps = {
   onReadyToggle: () => void
 }
 
-
 function formatBadgeCalculation(roll: DiceRoll): string {
   const faces =
     roll.dropped === null

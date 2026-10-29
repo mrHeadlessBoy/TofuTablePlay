@@ -151,8 +151,6 @@ export default function CharacterEditor({
   // Track whether the campaign's required template has already been loaded for this session
   const hasInitializedCampaignTemplateRef = useRef(Boolean(builtinInitial && returnToParam))
 
-
-
   const isOwner = (char: CharacterRecord) => {
     if (!currentUserId || !char.user_id) return true
     return char.user_id === currentUserId
